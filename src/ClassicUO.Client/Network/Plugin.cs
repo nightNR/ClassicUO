@@ -496,6 +496,21 @@ namespace ClassicUO.Network
             return false;
         }
 
+        internal static bool WalkTo(int x, int y, int z, int distance, bool run)
+        {
+            return Client.Game.UO?.World?.Player?.Pathfinder?.WalkTo(x, y, z, distance, run) ?? false;
+        }
+
+        internal static void StopWalk()
+        {
+            Client.Game.UO?.World?.Player?.Pathfinder?.StopAutoWalk();
+        }
+
+        internal static void OnWalkProgress(ClassicUO.Game.WalkState state)
+        {
+            Client.Game.PluginHost?.WalkProgress((int)state);
+        }
+
         internal static void Tick()
         {
             Client.Game.PluginHost?.Tick();

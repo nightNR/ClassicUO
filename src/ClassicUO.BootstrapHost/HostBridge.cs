@@ -3,6 +3,7 @@
 using System.Collections.Concurrent;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
+using ClassicUO.PluginApi;
 
 namespace ClassicUO.BootstrapHost;
 
@@ -40,12 +41,16 @@ internal sealed unsafe class HostBridge
             p.AttachHost();
     }
 
+    /// <summary>Test-only: inject a ClientBindings table without going through cuo's Initialize.</summary>
+    internal void InstallClientBindingsForTest(ClientBindings bindings) => _clientBindings = bindings;
+
     /// <summary>Test-only: drive lifecycle events without going through native callbacks.</summary>
     internal void TestRaiseConnected()    { foreach (var p in _loader.Plugins) p.RaiseConnected(); }
     internal void TestRaiseDisconnected() { foreach (var p in _loader.Plugins) p.RaiseDisconnected(); }
     internal void TestRaiseTick()         { DrainGameThreadQueue(); foreach (var p in _loader.Plugins) p.RaiseTick(); }
     internal void TestRaiseClosing()      { foreach (var p in _loader.Plugins) p.RaiseClosing(); }
     internal void TestRaisePlayerPositionChanged(int x, int y, int z) { foreach (var p in _loader.Plugins) p.RaisePlayerPositionChanged(x, y, z); }
+    internal void TestRaiseWalkProgress(int state) { foreach (var p in _loader.Plugins) p.RaiseWalkProgress((WalkState)state); }
     internal void TestRaiseMouse(int button, int wheel) { foreach (var p in _loader.Plugins) p.RaiseMouse(button, wheel); }
     internal bool TestRaiseHotkey(int key, int mod, bool pressed)
     {
@@ -144,6 +149,7 @@ internal sealed unsafe class HostBridge
         UpdatePlayerPosFn = (nint)(delegate* unmanaged[Cdecl]<int, int, int, void>)     &OnUpdatePlayerPos,
         PacketInFn        = (nint)(delegate* unmanaged[Cdecl]<nint, int*, byte>)        &OnPacketIn,
         PacketOutFn       = (nint)(delegate* unmanaged[Cdecl]<nint, int*, byte>)        &OnPacketOut,
+        WalkProgressFn    = (nint)(delegate* unmanaged[Cdecl]<int, void>)               &OnWalkProgress,
     };
 
     // ─── cuo → host callbacks ────────────────────────────────────────────────
@@ -195,6 +201,10 @@ internal sealed unsafe class HostBridge
     [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
     private static void OnUpdatePlayerPos(int x, int y, int z)
         => _instance?.RaiseEachPlugin(p => p.RaisePlayerPositionChanged(x, y, z));
+
+    [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
+    private static void OnWalkProgress(int state)
+        => _instance?.RaiseEachPlugin(p => p.RaiseWalkProgress((WalkState)state));
 
     [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
     private static byte OnPacketIn(nint data, int* lengthRef)
@@ -309,6 +319,7 @@ internal struct HostBindings
     public nint UpdatePlayerPosFn;
     public nint PacketInFn;
     public nint PacketOutFn;
+    public nint WalkProgressFn;
 }
 
 [StructLayout(LayoutKind.Sequential)]
@@ -323,4 +334,6 @@ internal struct ClientBindings
     public nint RequestMoveFn;         // bool(int dir, bool run)
     public nint GetPlayerPositionFn;   // bool(out int x, out int y, out int z)
     public nint ReflectionCmdFn;       // legacy reflection commands; unused by v2
+    public nint WalkToFn;              // bool(int x, int y, int z, int distance, byte run)
+    public nint StopWalkFn;            // void()
 }

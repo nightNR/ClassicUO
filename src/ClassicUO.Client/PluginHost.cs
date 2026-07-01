@@ -29,6 +29,7 @@ namespace ClassicUO
         public IntPtr /*delegate*<int, int, int, void>*/ UpdatePlayerPosFn;
         public IntPtr PacketInFn;
         public IntPtr PacketOutFn;
+        public IntPtr /*delegate*<int, void>*/ WalkProgressFn;
     }
 
     [StructLayout(LayoutKind.Sequential)]
@@ -43,6 +44,8 @@ namespace ClassicUO
         public IntPtr /*delegate*<int, bool, bool>*/ RequestMoveFn;
         public IntPtr /*delegate*<ref int, ref int, ref int, bool>*/ GetPlayerPositionFn;
         public IntPtr ReflectionCmdFn;
+        public IntPtr /*delegate*<int, int, int, int, bool, bool>*/ WalkToFn;
+        public IntPtr /*delegate*<void>*/ StopWalkFn;
     }
 
     internal unsafe sealed class UnmanagedAssistantHost : IPluginHost
@@ -93,6 +96,11 @@ namespace ClassicUO
         private readonly dOnUpdatePlayerPosition _updatePlayerPos;
 
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        delegate void dOnWalkProgress(int state);
+        [MarshalAs(UnmanagedType.FunctionPtr)]
+        private readonly dOnWalkProgress _walkProgress;
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         delegate void dOnPluginFocusWindow();
         [MarshalAs(UnmanagedType.FunctionPtr)]
         private readonly dOnPluginFocusWindow _focusGained, _focusLost;
@@ -119,6 +127,7 @@ namespace ClassicUO
             _hotkey = Marshal.GetDelegateForFunctionPointer<dOnHotkey>(setup->HotkeyFn);
             _mouse = Marshal.GetDelegateForFunctionPointer<dOnMouse>(setup->MouseFn);
             _updatePlayerPos = Marshal.GetDelegateForFunctionPointer<dOnUpdatePlayerPosition>(setup->UpdatePlayerPosFn);
+            _walkProgress = Marshal.GetDelegateForFunctionPointer<dOnWalkProgress>(setup->WalkProgressFn);
             _focusGained = Marshal.GetDelegateForFunctionPointer<dOnPluginFocusWindow>(setup->FocusGainedFn);
             _focusLost = Marshal.GetDelegateForFunctionPointer<dOnPluginFocusWindow>(setup->FocusLostFn);
             _sdlEvent = Marshal.GetDelegateForFunctionPointer<dOnPluginSdlEvent>(setup->SdlEventFn);
@@ -200,6 +209,16 @@ namespace ClassicUO
         private readonly dRequestMove _requestMove = Plugin.RequestMove;
 
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        delegate bool dWalkTo(int x, int y, int z, int distance, bool run);
+        [MarshalAs(UnmanagedType.FunctionPtr)]
+        private readonly dWalkTo _walkTo = Plugin.WalkTo;
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        delegate void dStopWalk();
+        [MarshalAs(UnmanagedType.FunctionPtr)]
+        private readonly dStopWalk _stopWalk = Plugin.StopWalk;
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         delegate bool dPacketRecvSend(IntPtr data, ref int length);
         [MarshalAs(UnmanagedType.FunctionPtr)]
         private readonly dPacketRecvSend _sendToClient = Plugin.OnPluginRecv_new;
@@ -260,7 +279,7 @@ namespace ClassicUO
                     break;
                 case 4:
                     var args = Unsafe.AsRef<(int, int, int, int, int)>(cmd.ToPointer());
-                    bool started = Client.Game.UO?.World?.Player?.Pathfinder?.WalkTo(args.Item2, args.Item3, args.Item4, args.Item5) ?? false;
+                    bool started = Client.Game.UO?.World?.Player?.Pathfinder?.WalkTo(args.Item2, args.Item3, args.Item4, args.Item5, false) ?? false;
                     return (IntPtr)Unsafe.AsPointer(ref started);
             }
 
@@ -282,6 +301,8 @@ namespace ClassicUO
             cuoHost.RequestMoveFn = Marshal.GetFunctionPointerForDelegate(_requestMove);
             cuoHost.GetPlayerPositionFn = Marshal.GetFunctionPointerForDelegate(_getPlayerPosition);
             cuoHost.ReflectionCmdFn = Marshal.GetFunctionPointerForDelegate(_reflectionCmd);
+            cuoHost.WalkToFn = Marshal.GetFunctionPointerForDelegate(_walkTo);
+            cuoHost.StopWalkFn = Marshal.GetFunctionPointerForDelegate(_stopWalk);
 
             _initialize((IntPtr)mem);
         }
@@ -343,6 +364,11 @@ namespace ClassicUO
         {
             _updatePlayerPos?.Invoke(x, y, z);
         }
+
+        public void WalkProgress(int state)
+        {
+            _walkProgress?.Invoke(state);
+        }
     }
 
     interface IPluginHost
@@ -362,6 +388,7 @@ namespace ClassicUO
         public void GetCommandList(out IntPtr listPtr, out int listCount);
         public unsafe int SdlEvent(SDL3.SDL.SDL_Event* ev);
         public void UpdatePlayerPosition(int x, int y, int z);
+        public void WalkProgress(int state);
         public bool PacketIn(ArraySegment<byte> buffer);
         public bool PacketOut(Span<byte> buffer);
     }

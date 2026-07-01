@@ -61,6 +61,7 @@ namespace ClassicUO
             IsFixedTimeStep = false; // Settings.GlobalSettings.FixedTimeStep;
             TargetElapsedTime = TimeSpan.FromMilliseconds(1000.0 / 250.0);
             PluginHost = pluginHost;
+            ClassicUO.Game.Pathfinder.WalkProgress += ClassicUO.Network.Plugin.OnWalkProgress;
         }
 
         public Scene Scene { get; private set; }

@@ -71,6 +71,7 @@ internal sealed class PluginContextImpl : IPluginContext
     public void RaiseFocusGained()           => FocusGained?.Invoke();
     public void RaiseFocusLost()             => FocusLost?.Invoke();
     public void RaisePlayerPositionChanged(int x, int y, int z) => PlayerPositionChanged?.Invoke(x, y, z);
+    public void RaiseWalkProgress(WalkState state) => _actions.RaiseWalkProgress(state);
     public void RaiseTick()                  => Tick?.Invoke();
     public void RaiseClosing()               => Closing?.Invoke();
     public void RaiseMouse(int button, int wheel) => _input.RaiseMouse(button, wheel);
@@ -182,6 +183,28 @@ internal sealed class GameActionsImpl : IGameActions
         x = xx; y = yy; z = zz;
         return ok;
     }
+
+    public unsafe bool WalkTo(int x, int y, int z, int distance, bool run)
+    {
+        var fn = _bridge.ClientBindings.WalkToFn;
+        if (fn == 0) return false;
+        if (!_bridge.IsGameThread)
+            throw new InvalidOperationException("WalkTo must be called from the game thread; use IDispatcher.Post.");
+        return ((delegate* unmanaged[Cdecl]<int, int, int, int, byte, byte>)fn)(x, y, z, distance, run ? (byte)1 : (byte)0) != 0;
+    }
+
+    public unsafe void StopWalk()
+    {
+        var fn = _bridge.ClientBindings.StopWalkFn;
+        if (fn == 0) return;
+        if (_bridge.IsGameThread)
+            ((delegate* unmanaged[Cdecl]<void>)fn)();
+        else
+            _bridge.PostToGameThread(() => ((delegate* unmanaged[Cdecl]<void>)fn)());
+    }
+
+    public event Action<WalkState>? WalkProgress;
+    internal void RaiseWalkProgress(WalkState state) => WalkProgress?.Invoke(state);
 }
 
 internal sealed class ClientImpl : IClient

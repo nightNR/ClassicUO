@@ -12,6 +12,7 @@ namespace ClassicUO.BootstrapHost.Tests;
 /// <see cref="HostBridge"/>'s test-only hooks, and asserts against the
 /// sample plugin's log file.
 /// </summary>
+[Collection("BootstrapHost")]
 public sealed class SmokeTests : IDisposable
 {
     private readonly string _tempRoot;
@@ -103,6 +104,17 @@ public sealed class SmokeTests : IDisposable
         log.Should().Contain("PacketIn:len=2,id=0x99");
     }
 
+    [Fact]
+    public void WalkProgress_event_reaches_the_plugin()
+    {
+        var bridge = new HostBridge();
+        bridge.LoadPluginsForTest(_pluginsRoot);
+
+        bridge.TestRaiseWalkProgress((int)ClassicUO.PluginApi.WalkState.Blocked);
+
+        ReadLog().Should().Contain("Walk:Blocked");
+    }
+
     private string ReadLog()
     {
         if (!File.Exists(_logPath)) return string.Empty;
@@ -110,3 +122,6 @@ public sealed class SmokeTests : IDisposable
         return File.ReadAllText(_logPath);
     }
 }
+
+[CollectionDefinition("BootstrapHost", DisableParallelization = true)]
+public sealed class BootstrapHostCollection { }

@@ -12,6 +12,16 @@ using MathHelper = ClassicUO.Utility.MathHelper;
 
 namespace ClassicUO.Game
 {
+    /// <summary>State of an auto-walk. Mirrors ClassicUO.PluginApi.WalkState
+    /// (same ordinals); the int value crosses the plugin FFI boundary.</summary>
+    internal enum WalkState
+    {
+        Walking,
+        Arrived,
+        Blocked,
+        Stopped,
+    }
+
     internal sealed class Pathfinder
     {
         private const int PATHFINDER_MAX_NODES = 10000;
@@ -47,6 +57,10 @@ namespace ClassicUO.Game
         public bool AutoWalking { get; set; }
 
         public bool PathindingCanBeCancelled { get; set; }
+
+        /// <summary>Raised on auto-walk state transitions (game thread). The
+        /// plugin bridge subscribes; see GameController / Network.Plugin.</summary>
+        internal static event Action<WalkState> WalkProgress;
 
         public bool BlockMoving { get; set; }
 
@@ -927,7 +941,7 @@ namespace ClassicUO.Game
             return true;
         }
 
-        public bool WalkTo(int x, int y, int z, int distance)
+        public bool WalkTo(int x, int y, int z, int distance, bool run)
         {
             if (_world.Player == null /*|| World.Player.Stamina == 0*/ || _world.Player.IsParalyzed)
             {
@@ -979,12 +993,14 @@ namespace ClassicUO.Game
             _pathfindDistance = distance;
             _pathSize = 0;
             PathindingCanBeCancelled = true;
-            StopAutoWalk();
+            ResetAutoWalk();
+            _run = run;
             AutoWalking = true;
 
             if (FindPath(PATHFINDER_MAX_NODES))
             {
                 _pointIndex = 1;
+                RaiseWalkProgress(WalkState.Walking);
                 ProcessAutoWalk();
             }
             else
@@ -1019,21 +1035,37 @@ namespace ClassicUO.Game
 
                     if (!_world.Player.Walk((Direction) p.Direction, _run))
                     {
-                        StopAutoWalk();
+                        EndAutoWalk(WalkState.Blocked);
                     }
                 }
                 else
                 {
-                    StopAutoWalk();
+                    EndAutoWalk(WalkState.Arrived);
                 }
             }
         }
 
         public void StopAutoWalk()
         {
+            EndAutoWalk(WalkState.Stopped);
+        }
+
+        internal void ResetAutoWalk()
+        {
             AutoWalking = false;
             _run = false;
             _pathSize = 0;
+        }
+
+        internal void EndAutoWalk(WalkState reason)
+        {
+            ResetAutoWalk();
+            RaiseWalkProgress(reason);
+        }
+
+        private static void RaiseWalkProgress(WalkState reason)
+        {
+            WalkProgress?.Invoke(reason);
         }
 
         private enum PATH_STEP_STATE

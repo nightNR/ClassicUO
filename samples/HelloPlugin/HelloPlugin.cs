@@ -44,10 +44,16 @@ public sealed class HelloPlugin : IPlugin
     private string? _logPath;
     private readonly object _logLock = new();
 
+    private IPluginContext? _ctx;
+    private int _retries;
+    private (int x, int y, int z, int dist, bool run) _goal;
+    private const int MaxRetries = 5;
+
     public void OnInitialize(IPluginContext context)
     {
         _logPath = Environment.GetEnvironmentVariable("CUO_PLUGIN_TEST_LOG");
         Log("OnInitialize");
+        _ctx = context;
 
         context.Connected             += () => Log("Connected");
         context.Disconnected          += () => Log("Disconnected");
@@ -56,6 +62,29 @@ public sealed class HelloPlugin : IPlugin
         context.PlayerPositionChanged += (x, y, z) => Log($"Pos:{x},{y},{z}");
         context.Tick                  += () => Log("Tick");
         context.Closing               += () => Log("Closing");
+
+        context.Actions.WalkProgress  += state => Log($"Walk:{state}");
+
+        if (Environment.GetEnvironmentVariable("CUO_PLUGIN_WALK_DEMO") is { Length: > 0 } target
+            && TryParseGoal(target, out _goal))
+        {
+            context.Connected += () => context.Game.Post(() =>
+            {
+                _retries = 0;
+                Log($"WalkDemo:start {_goal.x},{_goal.y},{_goal.z} dist={_goal.dist} run={_goal.run}");
+                _ctx!.Actions.WalkTo(_goal.x, _goal.y, _goal.z, _goal.dist, _goal.run);
+            });
+
+            context.Actions.WalkProgress += state =>
+            {
+                if (state == ClassicUO.PluginApi.WalkState.Blocked && _retries++ < MaxRetries)
+                {
+                    Log($"WalkDemo:reroute attempt={_retries}");
+                    _ctx!.Game.Post(() =>
+                        _ctx!.Actions.WalkTo(_goal.x, _goal.y, _goal.z, _goal.dist, _goal.run));
+                }
+            };
+        }
 
         context.Input.Mouse  += (button, wheel) => Log($"Mouse:{button}/{wheel}");
         context.Input.Hotkey += (key, mod, pressed) =>
@@ -74,6 +103,20 @@ public sealed class HelloPlugin : IPlugin
     }
 
     public void OnShutdown() => Log("OnShutdown");
+
+    // "x,y,z,dist,run" e.g. "1450,1670,0,1,true"
+    private static bool TryParseGoal(string s, out (int x, int y, int z, int dist, bool run) goal)
+    {
+        goal = default;
+        var p = s.Split(',');
+        if (p.Length != 5) return false;
+        if (!int.TryParse(p[0], out var x) || !int.TryParse(p[1], out var y) ||
+            !int.TryParse(p[2], out var z) || !int.TryParse(p[3], out var d) ||
+            !bool.TryParse(p[4], out var run))
+            return false;
+        goal = (x, y, z, d, run);
+        return true;
+    }
 
     private void Log(string line)
     {

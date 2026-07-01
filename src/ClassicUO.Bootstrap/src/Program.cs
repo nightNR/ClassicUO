@@ -124,6 +124,9 @@ sealed class ClassicUOHost : IPluginHandler
     delegate bool dOnUpdatePlayerPosition(int x, int y, int z);
 
     [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+    delegate void dOnWalkProgress(int state);
+
+    [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
     delegate void dOnPluginFocusWindow();
 
     [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
@@ -142,6 +145,7 @@ sealed class ClassicUOHost : IPluginHandler
     private readonly FuncPointer<dOnHotkey> _hotkeyPluginDel;
     private readonly FuncPointer<dOnMouse> _mousePluginDel;
     private readonly FuncPointer<OnUpdatePlayerPosition> _updatePlayerPosDel;
+    private readonly FuncPointer<dOnWalkProgress> _walkProgressDel;
     private readonly FuncPointer<dOnPluginFocusWindow> _focusGainedDel, _focusLostDel;
     private readonly FuncPointer<dOnPluginSdlEvent> _sdlEventDel;
     private readonly FuncPointer<dOnPluginCommandList> _cmdListDel;
@@ -160,6 +164,7 @@ sealed class ClassicUOHost : IPluginHandler
         _hotkeyPluginDel = new FuncPointer<dOnHotkey>(HotkeyPlugin);
         _mousePluginDel = new FuncPointer<dOnMouse>(MousePlugin);
         _updatePlayerPosDel = new FuncPointer<OnUpdatePlayerPosition>(UpdatePlayerPosition);
+        _walkProgressDel = new FuncPointer<dOnWalkProgress>(WalkProgress);
         _focusGainedDel = new FuncPointer<dOnPluginFocusWindow>(FocusGained);
         _focusLostDel = new FuncPointer<dOnPluginFocusWindow>(FocusLost);
         _sdlEventDel = new FuncPointer<dOnPluginSdlEvent>(SdlEvent);
@@ -226,6 +231,7 @@ sealed class ClassicUOHost : IPluginHandler
             hostSetup.HotkeyFn = _hotkeyPluginDel.Pointer;
             hostSetup.MouseFn = _mousePluginDel.Pointer;
             hostSetup.UpdatePlayerPosFn = _updatePlayerPosDel.Pointer;
+            hostSetup.WalkProgressFn = _walkProgressDel.Pointer;
             hostSetup.FocusGainedFn = _focusGainedDel.Pointer;
             hostSetup.FocusLostFn = _focusLostDel.Pointer;
             hostSetup.SdlEventFn = _sdlEventDel.Pointer;
@@ -310,6 +316,13 @@ sealed class ClassicUOHost : IPluginHandler
     {
         foreach (var plugin in _plugins)
             plugin.UpdatePlayerPosition(x, y, z);
+    }
+
+    void WalkProgress(int state)
+    {
+        // The legacy razor host has no v2 WalkProgress consumers. This no-op
+        // keeps the HostBindings function-pointer table fully populated so
+        // cuo can bind WalkProgressFn unconditionally (matching UpdatePlayerPos).
     }
 
     void FocusGained()
@@ -544,6 +557,7 @@ unsafe struct HostBindings
     public IntPtr /*delegate*<int, int, int, void>*/ UpdatePlayerPosFn;
     public IntPtr PacketInFn;
     public IntPtr PacketOutFn;
+    public IntPtr /*delegate*<int, void>*/ WalkProgressFn;
 }
 
 [StructLayout(LayoutKind.Sequential)]

@@ -786,7 +786,7 @@ namespace ClassicUO.Game.Scenes
                     }
                     else if (distance > 3)
                     {
-                        _world.Player.Pathfinder.WalkTo(follow.X, follow.Y, follow.Z, 1);
+                        _world.Player.Pathfinder.WalkTo(follow.X, follow.Y, follow.Z, 1, false);
                     }
                 }
                 else
