@@ -53,7 +53,7 @@ namespace ClassicUO.Game.UI.Gumps
 
 
         //counters
-        private Checkbox _enableCounters, _highlightOnChange, _highlightOnAmount, _enableAbbreviatedAmount;
+        private Checkbox _enableCounters, _highlightOnChange, _highlightOnAmount, _enableAbbreviatedAmount, _useFixedGridCheckbox;
         private Checkbox _enableDragSelect, _dragSelectHumanoidsOnly, _dragSelectHostileOnly;
 
         // sounds
@@ -3142,6 +3142,53 @@ namespace ClassicUO.Game.UI.Gumps
                 80
             );
 
+            startX = 5;
+            startX += 40;
+            startY += 40;
+
+            _useFixedGridCheckbox = AddCheckBox
+            (
+                rightArea,
+                ResGumps.CounterUseFixedGrid,
+                _currentProfile.CounterBarUseFixedGrid,
+                startX,
+                startY
+            );
+
+            startY += _useFixedGridCheckbox.Height + 2;
+
+            _rows = AddInputField
+            (
+                rightArea,
+                startX,
+                startY,
+                50,
+                TEXTBOX_HEIGHT,
+                ResGumps.CounterRows,
+                50,
+                false,
+                true,
+                3
+            );
+            _rows.SetText(_currentProfile.CounterBarRows.ToString());
+
+            startX += 120;
+
+            _columns = AddInputField
+            (
+                rightArea,
+                startX,
+                startY,
+                50,
+                TEXTBOX_HEIGHT,
+                ResGumps.CounterColumns,
+                50,
+                false,
+                true,
+                3
+            );
+            _columns.SetText(_currentProfile.CounterBarColumns.ToString());
+
             Add(rightArea, PAGE);
         }
 
@@ -3773,8 +3820,9 @@ namespace ClassicUO.Game.UI.Gumps
                     _enableCounters.IsChecked = false;
                     _highlightOnChange.IsChecked = false;
                     _enableAbbreviatedAmount.IsChecked = false;
-                    _columns.SetText("1");
-                    _rows.SetText("1");
+                    _useFixedGridCheckbox.IsChecked = false;
+                    _columns.SetText("10");
+                    _rows.SetText("3");
                     _cellSize.Value = 40;
                     _highlightOnAmount.IsChecked = false;
                     _highlightAmount.SetText("5");
@@ -4207,6 +4255,24 @@ namespace ClassicUO.Game.UI.Gumps
             _currentProfile.CounterBarHighlightOnAmount = _highlightOnAmount.IsChecked;
             _currentProfile.CounterBarDisplayAbbreviatedAmount = _enableAbbreviatedAmount.IsChecked;
 
+            bool useFixedGrid = _useFixedGridCheckbox.IsChecked;
+
+            if (!int.TryParse(_rows.Text, out int gridRows) || gridRows < 1)
+            {
+                gridRows = 3;
+                _rows.SetText("3");
+            }
+
+            if (!int.TryParse(_columns.Text, out int gridCols) || gridCols < 1)
+            {
+                gridCols = 10;
+                _columns.SetText("10");
+            }
+
+            _currentProfile.CounterBarUseFixedGrid = useFixedGrid;
+            _currentProfile.CounterBarRows = gridRows;
+            _currentProfile.CounterBarColumns = gridCols;
+
             CounterBarGump counterGump = UIManager.GetGump<CounterBarGump>();
 
             if (before != _currentProfile.CounterBarEnabled)
@@ -4230,11 +4296,13 @@ namespace ClassicUO.Game.UI.Gumps
                 else
                 {
                     counterGump.IsEnabled = counterGump.IsVisible = _currentProfile.CounterBarEnabled;
+                    counterGump.ApplyGridSettings(useFixedGrid, gridRows, gridCols);
                 }
             }
             else if (counterGump != null)
             {
                 counterGump.SetCellSize(_currentProfile.CounterBarCellSize);
+                counterGump.ApplyGridSettings(useFixedGrid, gridRows, gridCols);
             }
 
             // experimental

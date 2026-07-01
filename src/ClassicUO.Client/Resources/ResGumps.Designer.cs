@@ -572,7 +572,34 @@ namespace ClassicUO.Resources {
                 return ResourceManager.GetString("CellSize", resourceCulture);
             }
         }
-        
+
+        /// <summary>
+        ///   Looks up a localized string similar to Use fixed grid (locks resize).
+        /// </summary>
+        public static string CounterUseFixedGrid {
+            get {
+                return ResourceManager.GetString("CounterUseFixedGrid", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Rows:.
+        /// </summary>
+        public static string CounterRows {
+            get {
+                return ResourceManager.GetString("CounterRows", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Columns:.
+        /// </summary>
+        public static string CounterColumns {
+            get {
+                return ResourceManager.GetString("CounterColumns", resourceCulture);
+            }
+        }
+
         /// <summary>
         ///   Looks up a localized string similar to Changing language needs restart to take effect.
         /// </summary>

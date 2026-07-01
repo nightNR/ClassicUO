@@ -657,6 +657,15 @@ when amount is or exceeds</value>
   <data name="CellSize" xml:space="preserve">
     <value>Cell size:</value>
   </data>
+  <data name="CounterUseFixedGrid" xml:space="preserve">
+    <value>Use fixed grid (locks resize)</value>
+  </data>
+  <data name="CounterRows" xml:space="preserve">
+    <value>Rows:</value>
+  </data>
+  <data name="CounterColumns" xml:space="preserve">
+    <value>Columns:</value>
+  </data>
   <data name="DisableDefaultUOHotkeys" xml:space="preserve">
     <value>Disable default UO hotkeys</value>
   </data>
