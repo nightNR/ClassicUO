@@ -31,6 +31,13 @@ namespace ClassicUO.Game.UI.Gumps
         private int _rectSize;
         private ScissorControl _scissor;
 
+        private bool _useFixedGrid;
+        private int _rows = 3;
+        private int _cols = 10;
+        private int _scrollOffset;
+        private int _freeWidth = 200;
+        private int _freeHeight = 80;
+
         public bool ReadOnly
         {
             get => !ShowBorder;
@@ -53,6 +60,11 @@ namespace ClassicUO.Game.UI.Gumps
 
         private void SnapToGrid()
         {
+            if (_useFixedGrid)
+            {
+                return;
+            }
+
             int desiredWidth = Width;
             int desiredHeight = Height;
 
@@ -68,6 +80,47 @@ namespace ClassicUO.Game.UI.Gumps
             {
                 ResizeWindow(new Point(desiredWidth - tooWide, desiredHeight - tooHigh));
             }
+        }
+
+        public void ApplyGridSettings(bool useFixed, int rows, int cols)
+        {
+            rows = Math.Max(1, rows);
+            cols = Math.Max(1, cols);
+
+            // Entering fixed mode: remember the current free-resize size so we
+            // can restore it when the grid is turned back off.
+            if (useFixed && !_useFixedGrid)
+            {
+                _freeWidth = Width;
+                _freeHeight = Height;
+            }
+
+            _useFixedGrid = useFixed;
+            _rows = rows;
+            _cols = cols;
+
+            if (useFixed)
+            {
+                ResizeEnabled = false;
+
+                var (w, h) = CounterBarGridMath.GridPixelSize(rows, cols, _rectSize, BoderSize);
+                Point size = ResizeWindow(new Point(w, h));
+                Width = size.X;
+                Height = size.Y;
+            }
+            else
+            {
+                ResizeEnabled = true;
+                _scrollOffset = 0;
+
+                int w = _freeWidth > 0 ? _freeWidth : 200;
+                int h = _freeHeight > 0 ? _freeHeight : 80;
+                Point size = ResizeWindow(new Point(w, h));
+                Width = size.X;
+                Height = size.Y;
+            }
+
+            OnResize(); // calls SetupLayout
         }
 
         private ContextMenuControl ConfigureContextMenu(ContextMenuControl control)
@@ -132,8 +185,15 @@ namespace ClassicUO.Game.UI.Gumps
                 MinH = size + BoderSize * 2;
                 MinW = size + BoderSize * 2;
 
-                SnapToGrid();
-                SetupLayout();
+                if (_useFixedGrid)
+                {
+                    ApplyGridSettings(true, _rows, _cols);
+                }
+                else
+                {
+                    SnapToGrid();
+                    SetupLayout();
+                }
             }
         }
 
@@ -231,6 +291,28 @@ namespace ClassicUO.Game.UI.Gumps
                 _helpTextLabel = null;
             }
 
+            if (_useFixedGrid)
+            {
+                for (int i = 0; i < _dataBox.Children.Count; i++)
+                {
+                    CounterItem c = _dataBox.Children[i] as CounterItem;
+                    if (c == null || c.IsDisposed)
+                    {
+                        continue;
+                    }
+
+                    int col = i % _cols;
+                    int row = i / _cols;
+
+                    c.X = col * _rectSize + BORDER_LEFT;
+                    c.Y = (row - _scrollOffset) * _rectSize + BORDER_TOP;
+                    c.Width = _rectSize - BORDER_LEFT - BORDER_RIGHT;
+                    c.Height = _rectSize - BORDER_TOP - BORDER_BOTTOM;
+                }
+
+                return;
+            }
+
             for (int i = 0; i < _dataBox.Children.Count; i++)
             {
                 CounterItem c = _dataBox.Children[i] as CounterItem;
@@ -287,6 +369,32 @@ namespace ClassicUO.Game.UI.Gumps
             base.OnMouseUp(x, y, button);
         }
 
+        protected override void OnMouseWheel(Input.MouseEventType delta)
+        {
+            if (!_useFixedGrid)
+            {
+                return;
+            }
+
+            int maxScroll = CounterBarGridMath.MaxScroll(_dataBox.Children.Count, _rows, _cols);
+
+            if (delta == Input.MouseEventType.WheelScrollUp)
+            {
+                _scrollOffset--;
+            }
+            else if (delta == Input.MouseEventType.WheelScrollDown)
+            {
+                _scrollOffset++;
+            }
+            else
+            {
+                return;
+            }
+
+            _scrollOffset = Math.Clamp(_scrollOffset, 0, maxScroll);
+            SetupLayout();
+        }
+
         internal void UseSlot(string slotString)
         {
             if (!string.IsNullOrEmpty(slotString) && ushort.TryParse(slotString, out ushort slot))
@@ -317,6 +425,11 @@ namespace ClassicUO.Game.UI.Gumps
             writer.WriteAttributeString("width", Width.ToString());
             writer.WriteAttributeString("height", Height.ToString());
             writer.WriteAttributeString("readonly", ReadOnly.ToString());
+            writer.WriteAttributeString("usefixedgrid", _useFixedGrid.ToString());
+            writer.WriteAttributeString("rows", _rows.ToString());
+            writer.WriteAttributeString("cols", _cols.ToString());
+            writer.WriteAttributeString("freewidth", _freeWidth.ToString());
+            writer.WriteAttributeString("freeheight", _freeHeight.ToString());
 
             IEnumerable<CounterItem> controls = FindControls<CounterItem>();
 
@@ -373,6 +486,28 @@ namespace ClassicUO.Game.UI.Gumps
                 ReadOnly = isReadOnly;
             }
 
+            bool.TryParse(xml.GetAttribute("usefixedgrid"), out bool useFixedGrid);
+
+            if (!int.TryParse(xml.GetAttribute("rows"), out int gridRows))
+            {
+                gridRows = 3;
+            }
+
+            if (!int.TryParse(xml.GetAttribute("cols"), out int gridCols))
+            {
+                gridCols = 10;
+            }
+
+            if (!int.TryParse(xml.GetAttribute("freewidth"), out int freeWidth))
+            {
+                freeWidth = width;
+            }
+
+            if (!int.TryParse(xml.GetAttribute("freeheight"), out int freeHeight))
+            {
+                freeHeight = height;
+            }
+
             BuildGump();
 
             XmlElement controlsXml = xml["controls"];
@@ -405,9 +540,14 @@ namespace ClassicUO.Game.UI.Gumps
 
             // resize only after items have been added
             // because an empty counter bar will always receive a minimum width for the help text
-            ResizeWindow(new Point(width, height));
+            Point size = ResizeWindow(new Point(width, height));
+            Width = size.X;
+            Height = size.Y;
 
-            SetupLayout();
+            _freeWidth = freeWidth;
+            _freeHeight = freeHeight;
+
+            ApplyGridSettings(useFixedGrid, gridRows, gridCols);
         }
     }
 }
