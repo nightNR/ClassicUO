@@ -24,6 +24,7 @@ namespace ClassicUO.Game
         private readonly EffectManager _effectManager;
         private readonly List<uint> _toRemove = new List<uint>();
         private uint _timeToDelete;
+        private RegionMapProvider _regionMapProvider;
 
         public World()
         {
@@ -157,6 +158,7 @@ namespace ClassicUO.Game
 
                         Client.Game.UO.FileManager.Maps.LoadMap(value, ClientFeatures.Flags.HasFlag(CharacterListFlags.CLF_UNLOCK_FELUCCA_AREAS));
                         Map = new Map.Map(this, value);
+                        EnsureRegionMap(value);
 
                         Player.SetInWorldTile(x, y, z);
                         Player.ClearSteps();
@@ -165,6 +167,7 @@ namespace ClassicUO.Game
                     {
                         Client.Game.UO.FileManager.Maps.LoadMap(value, ClientFeatures.Flags.HasFlag(CharacterListFlags.CLF_UNLOCK_FELUCCA_AREAS));
                         Map = new Map.Map(this, value);
+                        EnsureRegionMap(value);
                     }
 
                     // force cursor update when switching map
@@ -194,7 +197,28 @@ namespace ClassicUO.Game
 
         public string ServerName { get; set; } = "_";
 
+        internal RegionMap RegionMap
+        {
+            get
+            {
+                RegionMap m = _regionMapProvider?.Current;
+                return m != null && m.Facet == MapIndex ? m : null;
+            }
+        }
 
+        private void EnsureRegionMap(int facet)
+        {
+            if (facet < 0)
+            {
+                return;
+            }
+
+            _regionMapProvider ??= new RegionMapProvider(
+                Client.Game.UO.FileManager,
+                System.IO.Path.Combine(ClassicUO.CUOEnviroment.ExecutablePath, "Data", "regioncache"));
+
+            _regionMapProvider.EnsureFor(facet);
+        }
 
         public void CreatePlayer(uint serial)
         {
