@@ -4281,16 +4281,16 @@ namespace ClassicUO.Game.UI.Gumps
                 {
                     if (_currentProfile.CounterBarEnabled)
                     {
-                        UIManager.Add
+                        CounterBarGump newCounterGump = new CounterBarGump
                         (
-                            new CounterBarGump
-                            (
-                                World,
-                                200,
-                                200,
-                                _currentProfile.CounterBarCellSize
-                            )
+                            World,
+                            200,
+                            200,
+                            _currentProfile.CounterBarCellSize
                         );
+
+                        UIManager.Add(newCounterGump);
+                        newCounterGump.ApplyGridSettings(useFixedGrid, gridRows, gridCols);
                     }
                 }
                 else

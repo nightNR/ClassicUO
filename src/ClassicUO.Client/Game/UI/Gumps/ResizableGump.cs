@@ -80,7 +80,7 @@ namespace ClassicUO.Game.UI.Gumps
         public bool ShowBorder
         {
             get => _borderControl.IsVisible;
-            set => _borderControl.IsVisible = _button.IsVisible = value;
+            set { _borderControl.IsVisible = value; _button.IsVisible = value && _resizeEnabled; }
         }
 
         protected bool ResizeEnabled

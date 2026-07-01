@@ -293,6 +293,8 @@ namespace ClassicUO.Game.UI.Gumps
 
             if (_useFixedGrid)
             {
+                _scrollOffset = Math.Clamp(_scrollOffset, 0, CounterBarGridMath.MaxScroll(_dataBox.Children.Count, _rows, _cols));
+
                 for (int i = 0; i < _dataBox.Children.Count; i++)
                 {
                     CounterItem c = _dataBox.Children[i] as CounterItem;
