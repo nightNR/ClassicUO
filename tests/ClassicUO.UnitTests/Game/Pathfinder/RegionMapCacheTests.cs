@@ -44,5 +44,25 @@ namespace ClassicUO.UnitTests.Game.Pathfinder
             Assert.False(RegionMapCache.TryRead(ms, 0, out RegionMap read));
             Assert.Null(read);
         }
+
+        [Fact]
+        public void Older_version_is_rejected()
+        {
+            // A cache written by a previous build (older Version constant) must be
+            // rejected so a stale map isn't reused after a builder change.
+            using var ms = new MemoryStream();
+            using (var w = new BinaryWriter(ms, System.Text.Encoding.UTF8, leaveOpen: true))
+            {
+                w.Write(RegionMapCache.Magic);
+                w.Write(RegionMapCache.Version - 1);
+                w.Write(0);   // facet
+                w.Write(3);   // width
+                w.Write(3);   // height
+            }
+            ms.Position = 0;
+
+            Assert.False(RegionMapCache.TryRead(ms, 0, out RegionMap read));
+            Assert.Null(read);
+        }
     }
 }

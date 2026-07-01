@@ -698,25 +698,36 @@ namespace ClassicUO.Game.UI.Gumps
         // hue 0 restores the default black ring.
         private void ApplyPriorityOverlay()
         {
-            if (_outline == null)
+            if (_outline != null)
             {
-                return;
-            }
+                ushort overlayHue = PluginStatusOverlays.Get(LocalSerial);
 
-            ushort overlayHue = PluginStatusOverlays.Get(LocalSerial);
-
-            if (overlayHue != 0)
-            {
-                if (_outline.Hue != overlayHue)
+                if (overlayHue != 0)
                 {
-                    _outline.Hue = overlayHue;
-                    _outline.LineColor = HPB_COLOR_WHITE;
+                    if (_outline.Hue != overlayHue)
+                    {
+                        _outline.Hue = overlayHue;
+                        _outline.LineColor = HPB_COLOR_WHITE;
+                    }
+                }
+                else if (_outline.Hue != 0)
+                {
+                    _outline.Hue = 0;
+                    _outline.LineColor = HPB_COLOR_BLACK;
                 }
             }
-            else if (_outline.Hue != 0)
+
+            // Background tint override: runs after the HP-state logic sets
+            // _background.Hue, so a non-zero plugin hue wins. Hue 0 leaves the
+            // state-driven color untouched (the update recomputes it each frame).
+            if (_background != null)
             {
-                _outline.Hue = 0;
-                _outline.LineColor = HPB_COLOR_BLACK;
+                ushort bgHue = PluginStatusOverlays.GetBackground(LocalSerial);
+
+                if (bgHue != 0 && _background.Hue != bgHue)
+                {
+                    _background.Hue = bgHue;
+                }
             }
         }
 

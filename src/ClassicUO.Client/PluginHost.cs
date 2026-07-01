@@ -48,7 +48,7 @@ namespace ClassicUO
         public IntPtr /*delegate*<void>*/ StopWalkFn;
         public IntPtr /*delegate*<uint, int, int, byte, int, void>*/ OpenStatusBarFn;
         public IntPtr /*delegate*<uint, void>*/ CloseStatusBarFn;
-        public IntPtr /*delegate*<uint, ushort, void>*/ SetOverlayFn;
+        public IntPtr /*delegate*<uint, ushort, ushort, void>*/ SetOverlayFn;
     }
 
     internal unsafe sealed class UnmanagedAssistantHost : IPluginHost
@@ -249,7 +249,7 @@ namespace ClassicUO
         private readonly dCloseStatusBar _closeStatusBar = Game.Managers.PluginStatusBars.CloseStatusBar;
 
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-        delegate void dSetOverlay(uint serial, ushort hue);
+        delegate void dSetOverlay(uint serial, ushort hue, ushort backgroundHue);
         [MarshalAs(UnmanagedType.FunctionPtr)]
         private readonly dSetOverlay _setOverlay = Game.Managers.PluginStatusBars.SetOverlay;
 

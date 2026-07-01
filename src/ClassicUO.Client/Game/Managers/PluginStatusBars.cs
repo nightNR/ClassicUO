@@ -13,22 +13,39 @@ namespace ClassicUO.Game.Managers
     /// </summary>
     internal static class PluginStatusOverlays
     {
-        private static readonly Dictionary<uint, ushort> _overlays = new Dictionary<uint, ushort>();
-
-        public static void Set(uint serial, ushort hue)
+        internal readonly struct OverlayHues
         {
-            if (hue == 0)
+            public readonly ushort Ring;
+            public readonly ushort Background;
+
+            public OverlayHues(ushort ring, ushort background)
+            {
+                Ring = ring;
+                Background = background;
+            }
+        }
+
+        private static readonly Dictionary<uint, OverlayHues> _overlays = new Dictionary<uint, OverlayHues>();
+
+        public static void Set(uint serial, ushort hue, ushort backgroundHue)
+        {
+            if (hue == 0 && backgroundHue == 0)
             {
                 _overlays.Remove(serial);
                 return;
             }
 
-            _overlays[serial] = hue;
+            _overlays[serial] = new OverlayHues(hue, backgroundHue);
         }
 
         public static ushort Get(uint serial)
         {
-            return _overlays.TryGetValue(serial, out ushort hue) ? hue : (ushort)0;
+            return _overlays.TryGetValue(serial, out OverlayHues hues) ? hues.Ring : (ushort)0;
+        }
+
+        public static ushort GetBackground(uint serial)
+        {
+            return _overlays.TryGetValue(serial, out OverlayHues hues) ? hues.Background : (ushort)0;
         }
 
         public static void Clear(uint serial) => _overlays.Remove(serial);
@@ -89,9 +106,9 @@ namespace ClassicUO.Game.Managers
     /// </summary>
     internal static class PluginStatusBars
     {
-        public static void SetOverlay(uint serial, ushort hue)
+        public static void SetOverlay(uint serial, ushort hue, ushort backgroundHue)
         {
-            PluginStatusOverlays.Set(serial, hue);
+            PluginStatusOverlays.Set(serial, hue, backgroundHue);
         }
 
         public static void CloseStatusBar(uint serial)

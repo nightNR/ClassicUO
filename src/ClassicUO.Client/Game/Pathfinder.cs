@@ -68,6 +68,20 @@ namespace ClassicUO.Game
 
         public bool PathindingCanBeCancelled { get; set; }
 
+        /// <summary>True while a computed auto-walk path is being followed (not
+        /// during the search phase). Consumers like the world map read the path
+        /// for display.</summary>
+        internal bool HasActivePath => AutoWalking && !_searching && _pathSize > 0;
+
+        /// <summary>The computed path, start→goal, in world-tile coordinates.
+        /// Only the first <see cref="CurrentPathSize"/> entries are valid; walk
+        /// progress is at <see cref="CurrentPathIndex"/>.</summary>
+        internal IReadOnlyList<AStarPathSearch.Step> CurrentPath => _path;
+
+        internal int CurrentPathIndex => _pointIndex;
+
+        internal int CurrentPathSize => _pathSize;
+
         /// <summary>Raised on auto-walk state transitions (game thread). The
         /// plugin bridge subscribes; see GameController / Network.Plugin.</summary>
         internal static event Action<WalkState> WalkProgress;
@@ -79,7 +93,17 @@ namespace ClassicUO.Game
 
         private bool CreateItemList(List<PathObject> list, int x, int y, int stepState)
         {
-            GameObject tile = _world.Map.GetTile(x, y, false);
+            // load: true. The client only keeps map chunks loaded in a window
+            // around the player, so the live A* used to see any tile outside that
+            // window as null == impassable — silently capping WalkTo range to
+            // roughly the view distance regardless of the region map. Loading the
+            // chunk on demand lets the search traverse far same-region routes.
+            // Chunks touched here refresh their LastAccessTime and are reclaimed
+            // by ClearUnusedBlocks shortly after the search moves on. This runs on
+            // the game thread (WalkTo / ProcessAutoWalk), same as normal chunk
+            // streaming, so it is safe. Walkability semantics are unchanged for
+            // tiles that were already loaded.
+            GameObject tile = _world.Map.GetTile(x, y, true);
 
             if (tile == null)
             {

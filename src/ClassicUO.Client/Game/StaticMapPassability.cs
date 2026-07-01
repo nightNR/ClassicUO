@@ -12,6 +12,15 @@ namespace ClassicUO.Game
 {
     internal static class StaticMapPassability
     {
+        /// <summary>True when a static tile forms a walkable floor. Mirrors the
+        /// live walker (Pathfinder.CreateItemList), which treats both SURFACE and
+        /// BRIDGE statics as standable — bridges/stairs are frequently flagged
+        /// BRIDGE only, so omitting them walls genuinely-connected areas apart.</summary>
+        public static bool IsPassableStatic(in StaticTiles sd)
+        {
+            return (sd.IsSurface || sd.IsBridge) && !sd.IsImpassable;
+        }
+
         public static int Width(UOFileManager fm, int facet)
         {
             return fm.Maps.MapBlocksSize[facet, 0] << 3;
@@ -138,7 +147,7 @@ namespace ClassicUO.Game
                                             continue;
                                         }
                                         ref readonly var sd = ref fm.TileData.StaticData[g];
-                                        if (sd.IsSurface && !sd.IsImpassable)
+                                        if (IsPassableStatic(sd))
                                         {
                                             int x = (bx << 3) + sb.X;
                                             int y = (by << 3) + sb.Y;

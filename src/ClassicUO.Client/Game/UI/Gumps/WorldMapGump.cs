@@ -87,6 +87,8 @@ namespace ClassicUO.Game.UI.Gumps
         private int _zoomIndex = 4;
         private bool _showGridIfZoomed = true;
         private bool _allowPositionalTarget = false;
+        private bool _showPath = true;
+        private Point _contextMenuWorld;
         private WMapMarker _gotoMarker;
 
         private int _mapLoading;
@@ -207,6 +209,7 @@ namespace ClassicUO.Game.UI.Gumps
 
             _showGridIfZoomed = ProfileManager.CurrentProfile.WorldMapShowGridIfZoomed;
             _allowPositionalTarget = ProfileManager.CurrentProfile.WorldMapAllowPositionalTarget;
+            _showPath = ProfileManager.CurrentProfile.WorldMapShowPath;
             TopMost = ProfileManager.CurrentProfile.WorldMapTopMost;
             FreeView = ProfileManager.CurrentProfile.WorldMapFreeView;
         }
@@ -247,6 +250,7 @@ namespace ClassicUO.Game.UI.Gumps
 
             ProfileManager.CurrentProfile.WorldMapShowGridIfZoomed = _showGridIfZoomed;
             ProfileManager.CurrentProfile.WorldMapAllowPositionalTarget = _allowPositionalTarget;
+            ProfileManager.CurrentProfile.WorldMapShowPath = _showPath;
         }
 
         private bool ParseBool(string boolStr)
@@ -327,6 +331,9 @@ namespace ClassicUO.Game.UI.Gumps
             _options["allow_positional_target"] = new ContextMenuItemEntry(
                 ResGumps.AllowPositionalTargeting, () => { _allowPositionalTarget = !_allowPositionalTarget; SaveSettings(); }, true, _allowPositionalTarget
             );
+
+            _options["walk_to"] = new ContextMenuItemEntry("Walk To", () => WalkToContextTarget());
+            _options["show_path"] = new ContextMenuItemEntry("Show Auto-Walk Path", () => { _showPath = !_showPath; SaveSettings(); }, true, _showPath);
 
             _options["markers_manager"] = new ContextMenuItemEntry(ResGumps.MarkersManager,
                 () =>
@@ -516,6 +523,9 @@ namespace ClassicUO.Game.UI.Gumps
             ContextMenu.Add(_options["show_mouse_coordinates"]);
             ContextMenu.Add(_options["allow_positional_target"]);
             ContextMenu.Add("", null);
+            ContextMenu.Add(_options["walk_to"]);
+            ContextMenu.Add(_options["show_path"]);
+            ContextMenu.Add("", null);
             ContextMenu.Add(_options["markers_manager"]);
             ContextMenu.Add(_options["add_marker_on_player"]);
             ContextMenu.Add("", null);
@@ -681,6 +691,21 @@ namespace ClassicUO.Game.UI.Gumps
             }
 
             return offset + 8;
+        }
+
+        private void WalkToContextTarget()
+        {
+            if (World.Player == null || _map == null)
+            {
+                return;
+            }
+
+            World.Player.Pathfinder.WalkTo(
+                _contextMenuWorld.X,
+                _contextMenuWorld.Y,
+                _map.GetTileZ(_contextMenuWorld.X, _contextMenuWorld.Y),
+                0,
+                false);
         }
 
         internal void HandlePositionTarget()
@@ -2094,6 +2119,11 @@ namespace ClassicUO.Game.UI.Gumps
                 );
             }
 
+            if (_showPath)
+            {
+                DrawPath(batcher, gX, gY, halfWidth, halfHeight, layerDepth);
+            }
+
             if (_showMobiles)
             {
                 foreach (Mobile mob in World.Mobiles.Values)
@@ -2748,6 +2778,65 @@ namespace ClassicUO.Game.UI.Gumps
             return new Vector2(rot.X, rot.Y);
         }
 
+        private void DrawPath(UltimaBatcher2D batcher, int x, int y, int width, int height, float layerDepth)
+        {
+            Pathfinder pathfinder = World.Player?.Pathfinder;
+
+            if (pathfinder == null || !pathfinder.HasActivePath)
+            {
+                return;
+            }
+
+            IReadOnlyList<AStarPathSearch.Step> path = pathfinder.CurrentPath;
+            int size = pathfinder.CurrentPathSize;
+            int start = pathfinder.CurrentPathIndex;
+
+            if (size <= 0 || start >= size)
+            {
+                return;
+            }
+
+            if (start < 0)
+            {
+                start = 0;
+            }
+
+            Vector3 hueVector = ShaderHueTranslator.GetHueVector(0);
+            Texture2D lineTexture = SolidColorTextureCache.GetTexture(Color.Yellow);
+
+            // Yellow polyline: player -> each remaining step -> destination.
+            Vector2 prev = WorldPointToGumpPoint(World.Player.X, World.Player.Y, x, y, width, height, Zoom);
+
+            for (int i = start; i < size; i++)
+            {
+                AStarPathSearch.Step step = path[i];
+                Vector2 point = WorldPointToGumpPoint(step.X, step.Y, x, y, width, height, Zoom);
+                batcher.DrawLine(lineTexture, prev, point, hueVector, 2, layerDepth);
+                prev = point;
+            }
+
+            // White dot at the player (path start).
+            DrawPathDot(batcher, WorldPointToGumpPoint(World.Player.X, World.Player.Y, x, y, width, height, Zoom), Color.White, hueVector, layerDepth);
+
+            // Red X at the destination (last step).
+            AStarPathSearch.Step dest = path[size - 1];
+            DrawPathCross(batcher, WorldPointToGumpPoint(dest.X, dest.Y, x, y, width, height, Zoom), Color.Red, hueVector, layerDepth);
+        }
+
+        private static void DrawPathDot(UltimaBatcher2D batcher, Vector2 p, Color color, Vector3 hueVector, float layerDepth)
+        {
+            const int SIZE = 5;
+            batcher.Draw(SolidColorTextureCache.GetTexture(color), new Rectangle((int)p.X - SIZE / 2, (int)p.Y - SIZE / 2, SIZE, SIZE), hueVector, layerDepth);
+        }
+
+        private static void DrawPathCross(UltimaBatcher2D batcher, Vector2 p, Color color, Vector3 hueVector, float layerDepth)
+        {
+            const int ARM = 5;
+            Texture2D texture = SolidColorTextureCache.GetTexture(color);
+            batcher.DrawLine(texture, new Vector2(p.X - ARM, p.Y - ARM), new Vector2(p.X + ARM, p.Y + ARM), hueVector, 2, layerDepth);
+            batcher.DrawLine(texture, new Vector2(p.X - ARM, p.Y + ARM), new Vector2(p.X + ARM, p.Y - ARM), hueVector, 2, layerDepth);
+        }
+
         private void DrawZone
         (
             UltimaBatcher2D batcher,
@@ -3044,6 +3133,13 @@ namespace ClassicUO.Game.UI.Gumps
 
         protected override void OnMouseUp(int x, int y, MouseButtonType button)
         {
+            if (button == MouseButtonType.Right)
+            {
+                // Remember where the context menu was opened so "Walk To" targets
+                // that tile (the mouse moves onto the menu before the item fires).
+                CanvasToWorld(x, y, out _contextMenuWorld.X, out _contextMenuWorld.Y);
+            }
+
             var allowTarget = _allowPositionalTarget && World.TargetManager.IsTargeting && World.TargetManager.TargetingState == CursorTarget.Position;
             if (allowTarget && button == MouseButtonType.Left)
             {

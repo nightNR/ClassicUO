@@ -346,5 +346,5 @@ internal struct ClientBindings
     public nint StopWalkFn;            // void()
     public nint OpenStatusBarFn;       // void(uint serial, int x, int y, byte moveIfExists, int groupId)
     public nint CloseStatusBarFn;      // void(uint serial)
-    public nint SetOverlayFn;          // void(uint serial, ushort hue)
+    public nint SetOverlayFn;          // void(uint serial, ushort hue, ushort backgroundHue)
 }

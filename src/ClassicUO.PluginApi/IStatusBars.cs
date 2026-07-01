@@ -25,12 +25,13 @@ public interface IStatusBars
 
     /// <summary>
     /// Sets a priority-highlight hue on the status bar for
-    /// <paramref name="serial"/>. <paramref name="hue"/> = 0 clears the
-    /// highlight. The highlight persists until the plugin clears it (hue 0);
-    /// it is NOT auto-cleared when the mobile is removed, and because serials
-    /// can be recycled you should clear it when you no longer want it. Re-apply
-    /// as needed. Auto-marshals to the game thread.
-    /// Badge support is deferred (see spec).
+    /// <paramref name="serial"/>. <paramref name="hue"/> tints the outline ring;
+    /// <paramref name="backgroundHue"/> tints the bar background (0 leaves the
+    /// state-driven background color). Both 0 clears the overlay. The overlay
+    /// persists until the plugin clears it; it is NOT auto-cleared when the
+    /// mobile is removed, and because serials can be recycled you should clear
+    /// it when you no longer want it. Re-apply as needed. Auto-marshals to the
+    /// game thread. Badge support is deferred (see spec).
     /// </summary>
-    void SetOverlay(uint serial, ushort hue);
+    void SetOverlay(uint serial, ushort hue, ushort backgroundHue = 0);
 }

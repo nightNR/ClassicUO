@@ -17,7 +17,7 @@ public sealed unsafe class StatusBarsTests
     private static uint _serial;
     private static int _x, _y, _group;
     private static byte _move;
-    private static ushort _hue;
+    private static ushort _hue, _bgHue;
     private static int _openCalls, _closeCalls, _overlayCalls;
 
     [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
@@ -30,7 +30,7 @@ public sealed unsafe class StatusBarsTests
     private static void CaptureClose(uint serial) { _serial = serial; _closeCalls++; }
 
     [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
-    private static void CaptureOverlay(uint serial, ushort hue) { _serial = serial; _hue = hue; _overlayCalls++; }
+    private static void CaptureOverlay(uint serial, ushort hue, ushort bgHue) { _serial = serial; _hue = hue; _bgHue = bgHue; _overlayCalls++; }
 
     private static StatusBarsImpl NewImplWithBindings(ClientBindings bindings)
     {
@@ -81,15 +81,16 @@ public sealed unsafe class StatusBarsTests
         _overlayCalls = 0;
         var bindings = new ClientBindings
         {
-            SetOverlayFn = (nint)(delegate* unmanaged[Cdecl]<uint, ushort, void>)&CaptureOverlay
+            SetOverlayFn = (nint)(delegate* unmanaged[Cdecl]<uint, ushort, ushort, void>)&CaptureOverlay
         };
         var impl = NewImplWithBindings(bindings);
 
-        impl.SetOverlay(0x55, 0x0021);
+        impl.SetOverlay(0x55, 0x0021, 0x0044);
 
         _overlayCalls.Should().Be(1);
         _serial.Should().Be(0x55u);
         _hue.Should().Be((ushort)0x0021);
+        _bgHue.Should().Be((ushort)0x0044);
     }
 
     [Fact]

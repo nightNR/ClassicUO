@@ -236,14 +236,14 @@ internal sealed class StatusBarsImpl : IStatusBars
             _bridge.PostToGameThread(() => ((delegate* unmanaged[Cdecl]<uint, void>)fn)(serial));
     }
 
-    public unsafe void SetOverlay(uint serial, ushort hue)
+    public unsafe void SetOverlay(uint serial, ushort hue, ushort backgroundHue = 0)
     {
         var fn = _bridge.ClientBindings.SetOverlayFn;
         if (fn == 0) return;
         if (_bridge.IsGameThread)
-            ((delegate* unmanaged[Cdecl]<uint, ushort, void>)fn)(serial, hue);
+            ((delegate* unmanaged[Cdecl]<uint, ushort, ushort, void>)fn)(serial, hue, backgroundHue);
         else
-            _bridge.PostToGameThread(() => ((delegate* unmanaged[Cdecl]<uint, ushort, void>)fn)(serial, hue));
+            _bridge.PostToGameThread(() => ((delegate* unmanaged[Cdecl]<uint, ushort, ushort, void>)fn)(serial, hue, backgroundHue));
     }
 }
 

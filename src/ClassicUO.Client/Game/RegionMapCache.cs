@@ -8,7 +8,10 @@ namespace ClassicUO.Game
     internal static class RegionMapCache
     {
         public const uint Magic = 0x4E475243; // 'C','R','G','N'
-        public const int Version = 1;
+        // v2: static passability now counts BRIDGE tiles as walkable. v1 caches
+        // were built without bridges and split bridge-connected areas apart, so
+        // they must be rejected and rebuilt.
+        public const int Version = 2;
 
         public static void Write(Stream stream, RegionMap map)
         {
