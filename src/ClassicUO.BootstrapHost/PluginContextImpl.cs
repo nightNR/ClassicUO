@@ -14,6 +14,7 @@ internal sealed class PluginContextImpl : IPluginContext
     private readonly PacketPipelineImpl _packets;
     private readonly InputRouterImpl _input;
     private readonly GameActionsImpl _actions;
+    private readonly StatusBarsImpl _statusBars;
     private readonly ClientImpl _client;
     private readonly DispatcherImpl _dispatcher;
 
@@ -26,6 +27,7 @@ internal sealed class PluginContextImpl : IPluginContext
         _packets    = new PacketPipelineImpl(bridge);
         _input      = new InputRouterImpl();
         _actions    = new GameActionsImpl(bridge);
+        _statusBars = new StatusBarsImpl(bridge);
         _client     = new ClientImpl(bridge);
         _dispatcher = new DispatcherImpl(bridge);
     }
@@ -38,6 +40,7 @@ internal sealed class PluginContextImpl : IPluginContext
     public IPacketPipeline Packets => _packets;
     public IInputRouter Input => _input;
     public IGameActions Actions => _actions;
+    public IStatusBars StatusBars => _statusBars;
     public IClient Client => _client;
     public IDispatcher Game => _dispatcher;
 
@@ -205,6 +208,43 @@ internal sealed class GameActionsImpl : IGameActions
 
     public event Action<WalkState>? WalkProgress;
     internal void RaiseWalkProgress(WalkState state) => WalkProgress?.Invoke(state);
+}
+
+internal sealed class StatusBarsImpl : IStatusBars
+{
+    private readonly HostBridge _bridge;
+    public StatusBarsImpl(HostBridge bridge) { _bridge = bridge; }
+
+    public unsafe void OpenStatusBar(uint serial, int x, int y, bool moveIfExists = true, int groupId = 0)
+    {
+        var fn = _bridge.ClientBindings.OpenStatusBarFn;
+        if (fn == 0) return;
+        byte move = moveIfExists ? (byte)1 : (byte)0;
+        if (_bridge.IsGameThread)
+            ((delegate* unmanaged[Cdecl]<uint, int, int, byte, int, void>)fn)(serial, x, y, move, groupId);
+        else
+            _bridge.PostToGameThread(() => ((delegate* unmanaged[Cdecl]<uint, int, int, byte, int, void>)fn)(serial, x, y, move, groupId));
+    }
+
+    public unsafe void CloseStatusBar(uint serial)
+    {
+        var fn = _bridge.ClientBindings.CloseStatusBarFn;
+        if (fn == 0) return;
+        if (_bridge.IsGameThread)
+            ((delegate* unmanaged[Cdecl]<uint, void>)fn)(serial);
+        else
+            _bridge.PostToGameThread(() => ((delegate* unmanaged[Cdecl]<uint, void>)fn)(serial));
+    }
+
+    public unsafe void SetOverlay(uint serial, ushort hue)
+    {
+        var fn = _bridge.ClientBindings.SetOverlayFn;
+        if (fn == 0) return;
+        if (_bridge.IsGameThread)
+            ((delegate* unmanaged[Cdecl]<uint, ushort, void>)fn)(serial, hue);
+        else
+            _bridge.PostToGameThread(() => ((delegate* unmanaged[Cdecl]<uint, ushort, void>)fn)(serial, hue));
+    }
 }
 
 internal sealed class ClientImpl : IClient

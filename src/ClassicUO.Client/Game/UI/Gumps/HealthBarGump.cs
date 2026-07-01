@@ -324,6 +324,9 @@ namespace ClassicUO.Game.UI.Gumps
         private static readonly Texture2D HPB_COLOR_POISON = SolidColorTextureCache.GetTexture(Color.LimeGreen);
         private static readonly Texture2D HPB_COLOR_BLACK = SolidColorTextureCache.GetTexture(Color.Black);
 
+        // A white source texture so a UO priority hue colorizes the outline ring.
+        private static readonly Texture2D HPB_COLOR_WHITE = SolidColorTextureCache.GetTexture(Color.White);
+
         private readonly LineCHB[] _bars = new LineCHB[3];
         private readonly LineCHB[] _border = new LineCHB[4];
 
@@ -684,6 +687,36 @@ namespace ClassicUO.Game.UI.Gumps
                         }
                     }
                 }
+            }
+
+            ApplyPriorityOverlay();
+        }
+
+        // Feature A: tint the outline ring with the plugin's priority hue, if
+        // any, leaving the state _border[] colors (low-HP red / war / target)
+        // untouched. A white source texture + UO hue renders as the hue color;
+        // hue 0 restores the default black ring.
+        private void ApplyPriorityOverlay()
+        {
+            if (_outline == null)
+            {
+                return;
+            }
+
+            ushort overlayHue = PluginStatusOverlays.Get(LocalSerial);
+
+            if (overlayHue != 0)
+            {
+                if (_outline.Hue != overlayHue)
+                {
+                    _outline.Hue = overlayHue;
+                    _outline.LineColor = HPB_COLOR_WHITE;
+                }
+            }
+            else if (_outline.Hue != 0)
+            {
+                _outline.Hue = 0;
+                _outline.LineColor = HPB_COLOR_BLACK;
             }
         }
 
@@ -1219,10 +1252,13 @@ namespace ClassicUO.Game.UI.Gumps
             public int LineWidth { get; set; }
             public Texture2D LineColor { get; set; }
 
+            // Plugin priority-overlay hue applied to this line only. 0 = none.
+            public ushort Hue { get; set; }
+
             public override bool AddToRenderLists(RenderLists renderLists, int x, int y, ref float layerDepthRef)
             {
                 float layerDepth = layerDepthRef;
-                Vector3 hueVector = ShaderHueTranslator.GetHueVector(0, false, Alpha);
+                Vector3 hueVector = ShaderHueTranslator.GetHueVector(Hue, false, Alpha);
                 renderLists.AddGumpNoAtlas(
                     batcher =>
                     {
@@ -1902,6 +1938,27 @@ namespace ClassicUO.Game.UI.Gumps
         {
             Heal1,
             Heal2
+        }
+    }
+
+    /// <summary>
+    /// Single decision point for custom-vs-classic health bars. Every spawn
+    /// site (including party members) should route through here so the
+    /// <see cref="Configuration.Profile.CustomBarsToggled"/> choice is honored
+    /// consistently. Feature B of the Plugin v2 status-bars work.
+    /// </summary>
+    internal static class HealthBarFactory
+    {
+        public static bool ShouldUseCustomBar(Configuration.Profile profile)
+        {
+            return profile != null && profile.CustomBarsToggled;
+        }
+
+        public static BaseHealthBarGump Create(World world, GameObjects.Entity entity)
+        {
+            return ShouldUseCustomBar(Configuration.ProfileManager.CurrentProfile)
+                ? new HealthBarGumpCustom(world, entity)
+                : new HealthBarGump(world, entity);
         }
     }
 }

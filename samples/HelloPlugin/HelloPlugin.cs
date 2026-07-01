@@ -90,6 +90,31 @@ public sealed class HelloPlugin : IPlugin
         context.Input.Hotkey += (key, mod, pressed) =>
         {
             Log($"Hotkey:{key}/{mod}/{pressed}");
+
+            // Manual status-bar demo (press-only). Replace 0x40000000 with a
+            // real serial when testing against a live shard.
+            if (pressed)
+            {
+                const uint demoSerial = 0x40000000;
+                switch (key)
+                {
+                    case 1: // open a grouped pair
+                        context.StatusBars.OpenStatusBar(demoSerial, 200, 200, true, 1);
+                        context.StatusBars.OpenStatusBar(demoSerial + 1, 200, 260, true, 1);
+                        break;
+                    case 2: // priority highlight (UO hue 0x0021 = red-ish)
+                        context.StatusBars.SetOverlay(demoSerial, 0x0021);
+                        break;
+                    case 3: // clear highlight
+                        context.StatusBars.SetOverlay(demoSerial, 0);
+                        break;
+                    case 4: // close
+                        context.StatusBars.CloseStatusBar(demoSerial);
+                        context.StatusBars.CloseStatusBar(demoSerial + 1);
+                        break;
+                }
+            }
+
             // Block the dedicated test key 999; allow everything else.
             return key != 999;
         };

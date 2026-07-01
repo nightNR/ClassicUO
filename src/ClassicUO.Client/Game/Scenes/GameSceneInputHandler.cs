@@ -206,16 +206,7 @@ namespace ClassicUO.Game.Scenes
                             continue;
                         }
 
-                        BaseHealthBarGump hbgc;
-
-                        if (useCHB)
-                        {
-                            hbgc = new HealthBarGumpCustom(_world, mobile);
-                        }
-                        else
-                        {
-                            hbgc = new HealthBarGump(_world, mobile);
-                        }
+                        BaseHealthBarGump hbgc = HealthBarFactory.Create(_world, mobile);
 
                         if (finalY >= Camera.Bounds.Bottom - 20)
                         {

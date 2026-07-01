@@ -46,6 +46,9 @@ namespace ClassicUO
         public IntPtr ReflectionCmdFn;
         public IntPtr /*delegate*<int, int, int, int, bool, bool>*/ WalkToFn;
         public IntPtr /*delegate*<void>*/ StopWalkFn;
+        public IntPtr /*delegate*<uint, int, int, byte, int, void>*/ OpenStatusBarFn;
+        public IntPtr /*delegate*<uint, void>*/ CloseStatusBarFn;
+        public IntPtr /*delegate*<uint, ushort, void>*/ SetOverlayFn;
     }
 
     internal unsafe sealed class UnmanagedAssistantHost : IPluginHost
@@ -235,6 +238,21 @@ namespace ClassicUO
         [MarshalAs(UnmanagedType.FunctionPtr)]
         private readonly dOnPluginReflectionCommand _reflectionCmd = reflectionCmd;
 
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        delegate void dOpenStatusBar(uint serial, int x, int y, byte moveIfExists, int groupId);
+        [MarshalAs(UnmanagedType.FunctionPtr)]
+        private readonly dOpenStatusBar _openStatusBar = Game.Managers.PluginStatusBars.OpenStatusBar;
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        delegate void dCloseStatusBar(uint serial);
+        [MarshalAs(UnmanagedType.FunctionPtr)]
+        private readonly dCloseStatusBar _closeStatusBar = Game.Managers.PluginStatusBars.CloseStatusBar;
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        delegate void dSetOverlay(uint serial, ushort hue);
+        [MarshalAs(UnmanagedType.FunctionPtr)]
+        private readonly dSetOverlay _setOverlay = Game.Managers.PluginStatusBars.SetOverlay;
+
 
         static short getPacketLength(int id)
         {
@@ -303,6 +321,9 @@ namespace ClassicUO
             cuoHost.ReflectionCmdFn = Marshal.GetFunctionPointerForDelegate(_reflectionCmd);
             cuoHost.WalkToFn = Marshal.GetFunctionPointerForDelegate(_walkTo);
             cuoHost.StopWalkFn = Marshal.GetFunctionPointerForDelegate(_stopWalk);
+            cuoHost.OpenStatusBarFn = Marshal.GetFunctionPointerForDelegate(_openStatusBar);
+            cuoHost.CloseStatusBarFn = Marshal.GetFunctionPointerForDelegate(_closeStatusBar);
+            cuoHost.SetOverlayFn = Marshal.GetFunctionPointerForDelegate(_setOverlay);
 
             _initialize((IntPtr)mem);
         }

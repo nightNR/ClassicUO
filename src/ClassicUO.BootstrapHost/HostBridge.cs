@@ -44,6 +44,14 @@ internal sealed unsafe class HostBridge
     /// <summary>Test-only: inject a ClientBindings table without going through cuo's Initialize.</summary>
     internal void InstallClientBindingsForTest(ClientBindings bindings) => _clientBindings = bindings;
 
+    /// <summary>Test-only: install a ClientBindings table and mark the current
+    /// thread as the game thread, so action impls dispatch synchronously.</summary>
+    internal void SetClientBindingsForTest(ClientBindings bindings)
+    {
+        _gameThread = Thread.CurrentThread;
+        _clientBindings = bindings;
+    }
+
     /// <summary>Test-only: drive lifecycle events without going through native callbacks.</summary>
     internal void TestRaiseConnected()    { foreach (var p in _loader.Plugins) p.RaiseConnected(); }
     internal void TestRaiseDisconnected() { foreach (var p in _loader.Plugins) p.RaiseDisconnected(); }
@@ -336,4 +344,7 @@ internal struct ClientBindings
     public nint ReflectionCmdFn;       // legacy reflection commands; unused by v2
     public nint WalkToFn;              // bool(int x, int y, int z, int distance, byte run)
     public nint StopWalkFn;            // void()
+    public nint OpenStatusBarFn;       // void(uint serial, int x, int y, byte moveIfExists, int groupId)
+    public nint CloseStatusBarFn;      // void(uint serial)
+    public nint SetOverlayFn;          // void(uint serial, ushort hue)
 }
