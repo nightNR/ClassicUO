@@ -547,6 +547,7 @@ namespace ClassicUO.Game.UI.Gumps
             _freeWidth = freeWidth;
             _freeHeight = freeHeight;
 
+            _useFixedGrid = useFixedGrid;
             ApplyGridSettings(useFixedGrid, gridRows, gridCols);
         }
     }
