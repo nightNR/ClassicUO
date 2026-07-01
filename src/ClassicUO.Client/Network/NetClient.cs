@@ -57,7 +57,7 @@ namespace ClassicUO.Network
 
         public bool IsConnected => _socket != null && _socket.IsConnected;
         public NetStatistics Statistics { get; }
-        public EncryptionHelper? Encryption { get; private set; }
+        public EncryptionHelper Encryption { get; private set; }
         public PacketsTable PacketsTable { get; private set; }
 
         public uint LocalIP

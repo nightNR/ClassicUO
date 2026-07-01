@@ -92,7 +92,6 @@ namespace ClassicUO.Game.UI.Gumps
         private WMapMarker _gotoMarker;
 
         private int _mapLoading;
-        private uint _mapLoadingTime;
         private Task _loadingTask;
 
         public WorldMapGump(World world) : base
@@ -823,7 +822,7 @@ namespace ClassicUO.Game.UI.Gumps
 
                 try
                 {
-                    stream.Read(buffer, 0, buffer.Length);
+                    stream.ReadExactly(buffer, 0, (int)stream.Length);
 
                     StackDataReader reader = new StackDataReader(buffer.AsSpan(0, (int)stream.Length));
 

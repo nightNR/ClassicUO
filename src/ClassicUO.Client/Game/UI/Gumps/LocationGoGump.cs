@@ -132,7 +132,7 @@ internal partial class LocationGoGump : Gump
             point.Y = int.Parse(match.Groups["Y"].Value);
             return true;
         }
-        catch(Exception e)
+        catch (Exception)
         {
             // do nothing
         }
