@@ -675,6 +675,12 @@ when amount is or exceeds</value>
   <data name="DisableTab" xml:space="preserve">
     <value>Disable TAB (toggle warmode)</value>
   </data>
+  <data name="ChatHistoryUseArrows" xml:space="preserve">
+    <value>Use Up/Down arrows for chat history</value>
+  </data>
+  <data name="ChatHistoryLength" xml:space="preserve">
+    <value>Chat history length</value>
+  </data>
   <data name="DisableMessageHistory" xml:space="preserve">
     <value>Disable Ctrl + Q/W (messageHistory)</value>
   </data>

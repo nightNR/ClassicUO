@@ -1295,6 +1295,24 @@ namespace ClassicUO.Resources {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to Use Up/Down arrows for chat history.
+        /// </summary>
+        public static string ChatHistoryUseArrows {
+            get {
+                return ResourceManager.GetString("ChatHistoryUseArrows", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Chat history length.
+        /// </summary>
+        public static string ChatHistoryLength {
+            get {
+                return ResourceManager.GetString("ChatHistoryLength", resourceCulture);
+            }
+        }
+
+        /// <summary>
         ///   Looks up a localized string similar to Disable Ctrl + Q/W (messageHistory).
         /// </summary>
         public static string DisableMessageHistory {

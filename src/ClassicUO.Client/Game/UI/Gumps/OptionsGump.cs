@@ -66,6 +66,8 @@ namespace ClassicUO.Game.UI.Gumps
         private Checkbox _maxJournalFilesEnabled;
         private InputField _maxJournalFiles;
         private Checkbox _journalFileWithSerial;
+        private Checkbox _chatUseArrowsForHistory;
+        private InputField _chatHistoryLength;
 
         private Checkbox _gameWindowLock, _gameWindowFullsize;
         // GameWindowPosition
@@ -3253,6 +3255,35 @@ namespace ClassicUO.Game.UI.Gumps
 
             startY += _disableCtrlQWBtn.Height + 2;
 
+            _chatUseArrowsForHistory = AddCheckBox
+            (
+                rightArea,
+                ResGumps.ChatHistoryUseArrows,
+                _currentProfile.ChatUseArrowsForHistory,
+                startX,
+                startY
+            );
+
+            startY += _chatUseArrowsForHistory.Height + 2;
+
+            _chatHistoryLength = AddInputField
+            (
+                rightArea,
+                startX,
+                startY,
+                50,
+                TEXTBOX_HEIGHT,
+                ResGumps.ChatHistoryLength,
+                50,
+                false,
+                true,
+                4
+            );
+
+            _chatHistoryLength.SetText(_currentProfile.ChatHistoryLength.ToString());
+
+            startY += _chatHistoryLength.Height + 2;
+
             _disableAutoMove = AddCheckBox
             (
                 rightArea,
@@ -4320,6 +4351,13 @@ namespace ClassicUO.Game.UI.Gumps
             _currentProfile.DisableArrowBtn = _disableArrowBtn.IsChecked;
             _currentProfile.DisableTabBtn = _disableTabBtn.IsChecked;
             _currentProfile.DisableCtrlQWBtn = _disableCtrlQWBtn.IsChecked;
+            _currentProfile.ChatUseArrowsForHistory = _chatUseArrowsForHistory.IsChecked;
+
+            if (int.TryParse(_chatHistoryLength.Text, out int chatHistoryLength) && chatHistoryLength >= 0)
+            {
+                _currentProfile.ChatHistoryLength = chatHistoryLength;
+            }
+
             _currentProfile.DisableAutoMove = _disableAutoMove.IsChecked;
             _currentProfile.AutoOpenDoors = _autoOpenDoors.IsChecked;
             _currentProfile.SmoothDoors = _smoothDoors.IsChecked;
