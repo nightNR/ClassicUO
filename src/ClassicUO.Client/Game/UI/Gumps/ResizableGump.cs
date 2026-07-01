@@ -14,6 +14,7 @@ namespace ClassicUO.Game.UI.Gumps
         private Point _lastSize, _savedSize, _beforeResizeSize;
         private int _minH;
         private int _minW;
+        private bool _resizeEnabled = true;
 
         public class ResizeCompletedEventArgs(Point beforeResize)
         {
@@ -82,6 +83,16 @@ namespace ClassicUO.Game.UI.Gumps
             set => _borderControl.IsVisible = _button.IsVisible = value;
         }
 
+        protected bool ResizeEnabled
+        {
+            get => _resizeEnabled;
+            set
+            {
+                _resizeEnabled = value;
+                _button.IsVisible = value;
+            }
+        }
+
         public int BoderSize
         {
             get => _borderControl.BorderSize;
@@ -143,7 +154,7 @@ namespace ClassicUO.Game.UI.Gumps
 
             _lastSize = _savedSize;
 
-            if (_clicked && offset != Point.Zero)
+            if (_clicked && _resizeEnabled && offset != Point.Zero)
             {
                 int w = _lastSize.X + offset.X;
                 int h = _lastSize.Y + offset.Y;
