@@ -87,6 +87,29 @@ namespace ClassicUO.Game.UI.Controls
 
         public uint ContainerSerial => _host.LocalSerial;
 
+        public int CurrentPage => _currentPage;
+
+        public void SetPage(int page)
+        {
+            _currentPage = page;
+
+            if (_currentPage < 0)
+            {
+                _currentPage = 0;
+            }
+            else if (_currentPage >= _pageCount)
+            {
+                _currentPage = _pageCount - 1;
+            }
+
+            if (_currentPage < 0)
+            {
+                _currentPage = 0;
+            }
+
+            ApplyPage();
+        }
+
         public void Rebuild()
         {
             foreach (GridContainerItem cell in Children.OfType<GridContainerItem>().ToList())

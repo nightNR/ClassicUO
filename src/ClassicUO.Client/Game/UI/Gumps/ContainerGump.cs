@@ -25,7 +25,7 @@ namespace ClassicUO.Game.UI.Gumps
         private HitBox _hitBox;
         private bool _isMinimized;
         private GridContainerView _gridView;
-        private Control _toggleButton;
+        private int _gridPage;
 
         internal const int CORPSES_GUMP = 0x0009;
 
@@ -189,7 +189,6 @@ namespace ClassicUO.Game.UI.Gumps
             _data = World.ContainerManager.Get(Graphic);
 
             _gridView = null;
-            _toggleButton = null;
 
             if (ResolveGridView(LocalSerial))
             {
@@ -251,6 +250,7 @@ namespace ClassicUO.Game.UI.Gumps
             _gridView = new GridContainerView(this) { X = 0, Y = 0 };
             Add(_gridView);
             _gridView.Rebuild();
+            _gridView.SetPage(_gridPage);
 
             Width = _gridView.Width;
             Height = _gridView.Height;
@@ -278,7 +278,6 @@ namespace ClassicUO.Game.UI.Gumps
 
             btn.MouseUp += ToggleButtonOnMouseUp;
 
-            _toggleButton = btn;
             Add(btn);
         }
 
@@ -618,8 +617,20 @@ namespace ClassicUO.Game.UI.Gumps
 
         protected override void UpdateContents()
         {
+            if (_gridView != null)
+            {
+                _gridPage = _gridView.CurrentPage;
+            }
+
             Clear();
             BuildGump();
+
+            Entity container = World.Get(LocalSerial);
+
+            if (container != null && !container.IsEmpty && _hideIfEmpty && !IsVisible)
+            {
+                IsVisible = true;
+            }
 
             if (_gridView == null)
             {
@@ -661,11 +672,6 @@ namespace ClassicUO.Game.UI.Gumps
             }
 
             bool is_corpse = container.Graphic == 0x2006;
-
-            if (!container.IsEmpty && _hideIfEmpty && !IsVisible)
-            {
-                IsVisible = true;
-            }
 
             for (LinkedObject i = container.Items; i != null; i = i.Next)
             {
