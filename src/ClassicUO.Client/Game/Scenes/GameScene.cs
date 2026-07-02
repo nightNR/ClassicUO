@@ -149,6 +149,11 @@ namespace ClassicUO.Game.Scenes
                 Client.Game.SetWindowSize(w, h);
             }
 
+            if (UIManager.GetGump<ScreenTimersGump>() == null)
+            {
+                UIManager.Add(new ScreenTimersGump(_world));
+            }
+
             Plugin.OnConnected();
         }
 
