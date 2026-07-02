@@ -19,7 +19,6 @@ namespace ClassicUO.Game.UI.Controls
     internal sealed class GridContainerItem : Control
     {
         private readonly GridContainerView _view;
-        private readonly HitBox _hit;
         private readonly Label _count;
 
         public GridContainerItem(GridContainerView view, uint serial, int size)
@@ -46,12 +45,14 @@ namespace ClassicUO.Game.UI.Controls
             AlphaBlendControl background = new AlphaBlendControl { Width = size, Height = size };
             Add(background);
 
-            _hit = new HitBox(0, 0, size, size, null, 0f);
-            Add(_hit);
-
+            // The cell itself is the mouse-input control (like ItemGump). Do NOT add a
+            // child HitBox spanning the cell: it would become UIManager's
+            // LastControlMouseDown / MouseOverControl instead of this cell, breaking the
+            // pickup gate (== this) in Update and stealing double-clicks. Tooltip and
+            // hover are driven off the cell.
             if (_view.World.ClientFeatures.TooltipsEnabled)
             {
-                _hit.SetTooltip(item);
+                SetTooltip(item);
             }
 
             _count = new Label(
@@ -98,7 +99,7 @@ namespace ClassicUO.Game.UI.Controls
             {
                 AttemptPickUp();
             }
-            else if (_hit.MouseIsOver)
+            else if (MouseIsOver)
             {
                 SelectedObject.Object = _view.World.Get(LocalSerial);
             }
@@ -267,19 +268,19 @@ namespace ClassicUO.Game.UI.Controls
             );
 
             // Center the art within the cell (mirrors GridLootItem centering).
-            Point size = new Point(_hit.Width, _hit.Height);
+            Point size = new Point(Width, Height);
             Point point = new Point();
 
-            if (rect.Width < _hit.Width)
+            if (rect.Width < Width)
             {
                 size.X = rect.Width;
-                point.X = (_hit.Width >> 1) - (size.X >> 1);
+                point.X = (Width >> 1) - (size.X >> 1);
             }
 
-            if (rect.Height < _hit.Height)
+            if (rect.Height < Height)
             {
                 size.Y = rect.Height;
-                point.Y = (_hit.Height >> 1) - (size.Y >> 1);
+                point.Y = (Height >> 1) - (size.Y >> 1);
             }
 
             var texture = artInfo.Texture;
@@ -307,7 +308,7 @@ namespace ClassicUO.Game.UI.Controls
                 );
             }
 
-            if (_hit.MouseIsOver)
+            if (MouseIsOver)
             {
                 Vector3 hoverHue = ShaderHueTranslator.GetHueVector(0);
                 hoverHue.Z = 0.2f;

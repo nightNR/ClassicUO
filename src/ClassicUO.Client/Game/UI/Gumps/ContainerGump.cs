@@ -304,6 +304,17 @@ namespace ClassicUO.Game.UI.Gumps
             RequestUpdateContents();
         }
 
+        // Container gumps are client-side and carry no server-gump buttons. The grid
+        // paginator (Prev/Next) and the view-mode toggle are NiceButtons using
+        // ButtonAction.Activate, whose click routes here through Gump.OnButtonClick —
+        // which treats any button on a LocalSerial gump as a server gump reply and
+        // Dispose()s the window. Those buttons do their real work in their own MouseUp
+        // handlers, so swallow the routed click here to keep the container open.
+        // Right-click close is unaffected (it disposes via Control.CloseWithRightClick).
+        public override void OnButtonClick(int buttonID)
+        {
+        }
+
         private void HitBoxOnMouseUp(object sender, MouseEventArgs e)
         {
             if (
