@@ -13,6 +13,25 @@ using System.Xml;
 
 namespace ClassicUO.Game.UI.Gumps
 {
+    /// <summary>Rendering input for one buff icon, from either a server BuffIcon or a plugin buff.</summary>
+    internal readonly struct BuffEntryInput
+    {
+        public readonly ushort Graphic;
+        public readonly long Timer;          // 0xFFFF_FFFF == infinite
+        public readonly string Text;
+        public readonly Data.BuffDisplayKind Kind;
+        public readonly string TooltipId;    // "ID: <type>" or "ID: <pluginId>"
+
+        public BuffEntryInput(ushort graphic, long timer, string text, Data.BuffDisplayKind kind, string tooltipId)
+        {
+            Graphic = graphic;
+            Timer = timer;
+            Text = text ?? string.Empty;
+            Kind = kind;
+            TooltipId = tooltipId ?? string.Empty;
+        }
+    }
+
     internal class BuffGump : Gump
     {
         private GumpPic _background;
@@ -40,9 +59,19 @@ namespace ClassicUO.Game.UI.Gumps
             SetInScreen();
 
             BuildGump();
+
+            Managers.PluginTimersManager.GumpRefresh = RequestUpdateContents;
         }
 
         public override GumpType GumpType => GumpType.Buff;
+
+        public override void Dispose()
+        {
+            if (Managers.PluginTimersManager.GumpRefresh == (Action)RequestUpdateContents)
+                Managers.PluginTimersManager.GumpRefresh = null;
+
+            base.Dispose();
+        }
 
         private void BuildGump()
         {
@@ -102,8 +131,18 @@ namespace ClassicUO.Game.UI.Gumps
             {
                 foreach (var k in World.Player.BuffIcons)
                 {
-                    _box.Add(new BuffControlEntry(World.Player.BuffIcons[k.Key]));
+                    BuffIcon icon = World.Player.BuffIcons[k.Key];
+                    _box.Add(new BuffControlEntry(new BuffEntryInput(
+                        icon.Graphic, icon.Timer, icon.Text, icon.Kind, $"ID: {icon.Type}")));
                 }
+            }
+
+            foreach (var kv in Managers.PluginBuffs.Entries)
+            {
+                var e = kv.Value;
+                long timer = e.IsInfinite ? 0xFFFF_FFFF : e.ExpiryTicks;
+                _box.Add(new BuffControlEntry(new BuffEntryInput(
+                    e.Graphic, timer, e.Text, e.Kind, $"ID: {e.Id}")));
             }
 
             _background.Graphic = _graphic;
@@ -287,15 +326,22 @@ namespace ClassicUO.Game.UI.Gumps
             private bool _decreaseAlpha;
             private readonly RenderedText _gText;
             private float _updateTooltipTime;
+            private readonly long _timer;
+            private readonly string _text;
+            private readonly string _tooltipId;
+            private readonly Data.BuffDisplayKind _kind;
 
-            public BuffControlEntry(BuffIcon icon) : base(0, 0, icon.Graphic, 0)
+            public BuffControlEntry(BuffEntryInput input) : base(0, 0, input.Graphic, 0)
             {
                 if (IsDisposed)
                 {
                     return;
                 }
 
-                Icon = icon;
+                _timer = input.Timer;
+                _text = input.Text;
+                _tooltipId = input.TooltipId;
+                _kind = input.Kind;
                 _alpha = 0xFF;
                 _decreaseAlpha = true;
 
@@ -313,18 +359,16 @@ namespace ClassicUO.Game.UI.Gumps
                 WantUpdateSize = false;
                 CanMove = true;
 
-                SetTooltip(icon.Text + $"\nID: {icon.Type}");
+                SetTooltip(_text + "\n" + _tooltipId);
             }
-
-            public BuffIcon Icon { get; }
 
             public override void Update()
             {
                 base.Update();
 
-                if (!IsDisposed && Icon != null)
+                if (!IsDisposed)
                 {
-                    int delta = (int)(Icon.Timer - Time.Ticks);
+                    int delta = (int)(_timer - Time.Ticks);
 
                     if (_updateTooltipTime < Time.Ticks && delta > 0)
                     {
@@ -333,7 +377,7 @@ namespace ClassicUO.Game.UI.Gumps
                         SetTooltip(
                             string.Format(
                                 ResGumps.TimeLeft,
-                                Icon.Text + $"\nID: {Icon.Type}",
+                                _text + "\n" + _tooltipId,
                                 span.Hours,
                                 span.Minutes,
                                 span.Seconds
@@ -355,7 +399,7 @@ namespace ClassicUO.Game.UI.Gumps
                         }
                     }
 
-                    if (Icon.Timer != 0xFFFF_FFFF && delta < 10000)
+                    if (_timer != 0xFFFF_FFFF && delta < 10000)
                     {
                         if (delta <= 0)
                         {
@@ -396,7 +440,14 @@ namespace ClassicUO.Game.UI.Gumps
             public override bool AddToRenderLists(RenderLists renderLists, int x, int y, ref float layerDepthRef)
             {
                 float layerDepth = layerDepthRef;
-                Vector3 hueVector = ShaderHueTranslator.GetHueVector(0, false, _alpha / 255f, true);
+
+                ushort hue = _kind switch
+                {
+                    Data.BuffDisplayKind.Debuff => 0x0021,   // red
+                    Data.BuffDisplayKind.Buff => 0x0044,     // green
+                    _ => (ushort)0,
+                };
+                Vector3 hueVector = ShaderHueTranslator.GetHueVector(hue, false, _alpha / 255f, true);
 
                 ref readonly var gumpInfo = ref Client.Game.UO.Gumps.GetGump(Graphic);
                 var texture = gumpInfo.Texture;
