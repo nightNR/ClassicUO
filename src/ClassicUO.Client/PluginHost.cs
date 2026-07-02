@@ -59,6 +59,9 @@ namespace ClassicUO
         public IntPtr /*delegate*<int, void>*/ RemoveTimerFn;
         public IntPtr /*delegate*<int, void>*/ RemoveTimerGroupFn;
         public IntPtr /*delegate*<void>*/ ClearTimersFn;
+        // Packed client version (major<<24|minor<<16|build<<8|revision). Appended last
+        // to preserve ABI; populated in Initialize() after UO.Load has parsed it.
+        public int ClientVersion;
     }
 
     internal unsafe sealed class UnmanagedAssistantHost : IPluginHost
@@ -386,6 +389,10 @@ namespace ClassicUO
             cuoHost.RemoveTimerFn = Marshal.GetFunctionPointerForDelegate(_removeTimer);
             cuoHost.RemoveTimerGroupFn = Marshal.GetFunctionPointerForDelegate(_removeTimerGroup);
             cuoHost.ClearTimersFn = Marshal.GetFunctionPointerForDelegate(_clearTimers);
+            // UO.Load (GameController.Load) runs before PluginHost.Initialize, so the
+            // client version is parsed by now. The host uses it to pick pre/post-KR
+            // packet framing (e.g. MoveItem drop); 0 would break drops on modern servers.
+            cuoHost.ClientVersion = (int)Client.Game.UO.Version;
 
             _initialize((IntPtr)mem);
         }
