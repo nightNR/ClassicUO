@@ -390,6 +390,9 @@ namespace ClassicUO
         {
             _walkProgress?.Invoke(state);
         }
+
+        public void BuffEvent(int id, int reason) { }
+        public void TimerEvent(int id, int reason) { }
     }
 
     interface IPluginHost
@@ -412,5 +415,7 @@ namespace ClassicUO
         public void WalkProgress(int state);
         public bool PacketIn(ArraySegment<byte> buffer);
         public bool PacketOut(Span<byte> buffer);
+        public void BuffEvent(int id, int reason);
+        public void TimerEvent(int id, int reason);
     }
 }
