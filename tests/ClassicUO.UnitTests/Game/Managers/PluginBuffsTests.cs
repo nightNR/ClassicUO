@@ -7,6 +7,7 @@ using Xunit;
 
 namespace ClassicUO.UnitTests.Game.Managers
 {
+    [Collection("PluginManagerState")]
     public class PluginBuffsTests
     {
         public PluginBuffsTests() => PluginBuffs.Reset();

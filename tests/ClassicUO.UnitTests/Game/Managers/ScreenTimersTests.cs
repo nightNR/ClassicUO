@@ -6,6 +6,7 @@ using Xunit;
 
 namespace ClassicUO.UnitTests.Game.Managers
 {
+    [Collection("PluginManagerState")]
     public class ScreenTimersTests
     {
         public ScreenTimersTests() => ScreenTimers.Reset();
