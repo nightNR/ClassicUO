@@ -24,6 +24,8 @@ namespace ClassicUO.Game.UI.Gumps
         private readonly bool _hideIfEmpty;
         private HitBox _hitBox;
         private bool _isMinimized;
+        private GridContainerView _gridView;
+        private Control _toggleButton;
 
         internal const int CORPSES_GUMP = 0x0009;
 
@@ -118,6 +120,13 @@ namespace ClassicUO.Game.UI.Gumps
             get => _isMinimized;
             set
             {
+                if (_gumpPicContainer == null)
+                {
+                    // Grid mode: no iconized artwork, minimize is disabled.
+                    _isMinimized = false;
+                    return;
+                }
+
                 //if (_isMinimized != value)
                 {
                     _isMinimized = value;
@@ -145,6 +154,23 @@ namespace ClassicUO.Game.UI.Gumps
         public bool IsBackgammonBoard =>
             Graphic == 0x092E;
 
+        private static bool ResolveGridView(uint serial)
+        {
+            var profile = ProfileManager.CurrentProfile;
+
+            if (profile == null)
+            {
+                return false;
+            }
+
+            return ContainerViewModeResolver.Resolve(
+                profile.ContainerViewMode,
+                profile.ContainerToggleDefaultGrid,
+                profile.ContainerGridStates,
+                serial
+            );
+        }
+
         private void BuildGump()
         {
             CanMove = true;
@@ -160,9 +186,26 @@ namespace ClassicUO.Game.UI.Gumps
                 return;
             }
 
-            float scale = GetScale();
-
             _data = World.ContainerManager.Get(Graphic);
+
+            _gridView = null;
+            _toggleButton = null;
+
+            if (ResolveGridView(LocalSerial))
+            {
+                BuildGridBranch();
+            }
+            else
+            {
+                BuildStandardBranch(item);
+            }
+
+            AddToggleButtonIfNeeded();
+        }
+
+        private void BuildStandardBranch(Item item)
+        {
+            float scale = GetScale();
             ushort g = _data.Graphic;
 
             _gumpPicContainer?.Dispose();
@@ -196,6 +239,70 @@ namespace ClassicUO.Game.UI.Gumps
 
             Width = _gumpPicContainer.Width = (int)(_gumpPicContainer.Width * scale);
             Height = _gumpPicContainer.Height = (int)(_gumpPicContainer.Height * scale);
+        }
+
+        private void BuildGridBranch()
+        {
+            // Grid mode has no minimizer hitbox, no container art, and no corpse eye.
+            _gumpPicContainer = null;
+            _hitBox = null;
+            _eyeGumpPic = null;
+
+            _gridView = new GridContainerView(this) { X = 0, Y = 0 };
+            Add(_gridView);
+            _gridView.Rebuild();
+
+            Width = _gridView.Width;
+            Height = _gridView.Height;
+        }
+
+        private void AddToggleButtonIfNeeded()
+        {
+            if (ProfileManager.CurrentProfile == null
+                || ProfileManager.CurrentProfile.ContainerViewMode != 2)
+            {
+                return;
+            }
+
+            NiceButton btn = new NiceButton(
+                Width - 22,
+                2,
+                20,
+                20,
+                ButtonAction.Activate,
+                _gridView != null ? "S" : "G"
+            )
+            {
+                IsSelectable = false
+            };
+
+            btn.MouseUp += ToggleButtonOnMouseUp;
+
+            _toggleButton = btn;
+            Add(btn);
+        }
+
+        private void ToggleButtonOnMouseUp(object sender, MouseEventArgs e)
+        {
+            if (e.Button != MouseButtonType.Left)
+            {
+                return;
+            }
+
+            var profile = ProfileManager.CurrentProfile;
+
+            if (profile == null)
+            {
+                return;
+            }
+
+            profile.ContainerGridStates[LocalSerial] = ContainerViewModeResolver.ComputeToggleValue(
+                profile.ContainerToggleDefaultGrid,
+                profile.ContainerGridStates,
+                LocalSerial
+            );
+
+            RequestUpdateContents();
         }
 
         private void HitBoxOnMouseUp(object sender, MouseEventArgs e)
@@ -498,7 +605,7 @@ namespace ClassicUO.Game.UI.Gumps
                 SelectedObject.SelectedContainer = item;
             }
 
-            if (Graphic == CORPSES_GUMP && _corpseEyeTicks < Time.Ticks)
+            if (Graphic == CORPSES_GUMP && _eyeGumpPic != null && _corpseEyeTicks < Time.Ticks)
             {
                 _eyeCorspeOffset = _eyeCorspeOffset == 0 ? 1 : 0;
                 _corpseEyeTicks = (long)Time.Ticks + 750;
@@ -513,8 +620,13 @@ namespace ClassicUO.Game.UI.Gumps
         {
             Clear();
             BuildGump();
-            IsMinimized = IsMinimized;
-            ItemsOnAdded();
+
+            if (_gridView == null)
+            {
+                IsMinimized = IsMinimized;
+                ItemsOnAdded();
+            }
+            // Grid branch: BuildGump already created and populated _gridView.
         }
 
         public override void Save(XmlTextWriter writer)
@@ -680,7 +792,7 @@ namespace ClassicUO.Game.UI.Gumps
             base.AddToRenderLists(renderLists, x, y, ref layerDepthRef);
             float layerDepth = layerDepthRef;
 
-            if (CUOEnviroment.Debug && !IsMinimized)
+            if (CUOEnviroment.Debug && !IsMinimized && _gridView == null)
             {
                 Rectangle bounds = _data.Bounds;
                 float scale = GetScale();
