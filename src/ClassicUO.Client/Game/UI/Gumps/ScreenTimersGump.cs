@@ -114,20 +114,24 @@ namespace ClassicUO.Game.UI.Gumps
 
                 case TimerShape.Circle:
                 {
-                    // Approximate radial depletion with a shrinking, centered filled
-                    // square. A true arc can replace this later without touching any
-                    // of the layout inputs (px, py, w, h, remaining) computed above.
-                    int side = (int)(w * remaining);
-                    int cx = px + (w - side) / 2;
-                    int cy = py + (h - side) / 2;
-                    if (side > 0)
+                    // Ring outline that depletes clockwise from 12 o'clock. The gray
+                    // backdrop draws the full circle; the hued arc covers only the
+                    // remaining fraction, so it shrinks back toward 12 as time runs
+                    // out. Built from short line segments since the batcher has no
+                    // native arc primitive.
+                    float radius = Math.Min(w, h) / 2f - 1f;
+                    float ccx = px + w / 2f;
+                    float ccy = py + h / 2f;
+                    float frac = Math.Clamp(remaining, 0f, 1f);
+                    renderLists.AddGumpNoAtlas(batcher =>
                     {
-                        renderLists.AddGumpNoAtlas(batcher =>
+                        DrawArc(batcher, ccx, ccy, radius, 1f, _neutralHue, depth);
+                        if (frac > 0f)
                         {
-                            batcher.Draw(_fillTexture, new Rectangle(cx, cy, side, side), hued, depth);
-                            return true;
-                        });
-                    }
+                            DrawArc(batcher, ccx, ccy, radius, frac, hued, depth);
+                        }
+                        return true;
+                    });
                     break;
                 }
 
@@ -149,6 +153,40 @@ namespace ClassicUO.Game.UI.Gumps
                     renderLists.AddGumpNoAtlas(rt, px, textY, depth, 1f, e.Hue);
                 }
             }
+        }
+
+        // Stroke width of the ring outline, in pixels.
+        private const float CircleStroke = 2f;
+
+        // Draws a clockwise arc starting at 12 o'clock and sweeping `frac` of a full
+        // turn, approximated by line segments. Segment count scales with radius so
+        // large timers stay smooth without over-drawing tiny ones.
+        private static void DrawArc(UltimaBatcher2D batcher, float cx, float cy, float radius, float frac, Vector3 color, float depth)
+        {
+            if (radius <= 0f || frac <= 0f)
+            {
+                return;
+            }
+
+            const float TwoPi = MathF.PI * 2f;
+            int segments = Math.Max(2, (int)(radius * frac));
+            float sweep = frac * TwoPi;
+
+            Vector2 prev = PointOnCircle(cx, cy, radius, 0f);
+            for (int i = 1; i <= segments; i++)
+            {
+                float t = sweep * (i / (float)segments);
+                Vector2 cur = PointOnCircle(cx, cy, radius, t);
+                batcher.DrawLine(_fillTexture, prev, cur, color, CircleStroke, depth);
+                prev = cur;
+            }
+        }
+
+        // Angle 0 = top (12 o'clock); increasing angle sweeps clockwise in screen
+        // space (y grows downward).
+        private static Vector2 PointOnCircle(float cx, float cy, float radius, float angle)
+        {
+            return new Vector2(cx + radius * MathF.Sin(angle), cy - radius * MathF.Cos(angle));
         }
 
         private RenderedText GetOrBuildText(in ScreenTimerEntry e, int secs, bool wantTime)

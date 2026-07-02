@@ -141,8 +141,16 @@ namespace ClassicUO.Game.UI.Gumps
             {
                 var e = kv.Value;
                 long timer = e.IsInfinite ? 0xFFFF_FFFF : e.ExpiryTicks;
+
+                // Accept a BuffIconType id (e.g. 1078 = Surge) and resolve it to a
+                // gump graphic like the server path does; fall back to treating the
+                // value as a raw gump graphic for custom icons outside the table.
+                ushort graphic = Data.BuffTable.TryResolveIcon(e.Graphic, out ushort mapped)
+                    ? mapped
+                    : e.Graphic;
+
                 _box.Add(new BuffControlEntry(new BuffEntryInput(
-                    e.Graphic, timer, e.Text, e.Kind, $"ID: {e.Id}")));
+                    graphic, timer, e.Text, e.Kind, $"ID: {e.Id}")));
             }
 
             _background.Graphic = _graphic;
