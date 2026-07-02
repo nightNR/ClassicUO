@@ -726,6 +726,9 @@ when amount is or exceeds</value>
   <data name="RelativeDragAndDropContainers" xml:space="preserve">
     <value>Relative drag and drop items in containers</value>
   </data>
+  <data name="AllowItemsOutsideContainerBounds" xml:space="preserve">
+    <value>Allow dropping items outside container bounds</value>
+  </data>
   <data name="OverrideContainerGumpLocation" xml:space="preserve">
     <value>Override container gump location</value>
   </data>

@@ -370,6 +370,10 @@ namespace ClassicUO.Game.UI.Gumps
 
                         float scale = GetScale();
 
+                        bool clampToBounds =
+                            ProfileManager.CurrentProfile == null
+                            || !ProfileManager.CurrentProfile.AllowItemsOutsideContainerBounds;
+
                         containerBounds.X = (int)(containerBounds.X * scale);
                         containerBounds.Y = (int)(containerBounds.Y * scale);
                         containerBounds.Width = (int)(containerBounds.Width * scale);
@@ -408,25 +412,31 @@ namespace ClassicUO.Game.UI.Gumps
                             x -= textureW >> 1;
                             y -= textureH >> 1;
 
-                            if (x + textureW > containerBounds.Width)
+                            if (clampToBounds)
                             {
-                                x = containerBounds.Width - textureW;
-                            }
+                                if (x + textureW > containerBounds.Width)
+                                {
+                                    x = containerBounds.Width - textureW;
+                                }
 
-                            if (y + textureH > containerBounds.Height)
-                            {
-                                y = containerBounds.Height - textureH;
+                                if (y + textureH > containerBounds.Height)
+                                {
+                                    y = containerBounds.Height - textureH;
+                                }
                             }
                         }
 
-                        if (x < containerBounds.X)
+                        if (clampToBounds)
                         {
-                            x = containerBounds.X;
-                        }
+                            if (x < containerBounds.X)
+                            {
+                                x = containerBounds.X;
+                            }
 
-                        if (y < containerBounds.Y)
-                        {
-                            y = containerBounds.Y;
+                            if (y < containerBounds.Y)
+                            {
+                                y = containerBounds.Y;
+                            }
                         }
 
                         x = (int)(x / scale);
@@ -612,6 +622,14 @@ namespace ClassicUO.Game.UI.Gumps
 
         public void CheckItemControlPosition(Item item)
         {
+            if (
+                ProfileManager.CurrentProfile != null
+                && ProfileManager.CurrentProfile.AllowItemsOutsideContainerBounds
+            )
+            {
+                return;
+            }
+
             Rectangle dataBounds = _data.Bounds;
 
             int boundX = dataBounds.X;

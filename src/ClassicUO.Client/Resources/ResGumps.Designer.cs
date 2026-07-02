@@ -3377,6 +3377,15 @@ namespace ClassicUO.Resources {
                 return ResourceManager.GetString("RelativeDragAndDropContainers", resourceCulture);
             }
         }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Allow dropping items outside container bounds.
+        /// </summary>
+        public static string AllowItemsOutsideContainerBounds {
+            get {
+                return ResourceManager.GetString("AllowItemsOutsideContainerBounds", resourceCulture);
+            }
+        }
         
         /// <summary>
         ///   Looks up a localized string similar to Releasing Ctrl Restores Scale.

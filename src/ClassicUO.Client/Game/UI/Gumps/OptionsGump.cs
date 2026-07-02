@@ -39,7 +39,7 @@ namespace ClassicUO.Game.UI.Gumps
         private Checkbox _autoOpenDoors, _autoOpenCorpse, _skipEmptyCorpse, _disableTabBtn, _disableCtrlQWBtn, _disableDefaultHotkeys, _disableArrowBtn, _disableAutoMove, _overrideContainerLocation, _smoothDoors, _showTargetRangeIndicator, _customBars, _customBarsBBG, _saveHealthbars;
         private Checkbox _nameOverheadAlwaysOn, _nameOverheadShowHpBar;
         private HSliderBar _cellSize;
-        private Checkbox _containerScaleItems, _containerDoubleClickToLoot, _relativeDragAnDropItems, _useLargeContianersGumps, _highlightContainersWhenMouseIsOver;
+        private Checkbox _containerScaleItems, _containerDoubleClickToLoot, _relativeDragAnDropItems, _useLargeContianersGumps, _highlightContainersWhenMouseIsOver, _allowItemsOutsideContainerBounds;
 
 
         // containers
@@ -3540,6 +3540,17 @@ namespace ClassicUO.Game.UI.Gumps
 
             startY += _relativeDragAnDropItems.Height + 2;
 
+            _allowItemsOutsideContainerBounds = AddCheckBox
+            (
+                rightArea,
+                ResGumps.AllowItemsOutsideContainerBounds,
+                _currentProfile.AllowItemsOutsideContainerBounds,
+                startX,
+                startY
+            );
+
+            startY += _allowItemsOutsideContainerBounds.Height + 2;
+
             _highlightContainersWhenMouseIsOver = AddCheckBox
             (
                 rightArea,
@@ -3872,6 +3883,7 @@ namespace ClassicUO.Game.UI.Gumps
                     _useLargeContianersGumps.IsChecked = false;
                     _containerDoubleClickToLoot.IsChecked = false;
                     _relativeDragAnDropItems.IsChecked = false;
+                    _allowItemsOutsideContainerBounds.IsChecked = false;
                     _highlightContainersWhenMouseIsOver.IsChecked = false;
                     _overrideContainerLocation.IsChecked = false;
                     _overrideContainerLocationSetting.SelectedIndex = 0;
@@ -4477,6 +4489,7 @@ namespace ClassicUO.Game.UI.Gumps
             _currentProfile.UseLargeContainerGumps = _useLargeContianersGumps.IsChecked;
             _currentProfile.DoubleClickToLootInsideContainers = _containerDoubleClickToLoot.IsChecked;
             _currentProfile.RelativeDragAndDropItems = _relativeDragAnDropItems.IsChecked;
+            _currentProfile.AllowItemsOutsideContainerBounds = _allowItemsOutsideContainerBounds.IsChecked;
             _currentProfile.HighlightContainerWhenSelected = _highlightContainersWhenMouseIsOver.IsChecked;
             _currentProfile.HueContainerGumps = _hueContainerGumps.IsChecked;
 
