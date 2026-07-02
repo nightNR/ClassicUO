@@ -50,6 +50,7 @@ namespace ClassicUO.Game.UI.Gumps
         private Combobox _dragSelectModifierKey;
         private Combobox _backpackStyle;
         private Checkbox _hueContainerGumps;
+        private Checkbox _containerToggleDefaultGrid;
 
 
         //counters
@@ -119,6 +120,7 @@ namespace ClassicUO.Game.UI.Gumps
         private Checkbox _overrideAllFonts;
         private Combobox _overrideAllFontsIsUnicodeCheckbox;
         private Combobox _overrideContainerLocationSetting;
+        private Combobox _containerViewMode;
         private ClickableColorBox _poisonColorPickerBox, _paralyzedColorPickerBox, _invulnerableColorPickerBox;
         private NiceButton _randomizeColorsButton;
         private Checkbox _restorezoomCheckbox, _zoomCheckbox;
@@ -3601,6 +3603,46 @@ namespace ClassicUO.Game.UI.Gumps
             startX = 5;
             startY += _overrideContainerLocation.Height + 2 + 10;
 
+            // Container view mode (Standard / Grid / Toggle)
+            Label containerViewLabel = AddLabel(rightArea, ResGumps.ContainerViewMode, startX, startY);
+            startX += containerViewLabel.Width + 5;
+
+            _containerViewMode = AddCombobox
+            (
+                rightArea,
+                new[]
+                {
+                    ResGumps.ContainerViewMode_Standard,
+                    ResGumps.ContainerViewMode_Grid,
+                    ResGumps.ContainerViewMode_Toggle
+                },
+                _currentProfile.ContainerViewMode,
+                startX,
+                startY,
+                200
+            );
+
+            startX = 5;
+            startY += _containerViewMode.Height + 2;
+
+            _containerToggleDefaultGrid = AddCheckBox
+            (
+                rightArea,
+                ResGumps.ContainerToggleDefaultGrid,
+                _currentProfile.ContainerToggleDefaultGrid,
+                startX,
+                startY
+            );
+
+            // Only meaningful in Toggle mode.
+            _containerToggleDefaultGrid.IsEnabled = _currentProfile.ContainerViewMode == 2;
+            _containerViewMode.OnOptionSelected += (s, index) =>
+            {
+                _containerToggleDefaultGrid.IsEnabled = index == 2;
+            };
+
+            startY += _containerToggleDefaultGrid.Height + 2 + 10;
+
             NiceButton button = new NiceButton
             (
                 startX,
@@ -4492,6 +4534,18 @@ namespace ClassicUO.Game.UI.Gumps
             _currentProfile.AllowItemsOutsideContainerBounds = _allowItemsOutsideContainerBounds.IsChecked;
             _currentProfile.HighlightContainerWhenSelected = _highlightContainersWhenMouseIsOver.IsChecked;
             _currentProfile.HueContainerGumps = _hueContainerGumps.IsChecked;
+
+            if (_currentProfile.ContainerViewMode != _containerViewMode.SelectedIndex
+                || _currentProfile.ContainerToggleDefaultGrid != _containerToggleDefaultGrid.IsChecked)
+            {
+                _currentProfile.ContainerViewMode = _containerViewMode.SelectedIndex;
+                _currentProfile.ContainerToggleDefaultGrid = _containerToggleDefaultGrid.IsChecked;
+
+                foreach (ContainerGump containerGump in UIManager.Gumps.OfType<ContainerGump>())
+                {
+                    containerGump.RequestUpdateContents();
+                }
+            }
 
             if (_currentProfile.BackpackStyle != _backpackStyle.SelectedIndex)
             {

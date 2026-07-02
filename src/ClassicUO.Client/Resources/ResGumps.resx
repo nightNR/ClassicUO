@@ -219,6 +219,21 @@
   <data name="GridLoot_None" xml:space="preserve">
     <value>None</value>
   </data>
+  <data name="ContainerViewMode" xml:space="preserve">
+    <value>Container view:</value>
+  </data>
+  <data name="ContainerViewMode_Standard" xml:space="preserve">
+    <value>Standard</value>
+  </data>
+  <data name="ContainerViewMode_Grid" xml:space="preserve">
+    <value>Grid</value>
+  </data>
+  <data name="ContainerViewMode_Toggle" xml:space="preserve">
+    <value>Toggle</value>
+  </data>
+  <data name="ContainerToggleDefaultGrid" xml:space="preserve">
+    <value>Default toggled containers to grid</value>
+  </data>
   <data name="HideRoofTiles" xml:space="preserve">
     <value>Hide roof tiles</value>
   </data>

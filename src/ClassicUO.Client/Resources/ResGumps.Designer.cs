@@ -1879,7 +1879,52 @@ namespace ClassicUO.Resources {
                 return ResourceManager.GetString("GridLoot_None", resourceCulture);
             }
         }
-        
+
+        /// <summary>
+        ///   Looks up a localized string similar to Container view:.
+        /// </summary>
+        public static string ContainerViewMode {
+            get {
+                return ResourceManager.GetString("ContainerViewMode", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Standard.
+        /// </summary>
+        public static string ContainerViewMode_Standard {
+            get {
+                return ResourceManager.GetString("ContainerViewMode_Standard", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Grid.
+        /// </summary>
+        public static string ContainerViewMode_Grid {
+            get {
+                return ResourceManager.GetString("ContainerViewMode_Grid", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Toggle.
+        /// </summary>
+        public static string ContainerViewMode_Toggle {
+            get {
+                return ResourceManager.GetString("ContainerViewMode_Toggle", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Default toggled containers to grid.
+        /// </summary>
+        public static string ContainerToggleDefaultGrid {
+            get {
+                return ResourceManager.GetString("ContainerToggleDefaultGrid", resourceCulture);
+            }
+        }
+
         /// <summary>
         ///   Looks up a localized string similar to [Guild]: .
         /// </summary>
