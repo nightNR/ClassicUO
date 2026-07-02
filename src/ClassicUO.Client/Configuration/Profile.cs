@@ -285,6 +285,17 @@ namespace ClassicUO.Configuration
 
         public bool AllowItemsOutsideContainerBounds { get; set; }
 
+        // 0 = Standard (default), 1 = Grid, 2 = Toggle
+        public int ContainerViewMode { get; set; }
+
+        // In Toggle mode, the view used for a serial the user has never toggled.
+        // false = standard, true = grid.
+        public bool ContainerToggleDefaultGrid { get; set; }
+
+        // Explicit per-serial choice in Toggle mode. true = grid, false = standard.
+        // Absent key => fall back to ContainerToggleDefaultGrid.
+        public Dictionary<uint, bool> ContainerGridStates { get; set; } = new();
+
         public bool HighlightContainerWhenSelected { get; set; }
 
         public bool UseNewTargetSystem { get; set; } = true;
