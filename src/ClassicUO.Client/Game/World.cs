@@ -278,6 +278,7 @@ namespace ClassicUO.Game
 
         public void Update()
         {
+            Managers.PluginTimersManager.Update(Time.Ticks);
             if (Player != null)
             {
                 if (SerialHelper.IsValid(ObjectToRemove))
