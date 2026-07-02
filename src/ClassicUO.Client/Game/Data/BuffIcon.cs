@@ -4,6 +4,8 @@ using System;
 
 namespace ClassicUO.Game.Data
 {
+    internal enum BuffDisplayKind { None, Buff, Debuff }
+
     internal class BuffIcon : IEquatable<BuffIcon>
     {
         public BuffIcon(BuffIconType type, ushort graphic, long timer, string text)
@@ -26,5 +28,7 @@ namespace ClassicUO.Game.Data
         public readonly long Timer;
 
         public readonly BuffIconType Type;
+
+        public BuffDisplayKind Kind = BuffDisplayKind.None;
     }
 }
