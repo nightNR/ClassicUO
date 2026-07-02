@@ -30,6 +30,8 @@ namespace ClassicUO
         public IntPtr PacketInFn;
         public IntPtr PacketOutFn;
         public IntPtr /*delegate*<int, void>*/ WalkProgressFn;
+        public IntPtr /*delegate*<int, int, void>*/ BuffEventFn;
+        public IntPtr /*delegate*<int, int, void>*/ TimerEventFn;
     }
 
     [StructLayout(LayoutKind.Sequential)]
@@ -104,6 +106,11 @@ namespace ClassicUO
         private readonly dOnWalkProgress _walkProgress;
 
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        delegate void dOnPluginTimerEvent(int id, int reason);
+        [MarshalAs(UnmanagedType.FunctionPtr)]
+        private readonly dOnPluginTimerEvent _buffEvent, _timerEvent;
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         delegate void dOnPluginFocusWindow();
         [MarshalAs(UnmanagedType.FunctionPtr)]
         private readonly dOnPluginFocusWindow _focusGained, _focusLost;
@@ -137,6 +144,11 @@ namespace ClassicUO
             _connected = Marshal.GetDelegateForFunctionPointer<dOnPluginConnection>(setup->ConnectedFn);
             _disconnected = Marshal.GetDelegateForFunctionPointer<dOnPluginConnection>(setup->DisconnectedFn);
             _cmdList = Marshal.GetDelegateForFunctionPointer<dOnPluginCommandList>(setup->CmdListFn);
+
+            if (setup->BuffEventFn != IntPtr.Zero)
+                _buffEvent = Marshal.GetDelegateForFunctionPointer<dOnPluginTimerEvent>(setup->BuffEventFn);
+            if (setup->TimerEventFn != IntPtr.Zero)
+                _timerEvent = Marshal.GetDelegateForFunctionPointer<dOnPluginTimerEvent>(setup->TimerEventFn);
         }
 
         public Dictionary<IntPtr, GraphicsResource> GfxResources { get; } = new Dictionary<nint, GraphicsResource>();
@@ -391,8 +403,15 @@ namespace ClassicUO
             _walkProgress?.Invoke(state);
         }
 
-        public void BuffEvent(int id, int reason) { }
-        public void TimerEvent(int id, int reason) { }
+        public void BuffEvent(int id, int reason)
+        {
+            _buffEvent?.Invoke(id, reason);
+        }
+
+        public void TimerEvent(int id, int reason)
+        {
+            _timerEvent?.Invoke(id, reason);
+        }
     }
 
     interface IPluginHost
