@@ -9,10 +9,19 @@ using ClassicUO.Renderer;
 using ClassicUO.Resources;
 using Microsoft.Xna.Framework;
 using System;
+using System.Linq;
 using System.Xml;
 
 namespace ClassicUO.Game.UI.Gumps
 {
+    /// <summary>Which buff kinds a <see cref="BuffGump"/> instance displays.</summary>
+    internal enum BuffGumpMode
+    {
+        All = 0,    // joined: every icon
+        Buffs = 1,  // buffs + neutral (None)
+        Debuffs = 2 // debuffs only
+    }
+
     /// <summary>Rendering input for one buff icon, from either a server BuffIcon or a plugin buff.</summary>
     internal readonly struct BuffEntryInput
     {
@@ -40,6 +49,12 @@ namespace ClassicUO.Game.UI.Gumps
         private ushort _graphic;
         private DataBox _box;
         private int _shiftX, _shiftY;
+        private BuffGumpMode _mode = BuffGumpMode.All;
+
+        // Vertical gap between the Buffs and Debuffs windows when first split.
+        private const int SplitFallbackOffsetY = 100;
+
+        public BuffGumpMode Mode => _mode;
 
         public BuffGump(World world) : base(world, 0, 0)
         {
@@ -48,8 +63,17 @@ namespace ClassicUO.Game.UI.Gumps
             AcceptMouseInput = true;
         }
 
-        public BuffGump(World world, int x, int y) : this(world)
+        public BuffGump(World world, int x, int y) : this(world, x, y, BuffGumpMode.All)
         {
+        }
+
+        public BuffGump(World world, int x, int y, BuffGumpMode mode) : this(world)
+        {
+            _mode = mode;
+            // Distinct serial per mode so the two split windows save/restore
+            // independently; All stays 0 to preserve existing saved layouts.
+            LocalSerial = (uint)mode;
+
             X = x;
             Y = y;
 
@@ -59,18 +83,87 @@ namespace ClassicUO.Game.UI.Gumps
             SetInScreen();
 
             BuildGump();
-
-            Managers.PluginTimersManager.GumpRefresh = RequestUpdateContents;
         }
 
         public override GumpType GumpType => GumpType.Buff;
 
         public override void Dispose()
         {
-            if (Managers.PluginTimersManager.GumpRefresh == (Action)RequestUpdateContents)
-                Managers.PluginTimersManager.GumpRefresh = null;
-
             base.Dispose();
+
+            // Drop the shared refresh hook only when the last buff window closes.
+            if (!Managers.UIManager.Gumps.OfType<BuffGump>().Any(g => g != this && !g.IsDisposed))
+            {
+                Managers.PluginTimersManager.GumpRefresh = null;
+            }
+        }
+
+        /// <summary>Rebuilds every open buff window; used by the shared refresh hook.</summary>
+        public static void RequestUpdateContentsAll()
+        {
+            foreach (BuffGump g in Managers.UIManager.Gumps.OfType<BuffGump>())
+            {
+                g.RequestUpdateContents();
+            }
+        }
+
+        /// <summary>
+        /// Status-window button action: open the joined gump when none exist,
+        /// otherwise toggle between joined (single) and split (Buffs + Debuffs).
+        /// </summary>
+        public static void ToggleFromStatusButton(World world)
+        {
+            var list = Managers.UIManager.Gumps.OfType<BuffGump>().Where(g => !g.IsDisposed).ToList();
+
+            if (list.Count == 0)
+            {
+                Managers.UIManager.Add(new BuffGump(world, 100, 100, BuffGumpMode.All));
+                return;
+            }
+
+            BuffGump joined = list.FirstOrDefault(g => g.Mode == BuffGumpMode.All);
+
+            if (joined != null)
+            {
+                // Joined -> split. Buffs inherits the joined position; Debuffs
+                // offsets below it.
+                int x = joined.X;
+                int y = joined.Y;
+                joined.Dispose();
+
+                var buffs = new BuffGump(world, x, y, BuffGumpMode.Buffs);
+                Managers.UIManager.Add(buffs);
+
+                int offset = buffs.Height > 0 ? buffs.Height + 5 : SplitFallbackOffsetY;
+                Managers.UIManager.Add(new BuffGump(world, x, y + offset, BuffGumpMode.Debuffs));
+            }
+            else
+            {
+                // Split -> join. New joined window inherits the Buffs position.
+                BuffGump buffs = list.FirstOrDefault(g => g.Mode == BuffGumpMode.Buffs) ?? list[0];
+                int x = buffs.X;
+                int y = buffs.Y;
+
+                foreach (BuffGump g in list)
+                {
+                    g.Dispose();
+                }
+
+                Managers.UIManager.Add(new BuffGump(world, x, y, BuffGumpMode.All));
+            }
+        }
+
+        private bool Accepts(Data.BuffDisplayKind kind)
+        {
+            switch (_mode)
+            {
+                case BuffGumpMode.Buffs:
+                    return kind != Data.BuffDisplayKind.Debuff; // buff + neutral
+                case BuffGumpMode.Debuffs:
+                    return kind == Data.BuffDisplayKind.Debuff;
+                default:
+                    return true;
+            }
         }
 
         private void BuildGump()
@@ -132,6 +225,12 @@ namespace ClassicUO.Game.UI.Gumps
                 foreach (var k in World.Player.BuffIcons)
                 {
                     BuffIcon icon = World.Player.BuffIcons[k.Key];
+
+                    if (!Accepts(icon.Kind))
+                    {
+                        continue;
+                    }
+
                     _box.Add(new BuffControlEntry(new BuffEntryInput(
                         icon.Graphic, icon.Timer, icon.Text, icon.Kind, $"ID: {icon.Type}")));
                 }
@@ -140,6 +239,12 @@ namespace ClassicUO.Game.UI.Gumps
             foreach (var kv in Managers.PluginBuffs.Entries)
             {
                 var e = kv.Value;
+
+                if (!Accepts(e.Kind))
+                {
+                    continue;
+                }
+
                 long timer = e.IsInfinite ? 0xFFFF_FFFF : e.ExpiryTicks;
 
                 // Accept a BuffIconType id (e.g. 1078 = Surge) and resolve it to a
@@ -158,6 +263,10 @@ namespace ClassicUO.Game.UI.Gumps
             _background.Y = 0;
 
             UpdateElements();
+
+            // Wire the shared refresh hook on every build so both construction and
+            // restore paths keep plugin-buff expiry updates flowing to all windows.
+            Managers.PluginTimersManager.GumpRefresh = RequestUpdateContentsAll;
         }
 
         public override void Save(XmlTextWriter writer)
@@ -171,6 +280,7 @@ namespace ClassicUO.Game.UI.Gumps
 
             writer.WriteAttributeString("graphic", _graphic.ToString());
             writer.WriteAttributeString("direction", ((int)_direction).ToString());
+            writer.WriteAttributeString("mode", ((int)_mode).ToString());
         }
 
         public override void Restore(XmlElement xml)
@@ -179,6 +289,13 @@ namespace ClassicUO.Game.UI.Gumps
 
             _graphic = ushort.Parse(xml.GetAttribute("graphic"));
             _direction = (GumpDirection)byte.Parse(xml.GetAttribute("direction"));
+
+            string modeAttr = xml.GetAttribute("mode");
+            _mode = string.IsNullOrEmpty(modeAttr)
+                ? BuffGumpMode.All
+                : (BuffGumpMode)int.Parse(modeAttr);
+            LocalSerial = (uint)_mode;
+
             BuildGump();
         }
         protected override void UpdateContents()

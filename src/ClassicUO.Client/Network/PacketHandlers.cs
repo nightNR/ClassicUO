@@ -5499,13 +5499,12 @@ namespace ClassicUO.Network
 
             if (iconID < BuffTable.Table.Length)
             {
-                BuffGump gump = UIManager.GetGump<BuffGump>();
                 ushort count = p.ReadUInt16BE();
 
                 if (count == 0)
                 {
                     world.Player.RemoveBuff(ic);
-                    gump?.RequestUpdateContents();
+                    BuffGump.RequestUpdateContentsAll();
                 }
                 else
                 {
@@ -5576,7 +5575,7 @@ namespace ClassicUO.Network
 
                         if (!alreadyExists)
                         {
-                            gump?.RequestUpdateContents();
+                            BuffGump.RequestUpdateContentsAll();
                         }
                     }
                 }
