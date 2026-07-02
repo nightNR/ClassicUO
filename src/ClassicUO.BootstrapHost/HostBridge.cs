@@ -158,6 +158,8 @@ internal sealed unsafe class HostBridge
         PacketInFn        = (nint)(delegate* unmanaged[Cdecl]<nint, int*, byte>)        &OnPacketIn,
         PacketOutFn       = (nint)(delegate* unmanaged[Cdecl]<nint, int*, byte>)        &OnPacketOut,
         WalkProgressFn    = (nint)(delegate* unmanaged[Cdecl]<int, void>)               &OnWalkProgress,
+        BuffEventFn       = (nint)(delegate* unmanaged[Cdecl]<int, int, void>)         &OnBuffEvent,
+        TimerEventFn      = (nint)(delegate* unmanaged[Cdecl]<int, int, void>)         &OnTimerEvent,
     };
 
     // ─── cuo → host callbacks ────────────────────────────────────────────────
@@ -213,6 +215,14 @@ internal sealed unsafe class HostBridge
     [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
     private static void OnWalkProgress(int state)
         => _instance?.RaiseEachPlugin(p => p.RaiseWalkProgress((WalkState)state));
+
+    [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
+    private static void OnBuffEvent(int id, int reason)
+        => _instance?.RaiseEachPlugin(p => p.RaiseBuffEvent(id, reason));
+
+    [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
+    private static void OnTimerEvent(int id, int reason)
+        => _instance?.RaiseEachPlugin(p => p.RaiseTimerEvent(id, reason));
 
     [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
     private static byte OnPacketIn(nint data, int* lengthRef)
@@ -328,6 +338,8 @@ internal struct HostBindings
     public nint PacketInFn;
     public nint PacketOutFn;
     public nint WalkProgressFn;
+    public nint BuffEventFn;   // void(int id, int reason)
+    public nint TimerEventFn;  // void(int id, int reason)
 }
 
 [StructLayout(LayoutKind.Sequential)]
@@ -347,4 +359,12 @@ internal struct ClientBindings
     public nint OpenStatusBarFn;       // void(uint serial, int x, int y, byte moveIfExists, int groupId)
     public nint CloseStatusBarFn;      // void(uint serial)
     public nint SetOverlayFn;          // void(uint serial, ushort hue, ushort backgroundHue)
+    public nint AddBuffFn;             // void(int id, ushort graphic, int durationMs, int kind, nint textUtf8)
+    public nint RemoveBuffFn;          // void(int id)
+    public nint ClearBuffsFn;          // void()
+    public nint DefineTimerGroupFn;    // void(int groupId, int x, int y, int direction, int gap)
+    public nint AddTimerFn;            // void(int id, int shape, int durationMs, ushort hue, int groupId, int x, int y, int width, int height, nint labelUtf8, byte showTime)
+    public nint RemoveTimerFn;         // void(int id)
+    public nint RemoveTimerGroupFn;    // void(int groupId)
+    public nint ClearTimersFn;         // void()
 }

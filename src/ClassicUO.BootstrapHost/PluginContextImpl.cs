@@ -17,6 +17,8 @@ internal sealed class PluginContextImpl : IPluginContext
     private readonly StatusBarsImpl _statusBars;
     private readonly ClientImpl _client;
     private readonly DispatcherImpl _dispatcher;
+    private readonly BuffsImpl _buffs;
+    private readonly ScreenTimersImpl _screenTimers;
 
     public PluginContextImpl(HostBridge bridge, PluginRegistration registration, string folderName, string pluginsRoot)
     {
@@ -30,6 +32,8 @@ internal sealed class PluginContextImpl : IPluginContext
         _statusBars = new StatusBarsImpl(bridge);
         _client     = new ClientImpl(bridge);
         _dispatcher = new DispatcherImpl(bridge);
+        _buffs = new BuffsImpl(bridge);
+        _screenTimers = new ScreenTimersImpl(bridge);
     }
 
     public string Id { get; }
@@ -43,6 +47,8 @@ internal sealed class PluginContextImpl : IPluginContext
     public IStatusBars StatusBars => _statusBars;
     public IClient Client => _client;
     public IDispatcher Game => _dispatcher;
+    public IPluginBuffs Buffs => _buffs;
+    public IScreenTimers ScreenTimers => _screenTimers;
 
     public event Action? Connected;
     public event Action? Disconnected;
@@ -75,6 +81,8 @@ internal sealed class PluginContextImpl : IPluginContext
     public void RaiseFocusLost()             => FocusLost?.Invoke();
     public void RaisePlayerPositionChanged(int x, int y, int z) => PlayerPositionChanged?.Invoke(x, y, z);
     public void RaiseWalkProgress(WalkState state) => _actions.RaiseWalkProgress(state);
+    public void RaiseBuffEvent(int id, int reason) => _buffs.RaiseEvent(id, reason);
+    public void RaiseTimerEvent(int id, int reason) => _screenTimers.RaiseEvent(id, reason);
     public void RaiseTick()                  => Tick?.Invoke();
     public void RaiseClosing()               => Closing?.Invoke();
     public void RaiseMouse(int button, int wheel) => _input.RaiseMouse(button, wheel);
@@ -244,6 +252,125 @@ internal sealed class StatusBarsImpl : IStatusBars
             ((delegate* unmanaged[Cdecl]<uint, ushort, ushort, void>)fn)(serial, hue, backgroundHue);
         else
             _bridge.PostToGameThread(() => ((delegate* unmanaged[Cdecl]<uint, ushort, ushort, void>)fn)(serial, hue, backgroundHue));
+    }
+}
+
+internal sealed class BuffsImpl : IPluginBuffs
+{
+    private readonly HostBridge _bridge;
+    public BuffsImpl(HostBridge bridge) { _bridge = bridge; }
+
+    public event Action<int>? Expired;
+    public event Action<int, BuffRemoveReason>? Removed;
+
+    internal void RaiseEvent(int id, int reason)
+    {
+        var r = (BuffRemoveReason)reason;
+        if (r == BuffRemoveReason.Expired)
+            Expired?.Invoke(id);
+        Removed?.Invoke(id, r);
+    }
+
+    public unsafe void AddOrUpdate(BuffConfig config)
+    {
+        var fn = _bridge.ClientBindings.AddBuffFn;
+        if (fn == 0 || config is null) return;
+
+        int id = config.Id;
+        ushort graphic = config.Graphic;
+        int dur = config.DurationMs;
+        int kind = (int)config.Kind;
+        nint textPtr = string.IsNullOrEmpty(config.Text) ? nint.Zero : Marshal.StringToHGlobalAnsi(config.Text);
+
+        void Call()
+        {
+            try { ((delegate* unmanaged[Cdecl]<int, ushort, int, int, nint, void>)fn)(id, graphic, dur, kind, textPtr); }
+            finally { if (textPtr != nint.Zero) Marshal.FreeHGlobal(textPtr); }
+        }
+
+        if (_bridge.IsGameThread) Call();
+        else _bridge.PostToGameThread(Call);
+    }
+
+    public unsafe void Remove(int id)
+    {
+        var fn = _bridge.ClientBindings.RemoveBuffFn;
+        if (fn == 0) return;
+        if (_bridge.IsGameThread) ((delegate* unmanaged[Cdecl]<int, void>)fn)(id);
+        else _bridge.PostToGameThread(() => ((delegate* unmanaged[Cdecl]<int, void>)fn)(id));
+    }
+
+    public unsafe void ClearAll()
+    {
+        var fn = _bridge.ClientBindings.ClearBuffsFn;
+        if (fn == 0) return;
+        if (_bridge.IsGameThread) ((delegate* unmanaged[Cdecl]<void>)fn)();
+        else _bridge.PostToGameThread(() => ((delegate* unmanaged[Cdecl]<void>)fn)());
+    }
+}
+
+internal sealed class ScreenTimersImpl : IScreenTimers
+{
+    private readonly HostBridge _bridge;
+    public ScreenTimersImpl(HostBridge bridge) { _bridge = bridge; }
+
+    public event Action<int>? Expired;
+    public event Action<int, TimerRemoveReason>? Removed;
+
+    internal void RaiseEvent(int id, int reason)
+    {
+        var r = (TimerRemoveReason)reason;
+        if (r == TimerRemoveReason.Expired)
+            Expired?.Invoke(id);
+        Removed?.Invoke(id, r);
+    }
+
+    public unsafe void DefineGroup(TimerGroupConfig group)
+    {
+        var fn = _bridge.ClientBindings.DefineTimerGroupFn;
+        if (fn == 0 || group is null) return;
+        int gid = group.GroupId, x = group.X, y = group.Y, dir = (int)group.Direction, gap = group.Gap;
+        if (_bridge.IsGameThread) ((delegate* unmanaged[Cdecl]<int, int, int, int, int, void>)fn)(gid, x, y, dir, gap);
+        else _bridge.PostToGameThread(() => ((delegate* unmanaged[Cdecl]<int, int, int, int, int, void>)fn)(gid, x, y, dir, gap));
+    }
+
+    public unsafe void AddOrUpdate(TimerConfig timer)
+    {
+        var fn = _bridge.ClientBindings.AddTimerFn;
+        if (fn == 0 || timer is null) return;
+
+        int id = timer.Id, shape = (int)timer.Shape, dur = timer.DurationMs, gid = timer.GroupId;
+        ushort hue = timer.Hue;
+        int x = timer.X, y = timer.Y, w = timer.Width, h = timer.Height;
+        byte showTime = timer.ShowTime ? (byte)1 : (byte)0;
+        nint labelPtr = string.IsNullOrEmpty(timer.Label) ? nint.Zero : Marshal.StringToHGlobalAnsi(timer.Label);
+
+        void Call()
+        {
+            try { ((delegate* unmanaged[Cdecl]<int, int, int, ushort, int, int, int, int, int, nint, byte, void>)fn)(id, shape, dur, hue, gid, x, y, w, h, labelPtr, showTime); }
+            finally { if (labelPtr != nint.Zero) Marshal.FreeHGlobal(labelPtr); }
+        }
+
+        if (_bridge.IsGameThread) Call();
+        else _bridge.PostToGameThread(Call);
+    }
+
+    public unsafe void Remove(int id) => CallById(_bridge.ClientBindings.RemoveTimerFn, id);
+    public unsafe void RemoveGroup(int groupId) => CallById(_bridge.ClientBindings.RemoveTimerGroupFn, groupId);
+
+    public unsafe void ClearAll()
+    {
+        var fn = _bridge.ClientBindings.ClearTimersFn;
+        if (fn == 0) return;
+        if (_bridge.IsGameThread) ((delegate* unmanaged[Cdecl]<void>)fn)();
+        else _bridge.PostToGameThread(() => ((delegate* unmanaged[Cdecl]<void>)fn)());
+    }
+
+    private unsafe void CallById(nint fn, int id)
+    {
+        if (fn == 0) return;
+        if (_bridge.IsGameThread) ((delegate* unmanaged[Cdecl]<int, void>)fn)(id);
+        else _bridge.PostToGameThread(() => ((delegate* unmanaged[Cdecl]<int, void>)fn)(id));
     }
 }
 
