@@ -558,6 +558,8 @@ unsafe struct HostBindings
     public IntPtr PacketInFn;
     public IntPtr PacketOutFn;
     public IntPtr /*delegate*<int, void>*/ WalkProgressFn;
+    public IntPtr /*delegate*<int, int, void>*/ BuffEventFn;
+    public IntPtr /*delegate*<int, int, void>*/ TimerEventFn;
 }
 
 [StructLayout(LayoutKind.Sequential)]
