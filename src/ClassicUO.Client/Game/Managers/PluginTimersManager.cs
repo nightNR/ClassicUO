@@ -2,6 +2,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Runtime.InteropServices;
 
 namespace ClassicUO.Game.Managers
 {
@@ -74,6 +75,68 @@ namespace ClassicUO.Game.Managers
             GumpRefresh = null;
             PluginBuffs.Reset();
             ScreenTimers.Reset();
+        }
+
+        private static string PtrToString(IntPtr p) => p == IntPtr.Zero ? string.Empty : (Marshal.PtrToStringAnsi(p) ?? string.Empty);
+
+        // ── Buff commands (bound into ClientBindings) ──
+        public static void AddBuff(int id, ushort graphic, int durationMs, int kind, IntPtr textUtf8)
+        {
+            PluginBuffs.AddOrUpdate(id, graphic, durationMs, (Data.BuffDisplayKind)kind, PtrToString(textUtf8), Time.Ticks);
+            GumpRefresh?.Invoke();
+        }
+
+        public static void RemoveBuff(int id)
+        {
+            if (PluginBuffs.Remove(id))
+            {
+                RaiseBuffEvent(id, ReasonRemovedByPlugin);
+                GumpRefresh?.Invoke();
+            }
+        }
+
+        public static void ClearBuffs()
+        {
+            var ids = new List<int>(PluginBuffs.Entries.Keys);
+            PluginBuffs.Clear();
+            foreach (int id in ids)
+                RaiseBuffEvent(id, ReasonRemovedByPlugin);
+            GumpRefresh?.Invoke();
+        }
+
+        // ── Timer commands (bound into ClientBindings) ──
+        public static void DefineTimerGroup(int groupId, int x, int y, int direction, int gap)
+        {
+            ScreenTimers.DefineGroup(groupId, x, y, (StackDirection)direction, gap);
+        }
+
+        public static void AddTimer(int id, int shape, int durationMs, ushort hue, int groupId,
+                                    int x, int y, int width, int height, IntPtr labelUtf8, byte showTime)
+        {
+            ScreenTimers.AddOrUpdate(id, (TimerShape)shape, durationMs, hue, groupId,
+                x, y, width, height, PtrToString(labelUtf8), showTime != 0, Time.Ticks);
+        }
+
+        public static void RemoveTimer(int id)
+        {
+            if (ScreenTimers.Remove(id))
+                RaiseTimerEvent(id, ReasonRemovedByPlugin);
+        }
+
+        public static void RemoveTimerGroup(int groupId)
+        {
+            var removed = new List<int>();
+            ScreenTimers.RemoveGroup(groupId, removed);
+            foreach (int id in removed)
+                RaiseTimerEvent(id, ReasonRemovedByPlugin);
+        }
+
+        public static void ClearTimers()
+        {
+            var ids = new List<int>(ScreenTimers.Entries.Keys);
+            ScreenTimers.Clear();
+            foreach (int id in ids)
+                RaiseTimerEvent(id, ReasonRemovedByPlugin);
         }
     }
 }

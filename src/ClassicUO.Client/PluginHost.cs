@@ -51,6 +51,14 @@ namespace ClassicUO
         public IntPtr /*delegate*<uint, int, int, byte, int, void>*/ OpenStatusBarFn;
         public IntPtr /*delegate*<uint, void>*/ CloseStatusBarFn;
         public IntPtr /*delegate*<uint, ushort, ushort, void>*/ SetOverlayFn;
+        public IntPtr /*delegate*<int, ushort, int, int, IntPtr, void>*/ AddBuffFn;
+        public IntPtr /*delegate*<int, void>*/ RemoveBuffFn;
+        public IntPtr /*delegate*<void>*/ ClearBuffsFn;
+        public IntPtr /*delegate*<int, int, int, int, int, void>*/ DefineTimerGroupFn;
+        public IntPtr /*delegate*<int, int, int, ushort, int, int, int, int, int, IntPtr, byte, void>*/ AddTimerFn;
+        public IntPtr /*delegate*<int, void>*/ RemoveTimerFn;
+        public IntPtr /*delegate*<int, void>*/ RemoveTimerGroupFn;
+        public IntPtr /*delegate*<void>*/ ClearTimersFn;
     }
 
     internal unsafe sealed class UnmanagedAssistantHost : IPluginHost
@@ -265,6 +273,40 @@ namespace ClassicUO
         [MarshalAs(UnmanagedType.FunctionPtr)]
         private readonly dSetOverlay _setOverlay = Game.Managers.PluginStatusBars.SetOverlay;
 
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        delegate void dAddBuff(int id, ushort graphic, int durationMs, int kind, IntPtr textUtf8);
+        [MarshalAs(UnmanagedType.FunctionPtr)]
+        private readonly dAddBuff _addBuff = Game.Managers.PluginTimersManager.AddBuff;
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        delegate void dRemoveById(int id);
+        [MarshalAs(UnmanagedType.FunctionPtr)]
+        private readonly dRemoveById _removeBuff = Game.Managers.PluginTimersManager.RemoveBuff;
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        delegate void dNoArg();
+        [MarshalAs(UnmanagedType.FunctionPtr)]
+        private readonly dNoArg _clearBuffs = Game.Managers.PluginTimersManager.ClearBuffs;
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        delegate void dDefineTimerGroup(int groupId, int x, int y, int direction, int gap);
+        [MarshalAs(UnmanagedType.FunctionPtr)]
+        private readonly dDefineTimerGroup _defineTimerGroup = Game.Managers.PluginTimersManager.DefineTimerGroup;
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        delegate void dAddTimer(int id, int shape, int durationMs, ushort hue, int groupId, int x, int y, int width, int height, IntPtr labelUtf8, byte showTime);
+        [MarshalAs(UnmanagedType.FunctionPtr)]
+        private readonly dAddTimer _addTimer = Game.Managers.PluginTimersManager.AddTimer;
+
+        [MarshalAs(UnmanagedType.FunctionPtr)]
+        private readonly dRemoveById _removeTimer = Game.Managers.PluginTimersManager.RemoveTimer;
+
+        [MarshalAs(UnmanagedType.FunctionPtr)]
+        private readonly dRemoveById _removeTimerGroup = Game.Managers.PluginTimersManager.RemoveTimerGroup;
+
+        [MarshalAs(UnmanagedType.FunctionPtr)]
+        private readonly dNoArg _clearTimers = Game.Managers.PluginTimersManager.ClearTimers;
+
 
         static short getPacketLength(int id)
         {
@@ -336,6 +378,14 @@ namespace ClassicUO
             cuoHost.OpenStatusBarFn = Marshal.GetFunctionPointerForDelegate(_openStatusBar);
             cuoHost.CloseStatusBarFn = Marshal.GetFunctionPointerForDelegate(_closeStatusBar);
             cuoHost.SetOverlayFn = Marshal.GetFunctionPointerForDelegate(_setOverlay);
+            cuoHost.AddBuffFn = Marshal.GetFunctionPointerForDelegate(_addBuff);
+            cuoHost.RemoveBuffFn = Marshal.GetFunctionPointerForDelegate(_removeBuff);
+            cuoHost.ClearBuffsFn = Marshal.GetFunctionPointerForDelegate(_clearBuffs);
+            cuoHost.DefineTimerGroupFn = Marshal.GetFunctionPointerForDelegate(_defineTimerGroup);
+            cuoHost.AddTimerFn = Marshal.GetFunctionPointerForDelegate(_addTimer);
+            cuoHost.RemoveTimerFn = Marshal.GetFunctionPointerForDelegate(_removeTimer);
+            cuoHost.RemoveTimerGroupFn = Marshal.GetFunctionPointerForDelegate(_removeTimerGroup);
+            cuoHost.ClearTimersFn = Marshal.GetFunctionPointerForDelegate(_clearTimers);
 
             _initialize((IntPtr)mem);
         }
