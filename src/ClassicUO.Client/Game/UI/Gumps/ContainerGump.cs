@@ -29,6 +29,10 @@ namespace ClassicUO.Game.UI.Gumps
 
         internal const int CORPSES_GUMP = 0x0009;
 
+        // Top strip reserved in grid Toggle mode so the corner toggle button does not
+        // overlap the first row of grid cells.
+        private const int TOGGLE_HEADER_HEIGHT = 24;
+
         public ContainerGump(World world) : base(world, 0, 0) { }
 
         public ContainerGump(World world, uint serial, ushort gumpid, bool playsound) : base(world, serial, 0)
@@ -247,13 +251,21 @@ namespace ClassicUO.Game.UI.Gumps
             _hitBox = null;
             _eyeGumpPic = null;
 
-            _gridView = new GridContainerView(this) { X = 0, Y = 0 };
+            // In Toggle mode reserve a top strip so the corner toggle button sits above
+            // the grid instead of over the top-right cell.
+            int headerHeight =
+                ProfileManager.CurrentProfile != null
+                && ProfileManager.CurrentProfile.ContainerViewMode == 2
+                    ? TOGGLE_HEADER_HEIGHT
+                    : 0;
+
+            _gridView = new GridContainerView(this) { X = 0, Y = headerHeight };
             Add(_gridView);
             _gridView.Rebuild();
             _gridView.SetPage(_gridPage);
 
             Width = _gridView.Width;
-            Height = _gridView.Height;
+            Height = _gridView.Height + headerHeight;
         }
 
         private void AddToggleButtonIfNeeded()
