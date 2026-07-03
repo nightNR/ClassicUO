@@ -4561,7 +4561,16 @@ namespace ClassicUO.Resources {
                 return ResourceManager.GetString("UseBlackBackgr", resourceCulture);
             }
         }
-        
+
+        /// <summary>
+        ///   Looks up a localized string similar to Show stat values on bars.
+        /// </summary>
+        public static string ShowStatValuesOnBars {
+            get {
+                return ResourceManager.GetString("ShowStatValuesOnBars", resourceCulture);
+            }
+        }
+
         /// <summary>
         ///   Looks up a localized string similar to Use colored lights.
         /// </summary>

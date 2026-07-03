@@ -312,6 +312,19 @@ namespace ClassicUO.Game.UI.Gumps
         private const int HPB_BAR_HEIGHT = 8;
         private const int HPB_BAR_SPACELEFT = (HPB_WIDTH - HPB_BAR_WIDTH) / 2;
 
+        // Thicker bars + row layout used when the "show stat values" option is on,
+        // so a centered current/max number fits vertically inside each bar.
+        private const int HPB_BAR_HEIGHT_TEXT = 11;
+        private const int HPB_BAR_PITCH = 9;        // default row spacing (27/36/45)
+        private const int HPB_BAR_PITCH_TEXT = 12;  // row spacing with text (21/33/45)
+        private const int HPB_ROW_TOP = 27;         // multiline first bar Y, no text
+        private const int HPB_ROW_TOP_TEXT = 21;    // multiline first bar Y, with text
+        private const int HPB_SINGLE_ROW = 21;      // singleline bar Y (both modes)
+
+        // Constant white with black outline. Stat numbers do not follow the name's
+        // notoriety hue nor the HP fill's poison/yellow recolor.
+        private const ushort HPB_TEXT_HUE = 0x0481; // white
+
 
         private static Color HPB_COLOR_DRAW_RED = Color.Red;
         private static Color HPB_COLOR_DRAW_BLUE = Color.DodgerBlue;
@@ -331,6 +344,16 @@ namespace ClassicUO.Game.UI.Gumps
         private readonly LineCHB[] _border = new LineCHB[4];
 
         private LineCHB _hpLineRed, _manaLineRed, _stamLineRed, _outline;
+
+        // Centered current/max labels drawn over the bars (option-gated). Cached
+        // values avoid rebuilding the RenderedText every frame.
+        private Label _hpText, _manaText, _stamText;
+        // Name's notoriety hue captured at build time, so the stat numbers match
+        // the name's color but stay fixed if the name later recolors.
+        private ushort _nameHue = HPB_TEXT_HUE;
+        private int _textHits = -1, _textHitsMax = -1;
+        private int _textMana = -1, _textManaMax = -1;
+        private int _textStam = -1, _textStamMax = -1;
 
 
         private bool _oldWarMode, _normalHits, _poisoned, _yellowHits;
@@ -357,6 +380,8 @@ namespace ClassicUO.Game.UI.Gumps
 
             _background = null;
             _hpLineRed = _manaLineRed = _stamLineRed = null;
+            _hpText = _manaText = _stamText = null;
+            _textHits = _textHitsMax = _textMana = _textManaMax = _textStam = _textStamMax = -1;
 
             if (_textBox != null)
             {
@@ -689,7 +714,49 @@ namespace ClassicUO.Game.UI.Gumps
                 }
             }
 
+            UpdateStatLabels(entity);
+
             ApplyPriorityOverlay();
+        }
+
+        // Refresh the current/max labels (option-gated; fields null when off).
+        // Values follow the same source as the bars: HP from the entity, mana/
+        // stamina from the mobile (self/party only). Labels track bar visibility.
+        private void UpdateStatLabels(Entity entity)
+        {
+            if (_hpText == null && _manaText == null && _stamText == null)
+            {
+                return;
+            }
+
+            int hits = entity?.Hits ?? 0;
+            int hitsMax = entity?.HitsMax ?? 0;
+
+            // Stat numbers keep the name's notoriety hue captured at build time;
+            // they do not follow the HP fill's poison/yellow recolor.
+            UpdateStatLabel(_hpText, _bars[0], hits, hitsMax, ref _textHits, ref _textHitsMax);
+
+            Mobile mobile = entity as Mobile;
+
+            UpdateStatLabel
+            (
+                _manaText,
+                _bars.Length > 1 && mobile != null ? _bars[1] : null,
+                mobile?.Mana ?? 0,
+                mobile?.ManaMax ?? 0,
+                ref _textMana,
+                ref _textManaMax
+            );
+
+            UpdateStatLabel
+            (
+                _stamText,
+                _bars.Length > 2 && mobile != null ? _bars[2] : null,
+                mobile?.Stamina ?? 0,
+                mobile?.StaminaMax ?? 0,
+                ref _textStam,
+                ref _textStamMax
+            );
         }
 
         // Feature A: tint the outline ring with the plugin's priority hue, if
@@ -736,6 +803,22 @@ namespace ClassicUO.Game.UI.Gumps
             WantUpdateSize = false;
 
             Entity entity = World.Get(LocalSerial);
+
+            // Match the stat numbers to the name's notoriety hue (captured once).
+            _nameHue = Notoriety.GetHue
+            (
+                LocalSerial == World.Player
+                    ? World.Player.NotorietyFlag
+                    : (entity as Mobile)?.NotorietyFlag ?? NotorietyFlag.Gray
+            );
+
+            bool showValues = ProfileManager.CurrentProfile.ShowStatValuesOnBars;
+            int barHeight = showValues ? HPB_BAR_HEIGHT_TEXT : HPB_BAR_HEIGHT;
+            int barPitch = showValues ? HPB_BAR_PITCH_TEXT : HPB_BAR_PITCH;
+            int row0 = showValues ? HPB_ROW_TOP_TEXT : HPB_ROW_TOP;
+            int row1 = row0 + barPitch;
+            int row2 = row0 + 2 * barPitch;
+            int outlineH = barPitch * 2 + barHeight + HPB_OUTLINESIZE * 2;
 
 
             if (World.Party.Contains(LocalSerial))
@@ -798,9 +881,9 @@ namespace ClassicUO.Game.UI.Gumps
                     _outline = new LineCHB
                     (
                         HPB_BAR_SPACELEFT - HPB_OUTLINESIZE,
-                        27 - HPB_OUTLINESIZE,
+                        row0 - HPB_OUTLINESIZE,
                         HPB_BAR_WIDTH + HPB_OUTLINESIZE * 2,
-                        HPB_BAR_HEIGHT * 3 + 2 + HPB_OUTLINESIZE * 2,
+                        outlineH,
                         HPB_COLOR_DRAW_BLACK.PackedValue
                     )
                 );
@@ -810,9 +893,9 @@ namespace ClassicUO.Game.UI.Gumps
                     _hpLineRed = new LineCHB
                     (
                         HPB_BAR_SPACELEFT,
-                        27,
+                        row0,
                         HPB_BAR_WIDTH,
-                        HPB_BAR_HEIGHT,
+                        barHeight,
                         HPB_COLOR_DRAW_RED.PackedValue
                     )
                 );
@@ -822,9 +905,9 @@ namespace ClassicUO.Game.UI.Gumps
                     _manaLineRed = new LineCHB
                     (
                         HPB_BAR_SPACELEFT,
-                        36,
+                        row1,
                         HPB_BAR_WIDTH,
-                        HPB_BAR_HEIGHT,
+                        barHeight,
                         HPB_COLOR_DRAW_RED.PackedValue
                     )
                 );
@@ -834,9 +917,9 @@ namespace ClassicUO.Game.UI.Gumps
                     _stamLineRed = new LineCHB
                     (
                         HPB_BAR_SPACELEFT,
-                        45,
+                        row2,
                         HPB_BAR_WIDTH,
-                        HPB_BAR_HEIGHT,
+                        barHeight,
                         HPB_COLOR_DRAW_RED.PackedValue
                     )
                 );
@@ -846,9 +929,9 @@ namespace ClassicUO.Game.UI.Gumps
                     _bars[0] = new LineCHB
                     (
                         HPB_BAR_SPACELEFT,
-                        27,
+                        row0,
                         HPB_BAR_WIDTH,
-                        HPB_BAR_HEIGHT,
+                        barHeight,
                         HPB_COLOR_DRAW_BLUE.PackedValue
                     ) { LineWidth = 0 }
                 );
@@ -858,9 +941,9 @@ namespace ClassicUO.Game.UI.Gumps
                     _bars[1] = new LineCHB
                     (
                         HPB_BAR_SPACELEFT,
-                        36,
+                        row1,
                         HPB_BAR_WIDTH,
-                        HPB_BAR_HEIGHT,
+                        barHeight,
                         HPB_COLOR_DRAW_BLUE.PackedValue
                     ) { LineWidth = 0 }
                 );
@@ -870,12 +953,19 @@ namespace ClassicUO.Game.UI.Gumps
                     _bars[2] = new LineCHB
                     (
                         HPB_BAR_SPACELEFT,
-                        45,
+                        row2,
                         HPB_BAR_WIDTH,
-                        HPB_BAR_HEIGHT,
+                        barHeight,
                         HPB_COLOR_DRAW_BLUE.PackedValue
                     ) { LineWidth = 0 }
                 );
+
+                if (showValues)
+                {
+                    Add(_hpText = CreateStatLabel());
+                    Add(_manaText = CreateStatLabel());
+                    Add(_stamText = CreateStatLabel());
+                }
 
                 Add
                 (
@@ -961,9 +1051,9 @@ namespace ClassicUO.Game.UI.Gumps
                         _outline = new LineCHB
                         (
                             HPB_BAR_SPACELEFT - HPB_OUTLINESIZE,
-                            27 - HPB_OUTLINESIZE,
+                            row0 - HPB_OUTLINESIZE,
                             HPB_BAR_WIDTH + HPB_OUTLINESIZE * 2,
-                            HPB_BAR_HEIGHT * 3 + 2 + HPB_OUTLINESIZE * 2,
+                            outlineH,
                             HPB_COLOR_DRAW_BLACK.PackedValue
                         )
                     );
@@ -973,33 +1063,33 @@ namespace ClassicUO.Game.UI.Gumps
                         _hpLineRed = new LineCHB
                         (
                             HPB_BAR_SPACELEFT,
-                            27,
+                            row0,
                             HPB_BAR_WIDTH,
-                            HPB_BAR_HEIGHT,
+                            barHeight,
                             HPB_COLOR_DRAW_RED.PackedValue
                         )
                     );
 
                     Add
                     (
-                        new LineCHB
+                        _manaLineRed = new LineCHB
                         (
                             HPB_BAR_SPACELEFT,
-                            36,
+                            row1,
                             HPB_BAR_WIDTH,
-                            HPB_BAR_HEIGHT,
+                            barHeight,
                             HPB_COLOR_DRAW_RED.PackedValue
                         )
                     );
 
                     Add
                     (
-                        new LineCHB
+                        _stamLineRed = new LineCHB
                         (
                             HPB_BAR_SPACELEFT,
-                            45,
+                            row2,
                             HPB_BAR_WIDTH,
-                            HPB_BAR_HEIGHT,
+                            barHeight,
                             HPB_COLOR_DRAW_RED.PackedValue
                         )
                     );
@@ -1009,9 +1099,9 @@ namespace ClassicUO.Game.UI.Gumps
                         _bars[0] = new LineCHB
                         (
                             HPB_BAR_SPACELEFT,
-                            27,
+                            row0,
                             HPB_BAR_WIDTH,
-                            HPB_BAR_HEIGHT,
+                            barHeight,
                             HPB_COLOR_DRAW_BLUE.PackedValue
                         ) { LineWidth = 0 }
                     );
@@ -1021,9 +1111,9 @@ namespace ClassicUO.Game.UI.Gumps
                         _bars[1] = new LineCHB
                         (
                             HPB_BAR_SPACELEFT,
-                            36,
+                            row1,
                             HPB_BAR_WIDTH,
-                            HPB_BAR_HEIGHT,
+                            barHeight,
                             HPB_COLOR_DRAW_BLUE.PackedValue
                         ) { LineWidth = 0 }
                     );
@@ -1033,12 +1123,19 @@ namespace ClassicUO.Game.UI.Gumps
                         _bars[2] = new LineCHB
                         (
                             HPB_BAR_SPACELEFT,
-                            45,
+                            row2,
                             HPB_BAR_WIDTH,
-                            HPB_BAR_HEIGHT,
+                            barHeight,
                             HPB_COLOR_DRAW_BLUE.PackedValue
                         ) { LineWidth = 0 }
                     );
+
+                    if (showValues)
+                    {
+                        Add(_hpText = CreateStatLabel());
+                        Add(_manaText = CreateStatLabel());
+                        Add(_stamText = CreateStatLabel());
+                    }
 
                     Add
                     (
@@ -1109,9 +1206,9 @@ namespace ClassicUO.Game.UI.Gumps
                         _outline = new LineCHB
                         (
                             HPB_BAR_SPACELEFT - HPB_OUTLINESIZE,
-                            21 - HPB_OUTLINESIZE,
+                            HPB_SINGLE_ROW - HPB_OUTLINESIZE,
                             HPB_BAR_WIDTH + HPB_OUTLINESIZE * 2,
-                            HPB_BAR_HEIGHT + HPB_OUTLINESIZE * 2,
+                            barHeight + HPB_OUTLINESIZE * 2,
                             HPB_COLOR_DRAW_BLACK.PackedValue
                         )
                     );
@@ -1121,9 +1218,9 @@ namespace ClassicUO.Game.UI.Gumps
                         _hpLineRed = new LineCHB
                         (
                             HPB_BAR_SPACELEFT,
-                            21,
+                            HPB_SINGLE_ROW,
                             HPB_BAR_WIDTH,
-                            HPB_BAR_HEIGHT,
+                            barHeight,
                             HPB_COLOR_DRAW_RED.PackedValue
                         )
                     );
@@ -1133,12 +1230,17 @@ namespace ClassicUO.Game.UI.Gumps
                         _bars[0] = new LineCHB
                         (
                             HPB_BAR_SPACELEFT,
-                            21,
+                            HPB_SINGLE_ROW,
                             HPB_BAR_WIDTH,
-                            HPB_BAR_HEIGHT,
+                            barHeight,
                             HPB_COLOR_DRAW_BLUE.PackedValue
                         ) { LineWidth = 0 }
                     );
+
+                    if (showValues)
+                    {
+                        Add(_hpText = CreateStatLabel());
+                    }
 
                     Add
                     (
@@ -1240,6 +1342,42 @@ namespace ClassicUO.Game.UI.Gumps
         public override bool Contains(int x, int y)
         {
             return true;
+        }
+
+        private Label CreateStatLabel()
+        {
+            return new Label(string.Empty, true, _nameHue, font: 1, style: FontStyle.BlackBorder)
+            {
+                AcceptMouseInput = false,
+                CanMove = true
+            };
+        }
+
+        // Refresh a centered current/max label over its bar. The RenderedText is
+        // rebuilt only when a value changed; the label follows the bar's
+        // visibility (hidden out of range / dead).
+        private static void UpdateStatLabel(Label label, LineCHB bar, int cur, int max, ref int cachedCur, ref int cachedMax)
+        {
+            if (label == null)
+            {
+                return;
+            }
+
+            label.IsVisible = bar != null && bar.IsVisible;
+
+            if (!label.IsVisible)
+            {
+                return;
+            }
+
+            if (cur != cachedCur || max != cachedMax)
+            {
+                cachedCur = cur;
+                cachedMax = max;
+                label.Text = $"{cur}/{max}";
+                label.X = HPB_BAR_SPACELEFT + (HPB_BAR_WIDTH - label.Width) / 2;
+                label.Y = bar.Y + (bar.Height - label.Height) / 2;
+            }
         }
 
         private class LineCHB : Line

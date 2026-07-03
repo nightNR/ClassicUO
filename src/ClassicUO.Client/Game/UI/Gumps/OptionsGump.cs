@@ -36,7 +36,7 @@ namespace ClassicUO.Game.UI.Gumps
         private InputField _autoOpenCorpseRange;
 
         //experimental
-        private Checkbox _autoOpenDoors, _autoOpenCorpse, _skipEmptyCorpse, _disableTabBtn, _disableCtrlQWBtn, _disableDefaultHotkeys, _disableArrowBtn, _disableAutoMove, _overrideContainerLocation, _smoothDoors, _showTargetRangeIndicator, _customBars, _customBarsBBG, _saveHealthbars;
+        private Checkbox _autoOpenDoors, _autoOpenCorpse, _skipEmptyCorpse, _disableTabBtn, _disableCtrlQWBtn, _disableDefaultHotkeys, _disableArrowBtn, _disableAutoMove, _overrideContainerLocation, _smoothDoors, _showTargetRangeIndicator, _customBars, _customBarsBBG, _statValuesOnBars, _saveHealthbars;
         private Checkbox _nameOverheadAlwaysOn, _nameOverheadShowHpBar;
         private HSliderBar _cellSize;
         private Checkbox _containerScaleItems, _containerDoubleClickToLoot, _relativeDragAnDropItems, _useLargeContianersGumps, _highlightContainersWhenMouseIsOver, _allowItemsOutsideContainerBounds;
@@ -1029,6 +1029,18 @@ namespace ClassicUO.Game.UI.Gumps
                     null,
                     ResGumps.UseBlackBackgr,
                     _currentProfile.CBBlackBGToggled,
+                    0,
+                    0
+                )
+            );
+
+            section3.Add
+            (
+                _statValuesOnBars = AddCheckBox
+                (
+                    null,
+                    ResGumps.ShowStatValuesOnBars,
+                    _currentProfile.ShowStatValuesOnBars,
                     0,
                     0
                 )
@@ -3766,6 +3778,7 @@ namespace ClassicUO.Game.UI.Gumps
                     _nameOverheadShowHpBar.IsChecked = true;
                     _customBars.IsChecked = false;
                     _customBarsBBG.IsChecked = false;
+                    _statValuesOnBars.IsChecked = false;
                     _autoOpenCorpse.IsChecked = false;
                     _autoOpenDoors.IsChecked = false;
                     _smoothDoors.IsChecked = false;
@@ -4471,6 +4484,18 @@ namespace ClassicUO.Game.UI.Gumps
             }
 
             _currentProfile.CBBlackBGToggled = _customBarsBBG.IsChecked;
+
+            bool updateStatValues = _currentProfile.ShowStatValuesOnBars != _statValuesOnBars.IsChecked;
+            _currentProfile.ShowStatValuesOnBars = _statValuesOnBars.IsChecked;
+
+            if (updateStatValues)
+            {
+                foreach (HealthBarGumpCustom customhealthbar in UIManager.Gumps.OfType<HealthBarGumpCustom>().ToList())
+                {
+                    customhealthbar.RequestUpdateContents();
+                }
+            }
+
             _currentProfile.SaveHealthbars = _saveHealthbars.IsChecked;
 
 

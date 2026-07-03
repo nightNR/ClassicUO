@@ -222,6 +222,7 @@ namespace ClassicUO.Configuration
         public bool PartyInviteGump { get; set; }
         public bool CustomBarsToggled { get; set; }
         public bool CBBlackBGToggled { get; set; }
+        public bool ShowStatValuesOnBars { get; set; }
 
         public bool ShowInfoBar { get; set; }
         public int InfoBarHighlightType { get; set; } // 0 = text colour changes, 1 = underline

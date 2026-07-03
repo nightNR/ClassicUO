@@ -366,6 +366,9 @@
   <data name="UseBlackBackgr" xml:space="preserve">
     <value>Opaque background</value>
   </data>
+  <data name="ShowStatValuesOnBars" xml:space="preserve">
+    <value>Show stat values on bars</value>
+  </data>
   <data name="UseCustomHPBars" xml:space="preserve">
     <value>Use custom healthbars gump</value>
   </data>
