@@ -484,7 +484,26 @@ namespace ClassicUO.Game.UI.Gumps
                 WantUpdateSize = false;
                 CanMove = true;
 
-                SetTooltip(_text + "\n" + _tooltipId);
+                SetTooltip(BuildTooltip(null));
+            }
+
+            /// <summary>
+            /// Composes the tooltip: base text, optional remaining-time line, and
+            /// the buff ID line when <see cref="Profile.BuffBarShowId"/> is on.
+            /// </summary>
+            private string BuildTooltip(string timeLine)
+            {
+                string body = string.IsNullOrEmpty(timeLine) ? _text : timeLine;
+
+                bool showId = ProfileManager.CurrentProfile == null
+                    || ProfileManager.CurrentProfile.BuffBarShowId;
+
+                if (showId && !string.IsNullOrEmpty(_tooltipId))
+                {
+                    return body + "\n" + _tooltipId;
+                }
+
+                return body;
             }
 
             public override void Update()
@@ -500,12 +519,14 @@ namespace ClassicUO.Game.UI.Gumps
                         TimeSpan span = TimeSpan.FromMilliseconds(delta);
 
                         SetTooltip(
-                            string.Format(
-                                ResGumps.TimeLeft,
-                                _text + "\n" + _tooltipId,
-                                span.Hours,
-                                span.Minutes,
-                                span.Seconds
+                            BuildTooltip(
+                                string.Format(
+                                    ResGumps.TimeLeft,
+                                    _text,
+                                    span.Hours,
+                                    span.Minutes,
+                                    span.Seconds
+                                )
                             )
                         );
 

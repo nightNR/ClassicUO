@@ -112,7 +112,7 @@ namespace ClassicUO.Game.UI.Gumps
         // combat & spells
         private ClickableColorBox _innocentColorPickerBox, _friendColorPickerBox, _crimialColorPickerBox, _canAttackColorPickerBox, _enemyColorPickerBox, _murdererColorPickerBox, _neutralColorPickerBox, _beneficColorPickerBox, _harmfulColorPickerBox;
         private HSliderBar _lightBar;
-        private Checkbox _buffBarTime, _uiButtonsSingleClick, _queryBeforAttackCheckbox, _queryBeforeBeneficialCheckbox, _spellColoringCheckbox, _spellFormatCheckbox, _enableFastSpellsAssign;
+        private Checkbox _buffBarTime, _buffBarShowId, _uiButtonsSingleClick, _queryBeforAttackCheckbox, _queryBeforeBeneficialCheckbox, _spellColoringCheckbox, _spellFormatCheckbox, _enableFastSpellsAssign;
         private Checkbox _newTargetSystem, _showDPSCheckbox;
 
         // macro
@@ -2888,6 +2888,17 @@ namespace ClassicUO.Game.UI.Gumps
 
             startY += _buffBarTime.Height + 2;
 
+            _buffBarShowId = AddCheckBox
+            (
+                rightArea,
+                ResGumps.ShowBuffId,
+                _currentProfile.BuffBarShowId,
+                startX,
+                startY
+            );
+
+            startY += _buffBarShowId.Height + 2;
+
             _enableFastSpellsAssign = AddCheckBox
             (
                 rightArea,
@@ -3903,6 +3914,7 @@ namespace ClassicUO.Game.UI.Gumps
                     _queryBeforeBeneficialCheckbox.IsChecked = false;
                     _uiButtonsSingleClick.IsChecked = false;
                     _buffBarTime.IsChecked = false;
+                    _buffBarShowId.IsChecked = true;
                     _enableFastSpellsAssign.IsChecked = false;
                     _beneficColorPickerBox.Hue = 0x0059;
                     _harmfulColorPickerBox.Hue = 0x0020;
@@ -4316,6 +4328,7 @@ namespace ClassicUO.Game.UI.Gumps
             _currentProfile.EnabledBeneficialCriminalActionQuery = _queryBeforeBeneficialCheckbox.IsChecked;
             _currentProfile.CastSpellsByOneClick = _uiButtonsSingleClick.IsChecked;
             _currentProfile.BuffBarTime = _buffBarTime.IsChecked;
+            _currentProfile.BuffBarShowId = _buffBarShowId.IsChecked;
             _currentProfile.FastSpellsAssign = _enableFastSpellsAssign.IsChecked;
 
             _currentProfile.BeneficHue = _beneficColorPickerBox.Hue;

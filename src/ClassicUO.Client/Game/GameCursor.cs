@@ -6,6 +6,7 @@ using ClassicUO.Game.GameObjects;
 using ClassicUO.Game.Managers;
 using ClassicUO.Game.Scenes;
 using ClassicUO.Game.UI;
+using ClassicUO.Game.UI.Controls;
 using ClassicUO.Input;
 using ClassicUO.Renderer;
 using Microsoft.Xna.Framework;
@@ -83,6 +84,7 @@ namespace ClassicUO.Game
         private bool _needGraphicUpdate = true;
         private readonly List<Multi> _temp = new List<Multi>();
         private readonly Tooltip _tooltip;
+        private Control _lastTooltipOwner;
         private readonly World _world;
 
         public GameCursor(World world, float dpiScale)
@@ -598,8 +600,15 @@ namespace ClassicUO.Game
                 {
                     if (_tooltip.IsEmpty || _tooltip.Text != text)
                     {
-                        _tooltip.SetText(text, UIManager.MouseOverControl.TooltipMaxLength);
+                        // Only re-arm the hover delay when the tooltip belongs to a
+                        // different control. A control refreshing its own text (a
+                        // buff countdown) keeps its delay so it doesn't blink.
+                        bool sameOwner = ReferenceEquals(_lastTooltipOwner, UIManager.MouseOverControl);
+
+                        _tooltip.SetText(text, UIManager.MouseOverControl.TooltipMaxLength, !sameOwner);
                     }
+
+                    _lastTooltipOwner = UIManager.MouseOverControl;
 
                     _tooltip.Draw(batcher, position.X, position.Y + 24);
                 }
@@ -607,6 +616,7 @@ namespace ClassicUO.Game
             else if (!_tooltip.IsEmpty)
             {
                 _tooltip.Clear();
+                _lastTooltipOwner = null;
             }
         }
 

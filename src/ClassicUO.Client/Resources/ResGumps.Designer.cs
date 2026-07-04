@@ -3773,6 +3773,15 @@ namespace ClassicUO.Resources {
                 return ResourceManager.GetString("ShowBuffDuration", resourceCulture);
             }
         }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Show buff ID in tooltip.
+        /// </summary>
+        public static string ShowBuffId {
+            get {
+                return ResourceManager.GetString("ShowBuffId", resourceCulture);
+            }
+        }
         
         /// <summary>
         ///   Looks up a localized string similar to  - Show Caps.

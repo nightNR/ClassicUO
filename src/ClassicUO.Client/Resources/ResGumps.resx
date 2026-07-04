@@ -626,6 +626,9 @@ Murderers, Criminals, Grays (Monsters/Animals)</value>
   <data name="ShowBuffDuration" xml:space="preserve">
     <value>Show buff duration</value>
   </data>
+  <data name="ShowBuffId" xml:space="preserve">
+    <value>Show buff ID in tooltip</value>
+  </data>
   <data name="InnocentColor" xml:space="preserve">
     <value>Innocent Color</value>
   </data>

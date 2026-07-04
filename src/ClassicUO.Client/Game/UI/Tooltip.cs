@@ -270,7 +270,7 @@ namespace ClassicUO.Game.UI
             return string.IsNullOrEmpty(result) ? null : result;
         }
 
-        public void SetText(string text, int maxWidth = 0)
+        public void SetText(string text, int maxWidth = 0, bool resetHoverDelay = true)
         {
             if (ProfileManager.CurrentProfile != null && !ProfileManager.CurrentProfile.UseTooltip)
             {
@@ -283,7 +283,13 @@ namespace ClassicUO.Game.UI
                 Serial = 0;
                 Text = _textHTML = text;
 
-                _lastHoverTime = (uint) (Time.Ticks + (ProfileManager.CurrentProfile != null ? ProfileManager.CurrentProfile.TooltipDelayBeforeDisplay : 250));
+                // When a live tooltip merely refreshes its own text (e.g. a buff's
+                // countdown), keep the existing hover delay so the popup does not
+                // vanish and re-arm every update, which reads as a per-second blink.
+                if (resetHoverDelay)
+                {
+                    _lastHoverTime = (uint) (Time.Ticks + (ProfileManager.CurrentProfile != null ? ProfileManager.CurrentProfile.TooltipDelayBeforeDisplay : 250));
+                }
             }
         }
     }
