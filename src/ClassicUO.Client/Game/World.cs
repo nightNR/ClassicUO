@@ -31,6 +31,7 @@ namespace ClassicUO.Game
             WMapManager = new WorldMapEntityManager(this);
             CorpseManager = new CorpseManager(this);
             Party = new PartyManager(this);
+            PluginParty = new PluginPartyManager();
             HouseManager = new HouseManager(this);
             WorldTextManager = new WorldTextManager(this);
             _effectManager = new EffectManager(this);
@@ -68,6 +69,8 @@ namespace ClassicUO.Game
         public CorpseManager CorpseManager { get; }
 
         public PartyManager Party { get; }
+
+        public PluginPartyManager PluginParty { get; }
 
         public HouseManager HouseManager { get; }
 
@@ -826,6 +829,7 @@ namespace ClassicUO.Game
             Light.Personal = Light.RealPersonal = 0;
             ClientLockedFeatures.SetFlags(0);
             Party?.Clear();
+            PluginParty?.Clear();
             TargetManager.LastAttack = 0;
             MessageManager.PromptData = default;
             _effectManager.Clear();

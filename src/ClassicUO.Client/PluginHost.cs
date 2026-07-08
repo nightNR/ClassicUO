@@ -59,6 +59,9 @@ namespace ClassicUO
         public IntPtr /*delegate*<int, void>*/ RemoveTimerFn;
         public IntPtr /*delegate*<int, void>*/ RemoveTimerGroupFn;
         public IntPtr /*delegate*<void>*/ ClearTimersFn;
+        public IntPtr /*delegate*<uint, ushort, int, int, int, int, void>*/ SetPluginPartyMemberFn;
+        public IntPtr /*delegate*<uint, void>*/ RemovePluginPartyMemberFn;
+        public IntPtr /*delegate*<void>*/ ClearPluginPartyFn;
         // Packed client version (major<<24|minor<<16|build<<8|revision). Appended last
         // to preserve ABI; populated in Initialize() after UO.Load has parsed it.
         public int ClientVersion;
@@ -310,6 +313,19 @@ namespace ClassicUO
         [MarshalAs(UnmanagedType.FunctionPtr)]
         private readonly dNoArg _clearTimers = Game.Managers.PluginTimersManager.ClearTimers;
 
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        delegate void dSetPluginPartyMember(uint serial, ushort hue, int x, int y, int hp, int map);
+        [MarshalAs(UnmanagedType.FunctionPtr)]
+        private readonly dSetPluginPartyMember _setPluginPartyMember = Game.Managers.PluginPartyBridge.SetPluginPartyMember;
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        delegate void dRemovePluginPartyMember(uint serial);
+        [MarshalAs(UnmanagedType.FunctionPtr)]
+        private readonly dRemovePluginPartyMember _removePluginPartyMember = Game.Managers.PluginPartyBridge.RemovePluginPartyMember;
+
+        [MarshalAs(UnmanagedType.FunctionPtr)]
+        private readonly dNoArg _clearPluginParty = Game.Managers.PluginPartyBridge.ClearPluginParty;
+
 
         static short getPacketLength(int id)
         {
@@ -389,6 +405,9 @@ namespace ClassicUO
             cuoHost.RemoveTimerFn = Marshal.GetFunctionPointerForDelegate(_removeTimer);
             cuoHost.RemoveTimerGroupFn = Marshal.GetFunctionPointerForDelegate(_removeTimerGroup);
             cuoHost.ClearTimersFn = Marshal.GetFunctionPointerForDelegate(_clearTimers);
+            cuoHost.SetPluginPartyMemberFn = Marshal.GetFunctionPointerForDelegate(_setPluginPartyMember);
+            cuoHost.RemovePluginPartyMemberFn = Marshal.GetFunctionPointerForDelegate(_removePluginPartyMember);
+            cuoHost.ClearPluginPartyFn = Marshal.GetFunctionPointerForDelegate(_clearPluginParty);
             // UO.Load (GameController.Load) runs before PluginHost.Initialize, so the
             // client version is parsed by now. The host uses it to pick pre/post-KR
             // packet framing (e.g. MoveItem drop); 0 would break drops on modern servers.

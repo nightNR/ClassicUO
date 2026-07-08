@@ -403,7 +403,7 @@ namespace ClassicUO.Game.UI.Gumps
                 return;
             }
 
-            bool inparty = World.Party.Contains(LocalSerial);
+            bool inparty = (World.Party.Contains(LocalSerial) || World.PluginParty.Contains(LocalSerial));
 
 
             ushort textColor = 0x0386;
@@ -821,7 +821,7 @@ namespace ClassicUO.Game.UI.Gumps
             int outlineH = barPitch * 2 + barHeight + HPB_OUTLINESIZE * 2;
 
 
-            if (World.Party.Contains(LocalSerial))
+            if (World.Party.Contains(LocalSerial) || World.PluginParty.Contains(LocalSerial))
             {
                 Height = HPB_HEIGHT_MULTILINE;
                 Width = HPB_WIDTH;
@@ -1504,6 +1504,13 @@ namespace ClassicUO.Game.UI.Gumps
             Clear();
             Children.Clear();
 
+            // The bars are recreated below at Percent 0. Update() only writes a bar when the
+            // computed value differs from its cached _old* — so without resetting these, a
+            // rebuild that keeps the same underlying hits/mana/stam (e.g. single->party layout on
+            // a plugin-party join) leaves the fresh bars stuck at 0 until the value next changes
+            // (or another rebuild). Reset so the first Update after any rebuild repaints them.
+            _oldHits = _oldMana = _oldStam = -1;
+
             _background = _hpLineRed = _manaLineRed = _stamLineRed = null;
             _buttonHeal1 = _buttonHeal2 = null;
 
@@ -1523,7 +1530,7 @@ namespace ClassicUO.Game.UI.Gumps
 
             Entity entity = World.Get(LocalSerial);
 
-            if (World.Party.Contains(LocalSerial))
+            if (World.Party.Contains(LocalSerial) || World.PluginParty.Contains(LocalSerial))
             {
                 Add
                 (
@@ -1765,7 +1772,7 @@ namespace ClassicUO.Game.UI.Gumps
                 return;
             }
 
-            bool inparty = World.Party.Contains(LocalSerial);
+            bool inparty = (World.Party.Contains(LocalSerial) || World.PluginParty.Contains(LocalSerial));
 
 
             ushort textColor = 0x0386;
