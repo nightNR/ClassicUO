@@ -62,6 +62,8 @@ namespace ClassicUO
         public IntPtr /*delegate*<uint, ushort, int, int, int, int, void>*/ SetPluginPartyMemberFn;
         public IntPtr /*delegate*<uint, void>*/ RemovePluginPartyMemberFn;
         public IntPtr /*delegate*<void>*/ ClearPluginPartyFn;
+        public IntPtr /*delegate*<int,int,int,int,int,int,int,byte, byte>*/ CheckLosFn;
+        public IntPtr /*delegate*<int,int,int,int*,int,int,byte,byte*, void>*/ CheckLosBatchFn;
         // Packed client version (major<<24|minor<<16|build<<8|revision). Appended last
         // to preserve ABI; populated in Initialize() after UO.Load has parsed it.
         public int ClientVersion;
@@ -243,6 +245,16 @@ namespace ClassicUO
         private readonly dWalkTo _walkTo = Plugin.WalkTo;
 
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        delegate byte dCheckLos(int fx, int fy, int fz, int tx, int ty, int tz, int map, byte includeDynamic);
+        [MarshalAs(UnmanagedType.FunctionPtr)]
+        private readonly dCheckLos _checkLos = Plugin.CheckLos;
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        unsafe delegate void dCheckLosBatch(int fx, int fy, int fz, int* toXYZ, int count, int map, byte includeDynamic, byte* results);
+        [MarshalAs(UnmanagedType.FunctionPtr)]
+        private readonly dCheckLosBatch _checkLosBatch = Plugin.CheckLosBatch;
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         delegate void dStopWalk();
         [MarshalAs(UnmanagedType.FunctionPtr)]
         private readonly dStopWalk _stopWalk = Plugin.StopWalk;
@@ -393,6 +405,8 @@ namespace ClassicUO
             cuoHost.GetPlayerPositionFn = Marshal.GetFunctionPointerForDelegate(_getPlayerPosition);
             cuoHost.ReflectionCmdFn = Marshal.GetFunctionPointerForDelegate(_reflectionCmd);
             cuoHost.WalkToFn = Marshal.GetFunctionPointerForDelegate(_walkTo);
+            cuoHost.CheckLosFn = Marshal.GetFunctionPointerForDelegate(_checkLos);
+            cuoHost.CheckLosBatchFn = Marshal.GetFunctionPointerForDelegate(_checkLosBatch);
             cuoHost.StopWalkFn = Marshal.GetFunctionPointerForDelegate(_stopWalk);
             cuoHost.OpenStatusBarFn = Marshal.GetFunctionPointerForDelegate(_openStatusBar);
             cuoHost.CloseStatusBarFn = Marshal.GetFunctionPointerForDelegate(_closeStatusBar);

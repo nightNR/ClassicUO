@@ -501,6 +501,14 @@ namespace ClassicUO.Network
             return Client.Game.UO?.World?.Player?.Pathfinder?.WalkTo(x, y, z, distance, run) ?? false;
         }
 
+        internal static byte CheckLos(int fx, int fy, int fz, int tx, int ty, int tz, int map, byte includeDynamic) => 1;
+
+        internal static unsafe void CheckLosBatch(int fx, int fy, int fz, int* toXYZ, int count, int map, byte includeDynamic, byte* results)
+        {
+            for (int i = 0; i < count; i++)
+                results[i] = 1;
+        }
+
         internal static void StopWalk()
         {
             Client.Game.UO?.World?.Player?.Pathfinder?.StopAutoWalk();
