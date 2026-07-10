@@ -225,6 +225,7 @@ namespace ClassicUO.Configuration
         public bool ShowTargetRangeIndicator { get; set; }
         public bool PartyInviteGump { get; set; }
         public bool CustomBarsToggled { get; set; }
+        public bool StatusbarColorsEnabled { get; set; } = true;
         public bool CBBlackBGToggled { get; set; }
         public bool ShowStatValuesOnBars { get; set; }
 

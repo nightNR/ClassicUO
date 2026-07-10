@@ -115,6 +115,7 @@ namespace ClassicUO.Game.Scenes
 
             _world.CommandManager.Initialize();
             _world.AliasManager.Initialize();
+            _world.StatusbarColorManager.Initialize();
 
             WorldViewportGump viewport = new WorldViewportGump(_world, this);
             UIManager.Add(viewport, false);
