@@ -367,4 +367,11 @@ internal struct ClientBindings
     public nint RemoveTimerFn;         // void(int id)
     public nint RemoveTimerGroupFn;    // void(int groupId)
     public nint ClearTimersFn;         // void()
+    public nint AddAreaFn;             // void(nint idUtf8, int durationMs, int snapKind, uint anchorSerial, int x, int y, ushort hue, int rangeX, int rangeY, int objectTypes)
+    public nint RemoveAreaFn;          // void(nint idUtf8)
+    public nint ClearAreasFn;          // void()
+    public nint GetAreaTimerFn;        // int(nint idUtf8)
+    public nint AddCharacterFn;        // void(uint serial, ushort hue, byte priorityHighlight)
+    public nint RemoveCharacterFn;     // void(uint serial, byte priorityHighlight)
+    public nint ClearCharactersFn;     // void(byte priorityHighlight)
 }

@@ -15,6 +15,7 @@ internal sealed class PluginContextImpl : IPluginContext
     private readonly InputRouterImpl _input;
     private readonly GameActionsImpl _actions;
     private readonly StatusBarsImpl _statusBars;
+    private readonly HighlightImpl _highlight;
     private readonly ClientImpl _client;
     private readonly DispatcherImpl _dispatcher;
     private readonly BuffsImpl _buffs;
@@ -30,6 +31,7 @@ internal sealed class PluginContextImpl : IPluginContext
         _input      = new InputRouterImpl();
         _actions    = new GameActionsImpl(bridge);
         _statusBars = new StatusBarsImpl(bridge);
+        _highlight  = new HighlightImpl(bridge);
         _client     = new ClientImpl(bridge);
         _dispatcher = new DispatcherImpl(bridge);
         _buffs = new BuffsImpl(bridge);
@@ -45,6 +47,7 @@ internal sealed class PluginContextImpl : IPluginContext
     public IInputRouter Input => _input;
     public IGameActions Actions => _actions;
     public IStatusBars StatusBars => _statusBars;
+    public IHighlight Highlight => _highlight;
     public IClient Client => _client;
     public IDispatcher Game => _dispatcher;
     public IPluginBuffs Buffs => _buffs;
@@ -448,5 +451,114 @@ internal sealed class DispatcherImpl : IDispatcher
             catch (Exception ex) { tcs.SetException(ex); }
         });
         return tcs.Task;
+    }
+}
+
+internal sealed class HighlightImpl : IHighlight
+{
+    private readonly HostBridge _bridge;
+    public HighlightImpl(HostBridge bridge) { _bridge = bridge; }
+
+    public unsafe void AddArea(
+        string id,
+        int durationMs = -1,
+        HighlightSnap snap = HighlightSnap.Mouse,
+        uint anchorSerial = 0,
+        ushort hue = 0x0386,
+        int rangeX = 3,
+        int rangeY = 3,
+        HighlightObjectTypes objectTypes = HighlightObjectTypes.All,
+        int x = 0,
+        int y = 0)
+    {
+        var fn = _bridge.ClientBindings.AddAreaFn;
+        if (fn == 0 || string.IsNullOrEmpty(id)) return;
+
+        nint idPtr = Marshal.StringToHGlobalAnsi(id);
+        int snapKind = (int)snap;
+        int types = (int)objectTypes;
+
+        void Call()
+        {
+            try
+            {
+                ((delegate* unmanaged[Cdecl]<nint, int, int, uint, int, int, ushort, int, int, int, void>)fn)(
+                    idPtr, durationMs, snapKind, anchorSerial, x, y, hue, rangeX, rangeY, types);
+            }
+            finally { Marshal.FreeHGlobal(idPtr); }
+        }
+
+        if (_bridge.IsGameThread) Call();
+        else _bridge.PostToGameThread(Call);
+    }
+
+    public unsafe void RemoveArea(string id)
+    {
+        var fn = _bridge.ClientBindings.RemoveAreaFn;
+        if (fn == 0 || string.IsNullOrEmpty(id)) return;
+
+        nint idPtr = Marshal.StringToHGlobalAnsi(id);
+
+        void Call()
+        {
+            try { ((delegate* unmanaged[Cdecl]<nint, void>)fn)(idPtr); }
+            finally { Marshal.FreeHGlobal(idPtr); }
+        }
+
+        if (_bridge.IsGameThread) Call();
+        else _bridge.PostToGameThread(Call);
+    }
+
+    public unsafe void ClearAreas()
+    {
+        var fn = _bridge.ClientBindings.ClearAreasFn;
+        if (fn == 0) return;
+        if (_bridge.IsGameThread) ((delegate* unmanaged[Cdecl]<void>)fn)();
+        else _bridge.PostToGameThread(() => ((delegate* unmanaged[Cdecl]<void>)fn)());
+    }
+
+    // Direct synchronous read (no thread marshal), matching IGameActions.TryGetPlayerPosition:
+    // it only reads live state, and off-thread callers need the value immediately.
+    public unsafe int GetAreaTimer(string id)
+    {
+        var fn = _bridge.ClientBindings.GetAreaTimerFn;
+        if (fn == 0 || string.IsNullOrEmpty(id)) return 0;
+
+        nint idPtr = Marshal.StringToHGlobalAnsi(id);
+        try { return ((delegate* unmanaged[Cdecl]<nint, int>)fn)(idPtr); }
+        finally { Marshal.FreeHGlobal(idPtr); }
+    }
+
+    public unsafe void AddCharacter(uint serial, ushort hue, bool priorityHighlight = false)
+    {
+        var fn = _bridge.ClientBindings.AddCharacterFn;
+        if (fn == 0) return;
+        byte p = priorityHighlight ? (byte)1 : (byte)0;
+        if (_bridge.IsGameThread)
+            ((delegate* unmanaged[Cdecl]<uint, ushort, byte, void>)fn)(serial, hue, p);
+        else
+            _bridge.PostToGameThread(() => ((delegate* unmanaged[Cdecl]<uint, ushort, byte, void>)fn)(serial, hue, p));
+    }
+
+    public unsafe void RemoveCharacter(uint serial, bool priorityHighlight = false)
+    {
+        var fn = _bridge.ClientBindings.RemoveCharacterFn;
+        if (fn == 0) return;
+        byte p = priorityHighlight ? (byte)1 : (byte)0;
+        if (_bridge.IsGameThread)
+            ((delegate* unmanaged[Cdecl]<uint, byte, void>)fn)(serial, p);
+        else
+            _bridge.PostToGameThread(() => ((delegate* unmanaged[Cdecl]<uint, byte, void>)fn)(serial, p));
+    }
+
+    public unsafe void ClearCharacters(bool priorityHighlight = false)
+    {
+        var fn = _bridge.ClientBindings.ClearCharactersFn;
+        if (fn == 0) return;
+        byte p = priorityHighlight ? (byte)1 : (byte)0;
+        if (_bridge.IsGameThread)
+            ((delegate* unmanaged[Cdecl]<byte, void>)fn)(p);
+        else
+            _bridge.PostToGameThread(() => ((delegate* unmanaged[Cdecl]<byte, void>)fn)(p));
     }
 }
