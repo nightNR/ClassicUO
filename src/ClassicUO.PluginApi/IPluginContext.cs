@@ -41,6 +41,9 @@ public interface IPluginContext
     /// <summary>Plugin-driven on-screen timer overlay.</summary>
     IScreenTimers ScreenTimers { get; }
 
+    /// <summary>Plugin-driven object/area highlighting.</summary>
+    IHighlight Highlight { get; }
+
     /// <summary>Window title, cliloc translation, and other client-level services.</summary>
     IClient Client { get; }
 
