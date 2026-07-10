@@ -3,6 +3,7 @@
 using ClassicUO.Assets;
 using ClassicUO.Configuration;
 using ClassicUO.Game.Data;
+using ClassicUO.Game.Managers;
 using ClassicUO.Game.Scenes;
 using ClassicUO.Renderer;
 using ClassicUO.Utility;
@@ -148,6 +149,11 @@ namespace ClassicUO.Game.GameObjects
                 {
                     overridedHue = Notoriety.GetHue(NotorietyFlag);
                 }
+            }
+
+            if (PluginHighlights.TryResolveMobileHue(Serial, overridedHue != 0, X, Y, Z, out ushort pluginHue))
+            {
+                overridedHue = pluginHue;
             }
 
             ProcessSteps(out byte dir);
