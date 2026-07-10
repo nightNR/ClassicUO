@@ -38,6 +38,7 @@ namespace ClassicUO.Game
             MessageManager = new MessageManager(this);
             ContainerManager = new ContainerManager(this);
             IgnoreManager = new IgnoreManager(this);
+            AliasManager = new AliasManager(this);
             SkillsGroupManager = new SkillsGroupManager(this);
             ChatManager = new ChatManager(this);
             AuraManager = new AuraManager(this);
@@ -79,6 +80,8 @@ namespace ClassicUO.Game
         public ContainerManager ContainerManager { get; }
 
         public IgnoreManager IgnoreManager { get; }
+
+        public AliasManager AliasManager { get; }
 
         public SkillsGroupManager SkillsGroupManager { get; }
 

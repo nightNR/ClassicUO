@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: BSD-2-Clause
 
-using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Text;
 using System.Xml;
+using ClassicUO;
 using ClassicUO.Configuration;
 using ClassicUO.Utility.Logging;
 
@@ -15,5 +15,166 @@ namespace ClassicUO.Game.Managers
         public uint Serial { get; set; }
         public string Alias { get; set; }
         public bool Global { get; set; }
+    }
+
+    internal sealed class AliasManager
+    {
+        private readonly World _world;
+        private readonly Dictionary<uint, string> _global = new Dictionary<uint, string>();
+        private readonly Dictionary<uint, string> _profile = new Dictionary<uint, string>();
+
+        public AliasManager(World world) { _world = world; }
+
+        public bool Enabled { get; set; } = true;
+
+        private static string GlobalPath =>
+            Path.Combine(CUOEnviroment.ExecutablePath, "Data", "aliases_global.xml");
+
+        public string GetAlias(uint serial)
+        {
+            if (_profile.TryGetValue(serial, out string p))
+                return p;
+            if (_global.TryGetValue(serial, out string g))
+                return g;
+            return null;
+        }
+
+        public bool IsGlobal(uint serial) => !_profile.ContainsKey(serial) && _global.ContainsKey(serial);
+
+        public string Resolve(uint serial, string realName)
+        {
+            if (!Enabled)
+                return realName;
+
+            string alias = GetAlias(serial);
+            return string.IsNullOrEmpty(alias) ? realName : alias;
+        }
+
+        public void Set(uint serial, string alias, bool global)
+        {
+            if (string.IsNullOrEmpty(alias))
+            {
+                Remove(serial);
+                return;
+            }
+
+            _global.Remove(serial);
+            _profile.Remove(serial);
+
+            if (global)
+                _global[serial] = alias;
+            else
+                _profile[serial] = alias;
+
+            Persist();
+        }
+
+        public void Remove(uint serial)
+        {
+            _global.Remove(serial);
+            _profile.Remove(serial);
+            Persist();
+        }
+
+        public IReadOnlyList<AliasEntry> Entries
+        {
+            get
+            {
+                var list = new List<AliasEntry>(_profile.Count + _global.Count);
+                foreach (var kv in _profile)
+                    list.Add(new AliasEntry { Serial = kv.Key, Alias = kv.Value, Global = false });
+                foreach (var kv in _global)
+                    list.Add(new AliasEntry { Serial = kv.Key, Alias = kv.Value, Global = true });
+                return list;
+            }
+        }
+
+        public void Initialize()
+        {
+            _global.Clear();
+            _profile.Clear();
+
+            ReadGlobal(GlobalPath);
+
+            var profile = ProfileManager.CurrentProfile;
+            if (profile != null)
+            {
+                Enabled = profile.AliasesEnabled;
+                if (profile.CharacterAliases != null)
+                {
+                    foreach (var e in profile.CharacterAliases)
+                        if (e != null && !string.IsNullOrEmpty(e.Alias))
+                            _profile[e.Serial] = e.Alias;
+                }
+            }
+        }
+
+        private void Persist()
+        {
+            SaveGlobal(GlobalPath);
+
+            var profile = ProfileManager.CurrentProfile;
+            if (profile != null)
+            {
+                var list = new List<AliasEntry>(_profile.Count);
+                foreach (var kv in _profile)
+                    list.Add(new AliasEntry { Serial = kv.Key, Alias = kv.Value, Global = false });
+                profile.CharacterAliases = list;
+            }
+        }
+
+        internal void ReadGlobal(string path)
+        {
+            if (!File.Exists(path))
+                return;
+
+            XmlDocument doc = new XmlDocument();
+            try { doc.Load(path); }
+            catch (System.Exception ex) { Log.Error(ex.ToString()); return; }
+
+            XmlElement root = doc["aliases"];
+            if (root == null)
+                return;
+
+            foreach (XmlElement xml in root.ChildNodes)
+            {
+                if (xml.Name != "info")
+                    continue;
+
+                string serialText = xml.GetAttribute("serial");
+                string alias = xml.GetAttribute("alias");
+                if (uint.TryParse(serialText, out uint serial) && !string.IsNullOrEmpty(alias))
+                    _global[serial] = alias;
+            }
+        }
+
+        internal void SaveGlobal(string path)
+        {
+            string dir = Path.GetDirectoryName(path);
+            if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
+                Directory.CreateDirectory(dir);
+
+            using (XmlTextWriter xml = new XmlTextWriter(path, Encoding.UTF8)
+            {
+                Formatting = Formatting.Indented,
+                IndentChar = '\t',
+                Indentation = 1
+            })
+            {
+                xml.WriteStartDocument(true);
+                xml.WriteStartElement("aliases");
+
+                foreach (var kv in _global)
+                {
+                    xml.WriteStartElement("info");
+                    xml.WriteAttributeString("serial", kv.Key.ToString());
+                    xml.WriteAttributeString("alias", kv.Value);
+                    xml.WriteEndElement();
+                }
+
+                xml.WriteEndElement();
+                xml.WriteEndDocument();
+            }
+        }
     }
 }

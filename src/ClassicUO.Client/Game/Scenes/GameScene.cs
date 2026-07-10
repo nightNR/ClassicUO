@@ -114,6 +114,7 @@ namespace ClassicUO.Game.Scenes
             _healthLinesManager = new HealthLinesManager(_world);
 
             _world.CommandManager.Initialize();
+            _world.AliasManager.Initialize();
 
             WorldViewportGump viewport = new WorldViewportGump(_world, this);
             UIManager.Add(viewport, false);
