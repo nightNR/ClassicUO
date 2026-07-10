@@ -554,7 +554,7 @@ namespace ClassicUO.Game.UI.Gumps
             if (mobile != null)
             {
                 string title = mobile.Title;
-                if (!string.IsNullOrEmpty(mobile.Name) && !string.IsNullOrEmpty(title) && title.StartsWith(mobile.Name))
+                if (!string.IsNullOrEmpty(mobile.Name) && !string.IsNullOrEmpty(title) && title.StartsWith(mobile.Name, System.StringComparison.Ordinal))
                 {
                     string alias = World.AliasManager.Resolve(mobile.Serial, mobile.Name);
                     if (!string.Equals(alias, mobile.Name))

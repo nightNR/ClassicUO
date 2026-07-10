@@ -34,7 +34,7 @@ namespace ClassicUO.Game.UI.Gumps
             GameActions.RequestMobileStatus(world, entity.Serial, true);
             LocalSerial = entity.Serial;
             CanCloseWithRightClick = true;
-            _name = entity.Name;
+            _name = World.AliasManager.Resolve(entity.Serial, entity.Name);
             _isDead = entity is Mobile mm && mm.IsDead;
 
             BuildGump();
