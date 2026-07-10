@@ -610,6 +610,11 @@ namespace ClassicUO.Game.UI.Gumps
 
                 ushort barColor = mobile != null ? Notoriety.GetHue(mobile.NotorietyFlag) : (ushort) 912;
 
+                if (mobile != null && World.StatusbarColorManager.TryGetColor(mobile.Graphic, mobile.Hue, out ushort sbcColor))
+                {
+                    barColor = sbcColor;
+                }
+
                 if (_background.Hue != barColor)
                 {
                     if (mobile != null && mobile.IsDead)
@@ -1711,6 +1716,11 @@ namespace ClassicUO.Game.UI.Gumps
 
                     ushort barColor = entity == null || entity == World.Player || mobile == null || mobile.NotorietyFlag == NotorietyFlag.Criminal || mobile.NotorietyFlag == NotorietyFlag.Gray ? (ushort) 0 : Notoriety.GetHue(mobile.NotorietyFlag);
 
+                    if (mobile != null && World.StatusbarColorManager.TryGetColor(mobile.Graphic, mobile.Hue, out ushort sbcColorBuild))
+                    {
+                        barColor = sbcColorBuild;
+                    }
+
                     Add(_background = new GumpPic(0, 0, 0x0804, barColor) { ContainsByBounds = true });
                     Add(_hpLineRed = new GumpPic(34, 38, LINE_RED, hitsColor));
 
@@ -1967,6 +1977,11 @@ namespace ClassicUO.Game.UI.Gumps
                 }
 
                 ushort barColor = entity == World.Player || mobile == null || mobile.NotorietyFlag == NotorietyFlag.Criminal || mobile.NotorietyFlag == NotorietyFlag.Gray ? (ushort) 0 : Notoriety.GetHue(mobile.NotorietyFlag);
+
+                if (mobile != null && World.StatusbarColorManager.TryGetColor(mobile.Graphic, mobile.Hue, out ushort sbcColorUpd))
+                {
+                    barColor = sbcColorUpd;
+                }
 
                 if (_background.Hue != barColor)
                 {
