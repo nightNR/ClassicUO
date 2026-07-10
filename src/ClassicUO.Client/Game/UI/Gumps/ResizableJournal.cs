@@ -366,6 +366,46 @@ namespace ClassicUO.Game.UI.Gumps
                 return true;
             }
 
+            protected override void OnMouseOver(int x, int y)
+            {
+                // OnMouseOver receives x/y already relative to this control's local
+                // top-left (see Control.InvokeMouseOver: position - X - ParentX), with
+                // no scroll offset applied. AddToRenderLists' render loop starts its
+                // accumulator "my" at the absolute y and draws each line at
+                // "my - _scrollBar.Value", i.e. the local (pre-scroll) offset for a
+                // line is (my - y) and the on-screen offset is (my - y) - _scrollBar.Value.
+                // Adding _scrollBar.Value back to the local mouse y converts it into
+                // that same pre-scroll local-offset space so it can be compared directly
+                // against the accumulator below.
+                int my = 0;
+                int mouseY = y + _scrollBar.Value;
+
+                foreach (JournalData journalEntry in journalDatas)
+                {
+                    if (journalEntry == null || string.IsNullOrEmpty(journalEntry.EntryText.Text))
+                        continue;
+
+                    if (!CanBeDrawn(journalEntry.TextType, journalEntry.MessageType))
+                        continue;
+
+                    int h = journalEntry.EntryText.Height;
+
+                    if (mouseY >= my && mouseY < my + h)
+                    {
+                        if (!string.IsNullOrEmpty(journalEntry.RealName))
+                            SetTooltip(journalEntry.RealName);
+                        else
+                            ClearTooltip();
+
+                        return;
+                    }
+
+                    my += h;
+                }
+
+                ClearTooltip();
+            }
+
             public override void Update()
             {
                 base.Update();
@@ -436,7 +476,10 @@ namespace ClassicUO.Game.UI.Gumps
                         timeS,
                         e.TextType,
                         e.MessageType
-                    ));
+                    )
+                    {
+                        RealName = e.Name
+                    });
 
                 if (maxScroll)
                 {
@@ -503,6 +546,7 @@ namespace ClassicUO.Game.UI.Gumps
                 public Label TimeStamp { get; }
                 public TextType TextType { get; }
                 public MessageType MessageType { get; }
+                public string RealName;
             }
         }
 
