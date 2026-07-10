@@ -179,3 +179,17 @@ from the same entity.
   alias-prefixed; title without → unchanged.
 - Manual verification per display site (name plate, health bar, party,
   tooltip, paperdoll, both journals, journal hover) with a live alias.
+
+---
+
+## Follow-up increment (2026-07-10, post-review)
+
+Three user-requested refinements after in-game trial:
+
+### F1 — Options list shows real name, serial via tooltip
+`AliasEntry` gains `string RealName`, captured at target-add time from `ent.Name`, persisted in BOTH stores (global XML `realname` attr + profile list field). `AliasManager` tracks it (parallel `_realNames` dict; `Set` gains optional `realName` param that updates it when provided, preserves it on global-toggle). The options row (`AliasEntryControl`) shows `RealName` as its label instead of the raw `0xSERIAL`; the serial moves to a hover tooltip. Real name shows even when the character is offline (it is stored).
+
+### F2 — Single-click name shows alias (overhead + journal)
+When the user single-clicks a mobile, its name arrives as the message TEXT body (not the `Name` field), `TextType.OBJECT`, `MessageType.Label`; the `Name` field holds a title. Both the overhead float text and the journal line render this TEXT. General speech (`Regular`) must stay untranslated.
+
+Rule: at the overhead render (`MessageManager` `CreateMessage`/RenderedText path) and at the two journal render sites, when `TextType == OBJECT` AND an alias exists for the owner/entry serial, route the TEXT through `Resolve(serial, text)` (text is the real name for these lines, so `Resolve` returns the alias). Reuses the existing `Resolve` (so the master toggle still applies). Speech text is untouched (gated on `OBJECT`); item names are untouched (no alias for item serials). Journal disk keeps the real name (render-only substitution, as in the base feature).
