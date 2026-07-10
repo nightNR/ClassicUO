@@ -161,6 +161,7 @@ namespace ClassicUO.Game.UI.Gumps
         private GlobalProfile _globalProfile = ProfileManager.GlobalProfile;
         private Profile _currentProfile = ProfileManager.CurrentProfile;
         private bool _aliasTargetPending;
+        private bool _statusbarColorTargetPending;
 
         public OptionsGump(World world) : base(world, 0, 0)
         {
@@ -229,6 +230,19 @@ namespace ClassicUO.Game.UI.Gumps
                     ButtonAction.SwitchPage,
                     "Aliases"
                 ) { ButtonParameter = 13 }
+            );
+
+            Add
+            (
+                new NiceButton
+                (
+                    10,
+                    10 + 30 * i++,
+                    140,
+                    25,
+                    ButtonAction.SwitchPage,
+                    "Status Bar Colors"
+                ) { ButtonParameter = 14 }
             );
 
             Add
@@ -440,13 +454,14 @@ namespace ClassicUO.Game.UI.Gumps
             BuildContainers();
             BuildExperimental();
             BuildAliases();
+            BuildStatusbarColors();
 
             ChangePage(1);
         }
 
         public override void Dispose()
         {
-            if (_aliasTargetPending && World.TargetManager.IsTargeting)
+            if ((_aliasTargetPending || _statusbarColorTargetPending) && World.TargetManager.IsTargeting)
                 World.TargetManager.CancelTarget();
 
             base.Dispose();
@@ -3420,6 +3435,85 @@ namespace ClassicUO.Game.UI.Gumps
             };
 
             rightArea.Add(addButton);
+            rightArea.Add(databox);
+
+            Add(rightArea, PAGE);
+        }
+
+        private void BuildStatusbarColors()
+        {
+            const int PAGE = 14;
+
+            ScrollArea rightArea = new ScrollArea(190, 20, WIDTH - 210, 420, true);
+
+            Checkbox enabledBox = new Checkbox(0x00D2, 0x00D3, "Enable status bar colors", FONT, HUE_FONT)
+            {
+                IsChecked = World.StatusbarColorManager.Enabled,
+                X = 5,
+                Y = 5
+            };
+            enabledBox.ValueChanged += (s, e) =>
+            {
+                World.StatusbarColorManager.Enabled = enabledBox.IsChecked;
+                if (_currentProfile != null)
+                    _currentProfile.StatusbarColorsEnabled = enabledBox.IsChecked;
+            };
+            rightArea.Add(enabledBox);
+
+            DataBox databox = new DataBox(0, 70, 0, 0) { WantUpdateSize = true };
+
+            void AddRow(StatusbarColorRule rule)
+            {
+                var row = new StatusbarColorControl(this, rule) { Y = databox.Children.Count * 26 };
+                databox.Add(row);
+                databox.ReArrangeChildren();
+            }
+
+            foreach (StatusbarColorRule rule in World.StatusbarColorManager.Rules)
+            {
+                var row = new StatusbarColorControl(this, rule) { Y = databox.Children.Count * 26 };
+                databox.Add(row);
+            }
+
+            NiceButton addTarget = new NiceButton(5, 35, 130, 25, ButtonAction.Activate, "Add (target)") { ButtonParameter = 999 };
+            addTarget.MouseUp += (sender, e) =>
+            {
+                _statusbarColorTargetPending = true;
+
+                World.TargetManager.SetTargeting(
+                    obj =>
+                    {
+                        _statusbarColorTargetPending = false;
+
+                        if (obj is Mobile m)
+                        {
+                            var rule = new StatusbarColorRule
+                            {
+                                Graphic = m.Graphic,
+                                Hues = new List<ushort> { m.Hue },
+                                Color = 0
+                            };
+                            World.StatusbarColorManager.Add(rule);
+                            World.StatusbarColorManager.Save();
+                            AddRow(rule);
+                        }
+                    },
+                    CursorType.Target,
+                    TargetType.Neutral
+                );
+            };
+
+            NiceButton addManual = new NiceButton(140, 35, 130, 25, ButtonAction.Activate, "Add (manual)") { ButtonParameter = 999 };
+            addManual.MouseUp += (sender, e) =>
+            {
+                var rule = new StatusbarColorRule { Graphic = 0, Hues = new List<ushort>(), Color = 0 };
+                World.StatusbarColorManager.Add(rule);
+                World.StatusbarColorManager.Save();
+                AddRow(rule);
+            };
+
+            rightArea.Add(addTarget);
+            rightArea.Add(addManual);
             rightArea.Add(databox);
 
             Add(rightArea, PAGE);
