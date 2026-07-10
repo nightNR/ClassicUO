@@ -222,5 +222,13 @@ namespace ClassicUO.Game.Managers
                 _ => (group.X, group.Y),
             };
         }
+
+        /// <summary>
+        /// Absolute tile (x,y,z) → isometric world pixel, matching
+        /// GameObject.UpdateRealScreenPosition. The camera/draw-offset transform
+        /// to screen space is applied by the render path.
+        /// </summary>
+        public static (int wx, int wy) TileToWorldPixel(int x, int y, int z)
+            => ((x - y) * 22, (x + y) * 22 - (z << 2));
     }
 }

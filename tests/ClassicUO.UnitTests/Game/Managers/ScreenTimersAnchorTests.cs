@@ -58,5 +58,17 @@ namespace ClassicUO.UnitTests.Game.Managers
             ScreenTimers.SetMissingSince(1, 1234);
             Assert.Equal(1234, ScreenTimers.Entries[1].MissingSinceTicks);
         }
+
+        [Theory]
+        [InlineData(0, 0, 0, 0, 0)]
+        [InlineData(1, 0, 0, 22, 22)]
+        [InlineData(0, 1, 0, -22, 22)]
+        [InlineData(10, 10, 5, 0, 420)] // (10+10)*22 - (5<<2) = 440 - 20 = 420
+        public void TileToWorldPixel_MatchesIsoFormula(int x, int y, int z, int wx, int wy)
+        {
+            var (gx, gy) = ScreenTimers.TileToWorldPixel(x, y, z);
+            Assert.Equal(wx, gx);
+            Assert.Equal(wy, gy);
+        }
     }
 }
