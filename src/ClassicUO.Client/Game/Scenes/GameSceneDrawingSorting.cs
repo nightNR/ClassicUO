@@ -664,6 +664,17 @@ namespace ClassicUO.Game.Scenes
                 partial = m.ItemData.IsPartialHue;
             }
 
+            ClassicUO.PluginApi.HighlightObjectTypes meshType = obj is Land
+                ? ClassicUO.PluginApi.HighlightObjectTypes.Land
+                : obj is Multi
+                    ? ClassicUO.PluginApi.HighlightObjectTypes.Multi
+                    : ClassicUO.PluginApi.HighlightObjectTypes.Static;
+
+            if (PluginHighlightAreas.TryResolve(obj.X, obj.Y, obj.Z, meshType, out ushort pluginMeshHue))
+            {
+                hue = pluginMeshHue;
+            }
+
             float hueX, hueY;
             if (hue != 0)
             {
