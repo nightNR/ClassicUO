@@ -2,6 +2,7 @@
 
 using ClassicUO.Configuration;
 using ClassicUO.Assets;
+using ClassicUO.Game.Managers;
 using ClassicUO.Renderer;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
@@ -36,6 +37,11 @@ namespace ClassicUO.Game.GameObjects
             else if (World.Player.IsDead && ProfileManager.CurrentProfile.EnableBlackWhiteEffect)
             {
                 hue = Constants.DEAD_RANGE_COLOR;
+            }
+
+            if (PluginHighlightAreas.TryResolve(X, Y, Z, ClassicUO.PluginApi.HighlightObjectTypes.Land, out ushort pluginLandHue))
+            {
+                hue = pluginLandHue;
             }
 
             Vector3 hueVec;

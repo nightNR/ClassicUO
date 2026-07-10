@@ -2,6 +2,7 @@
 
 using ClassicUO.Configuration;
 using ClassicUO.Game.Data;
+using ClassicUO.Game.Managers;
 using ClassicUO.Game.Scenes;
 using ClassicUO.IO;
 using ClassicUO.Assets;
@@ -57,6 +58,12 @@ namespace ClassicUO.Game.GameObjects
             else if (World.Player.IsDead && ProfileManager.CurrentProfile.EnableBlackWhiteEffect)
             {
                 hue = Constants.DEAD_RANGE_COLOR;
+                partial = false;
+            }
+
+            if (PluginHighlightAreas.TryResolve(X, Y, Z, ClassicUO.PluginApi.HighlightObjectTypes.Static, out ushort pluginStaticHue))
+            {
+                hue = pluginStaticHue;
                 partial = false;
             }
 
