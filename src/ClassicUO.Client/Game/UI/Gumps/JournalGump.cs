@@ -272,7 +272,7 @@ namespace ClassicUO.Game.UI.Gumps
                 return;
 
             string displayText = entry.TextType == TextType.OBJECT
-                ? World.AliasManager.Resolve(entry.Serial, entry.Text)
+                ? World.AliasManager.ResolveObjectText(entry.Serial, entry.Text)
                 : entry.Text;
 
             string text = $"{usrSend}: {displayText}";

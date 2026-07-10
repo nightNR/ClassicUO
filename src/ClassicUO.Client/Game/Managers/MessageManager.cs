@@ -208,7 +208,7 @@ namespace ClassicUO.Game.Managers
                         break;
 
                     string overheadText = (textType == TextType.OBJECT && parent != null)
-                        ? _world.AliasManager.Resolve(parent.Serial, text)
+                        ? _world.AliasManager.ResolveObjectText(parent.Serial, text)
                         : text;
 
                     TextObject msg = CreateMessage

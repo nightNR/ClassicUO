@@ -335,7 +335,7 @@ namespace ClassicUO.Game.UI.Gumps
                 if (e.TextType != TextType.OBJECT)
                     return e.Text;
                 var mgr = _resizableJournal?.World?.AliasManager;
-                return mgr != null ? mgr.Resolve(e.Serial, e.Text) : e.Text;
+                return mgr != null ? mgr.ResolveObjectText(e.Serial, e.Text) : e.Text;
             }
 
             public override bool AddToRenderLists(RenderLists renderLists, int x, int y, ref float layerDepthRef)

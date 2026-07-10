@@ -6,6 +6,7 @@ using System.Text;
 using System.Xml;
 using ClassicUO;
 using ClassicUO.Configuration;
+using ClassicUO.Game.GameObjects;
 using ClassicUO.Utility.Logging;
 
 namespace ClassicUO.Game.Managers
@@ -52,6 +53,29 @@ namespace ClassicUO.Game.Managers
 
             string alias = GetAlias(serial);
             return string.IsNullOrEmpty(alias) ? realName : alias;
+        }
+
+        // For OBJECT/name-reply text that may carry extra decoration (e.g. a
+        // "[GUILD]" tag): replace only the real-name substring with the alias,
+        // preserving the rest. Falls back to leaving the text untouched when the
+        // real name can't be located, so decorations are never clobbered.
+        public string ResolveObjectText(uint serial, string text)
+        {
+            if (!Enabled || string.IsNullOrEmpty(text))
+                return text;
+
+            string alias = GetAlias(serial);
+            if (string.IsNullOrEmpty(alias))
+                return text;
+
+            string real = _realNames.TryGetValue(serial, out var rn) && !string.IsNullOrEmpty(rn)
+                ? rn
+                : _world?.Mobiles.Get(serial)?.Name;
+
+            if (!string.IsNullOrEmpty(real) && text.Contains(real))
+                return text.Replace(real, alias);
+
+            return text;
         }
 
         public void Set(uint serial, string alias, bool global, string realName = null)

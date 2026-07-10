@@ -134,5 +134,53 @@ namespace ClassicUO.UnitTests
             m.Remove(0xA0);
             Assert.Empty(m.Entries);
         }
+
+        [Fact]
+        public void ResolveObjectText_PreservesGuildSuffix()
+        {
+            var m = New();
+            m.Set(0xA0, "Ducky", false, "Sinon");
+            Assert.Equal("Ducky [GLD]", m.ResolveObjectText(0xA0, "Sinon [GLD]"));
+        }
+
+        [Fact]
+        public void ResolveObjectText_PreservesGuildPrefix()
+        {
+            var m = New();
+            m.Set(0xA0, "Ducky", false, "Sinon");
+            Assert.Equal("[GLD] Ducky", m.ResolveObjectText(0xA0, "[GLD] Sinon"));
+        }
+
+        [Fact]
+        public void ResolveObjectText_PlainName()
+        {
+            var m = New();
+            m.Set(0xA0, "Ducky", false, "Sinon");
+            Assert.Equal("Ducky", m.ResolveObjectText(0xA0, "Sinon"));
+        }
+
+        [Fact]
+        public void ResolveObjectText_NoAlias_ReturnsTextUnchanged()
+        {
+            var m = New();
+            Assert.Equal("Sinon [GLD]", m.ResolveObjectText(0xB2, "Sinon [GLD]"));
+        }
+
+        [Fact]
+        public void ResolveObjectText_Disabled_ReturnsTextUnchanged()
+        {
+            var m = New();
+            m.Set(0xA0, "Ducky", false, "Sinon");
+            m.Enabled = false;
+            Assert.Equal("Sinon [GLD]", m.ResolveObjectText(0xA0, "Sinon [GLD]"));
+        }
+
+        [Fact]
+        public void ResolveObjectText_RealNameNotInText_Unchanged()
+        {
+            var m = New();
+            m.Set(0xA0, "Ducky", false, "Sinon");
+            Assert.Equal("Something else", m.ResolveObjectText(0xA0, "Something else"));
+        }
     }
 }
