@@ -151,6 +151,10 @@ namespace ClassicUO.Game.GameObjects
                 }
             }
 
+            // overridedHue != 0 here means "the client already owns an override" —
+            // selection/out-of-range/dead-world/hidden as well as status/notoriety —
+            // so a normal-tier plugin highlight loses to any of those, not just status.
+            // Priority-tier plugin highlights still always win regardless.
             if (PluginHighlights.TryResolveMobileHue(Serial, overridedHue != 0, X, Y, Z, out ushort pluginHue))
             {
                 overridedHue = pluginHue;
