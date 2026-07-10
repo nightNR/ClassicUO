@@ -226,6 +226,7 @@ namespace ClassicUO.Configuration
         public bool PartyInviteGump { get; set; }
         public bool CustomBarsToggled { get; set; }
         public bool StatusbarColorsEnabled { get; set; } = true;
+        public int StatusbarColorOpacity { get; set; } = 80;
         public bool CBBlackBGToggled { get; set; }
         public bool ShowStatValuesOnBars { get; set; }
 
