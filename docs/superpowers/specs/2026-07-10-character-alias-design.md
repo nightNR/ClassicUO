@@ -43,11 +43,18 @@ Dictionary<uint, string> _global    // serial -> alias, shared across all this-a
 Dictionary<uint, string> _profile   // serial -> alias, this character only
 ```
 
+Master switch: a single `Enabled` flag turns the whole feature off. When
+off, `Resolve` short-circuits and returns the real name for every serial —
+no substitution anywhere, aliases stay stored but dormant. Backed by a
+`AliasesEnabled` bool auto-property on `Profile.cs` (default `true`),
+per-character.
+
 API:
 
 ```
-string? GetAlias(uint serial)                       // profile first, then global; null if none
-string  Resolve(uint serial, string realName)       // GetAlias(serial) ?? realName
+bool    Enabled                                     // mirrors Profile.AliasesEnabled
+string? GetAlias(uint serial)                       // null if disabled, else profile-then-global
+string  Resolve(uint serial, string realName)       // !Enabled -> realName; else GetAlias(serial) ?? realName
 void    Set(uint serial, string alias, bool global) // upsert into the chosen store, remove from the other
 void    Remove(uint serial)                          // remove from whichever store holds it
 bool    IsGlobal(uint serial)
@@ -90,6 +97,10 @@ Modern variant exists).
   so `PAGE = 13`), `IsSelected` handling as siblings.
 - New `BuildAliasList()` method, `const int PAGE = 13`, called from the ctor
   alongside the other `BuildX()` calls, ending in `Add(rightArea, PAGE)`.
+- **Master toggle** at the top of the tab: a `Checkbox` bound to
+  `Profile.AliasesEnabled` (label e.g. "Enable character aliases"). Off =
+  whole feature dormant, list below stays editable but has no display
+  effect.
 - Content = ScrollArea + DataBox list, pattern from `IgnoreManagerGump` /
   `IgnoreListControl` and the InfoBar tab (OptionsGump.cs:3327-3453).
 - **Row control** (new `AliasEntryControl : Control`, modeled on
@@ -160,9 +171,10 @@ from the same entity.
 
 - `AliasManager` unit tests (project already exposes internals to
   `ClassicUO.UnitTests`): `Resolve` returns alias when set / real name when
-  not; profile-beats-global precedence; `Set` with global toggle moves the
-  entry between stores and out of the other; `Remove` clears from whichever
-  store; round-trip persistence load/save for both stores.
+  not; `Enabled = false` makes `Resolve` return real name even with an
+  alias set; profile-beats-global precedence; `Set` with global toggle
+  moves the entry between stores and out of the other; `Remove` clears from
+  whichever store; round-trip persistence load/save for both stores.
 - Paperdoll prefix replacement: title with matching name prefix →
   alias-prefixed; title without → unchanged.
 - Manual verification per display site (name plate, health bar, party,
