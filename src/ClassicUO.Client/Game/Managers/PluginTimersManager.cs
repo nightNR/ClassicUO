@@ -3,6 +3,7 @@
 using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
+using ClassicUO.Game;
 
 namespace ClassicUO.Game.Managers
 {
@@ -18,17 +19,24 @@ namespace ClassicUO.Game.Managers
         public const int ReasonExpired = 0;
         public const int ReasonRemovedByPlugin = 1;
         public const int ReasonRemovedByUser = 2;
+        public const int ReasonAnchorLost = 3;
 
         // Test seams; when null, events route to the real plugin host.
         internal static Action<int, int> BuffEventSink;
         internal static Action<int, int> TimerEventSink;
 
+        // Test seam; when null, serial resolution uses the live World.
+        internal static Func<uint, bool> SerialResolver;
+
         // Wired by BuffGump so an open gump rebuilds after a set change.
         internal static Action GumpRefresh;
 
         private static readonly List<int> _expiredScratch = new List<int>();
+        private static readonly List<int> _lostScratch = new List<int>();
 
-        public static void Update(long now)
+        public static void Update(long now) => Update(null, now);
+
+        public static void Update(World world, long now)
         {
             _expiredScratch.Clear();
             PluginBuffs.CollectExpired(now, _expiredScratch);
@@ -49,7 +57,56 @@ namespace ClassicUO.Game.Managers
                 ScreenTimers.Remove(id);
                 RaiseTimerEvent(id, ReasonExpired);
             }
+
+            UpdateAnchors(world, now);
         }
+
+        // Lost-anchor grace for Serial/Self timers. Off-screen is NOT handled here
+        // (that is a render-only concern); this only fires when the anchor entity
+        // no longer exists in the world. Absolute anchors are never lost.
+        private static void UpdateAnchors(World world, long now)
+        {
+            _lostScratch.Clear();
+
+            foreach (var kv in ScreenTimers.Entries)
+            {
+                var e = kv.Value;
+                if (e.AnchorKind != AnchorKind.Serial && e.AnchorKind != AnchorKind.Self)
+                    continue;
+
+                bool resolvable = e.AnchorKind == AnchorKind.Self
+                    ? ResolvePlayer(world)
+                    : ResolveSerial(world, e.AnchorSerial);
+
+                if (resolvable)
+                {
+                    if (e.MissingSinceTicks != 0)
+                        ScreenTimers.SetMissingSince(e.Id, 0);
+                    continue;
+                }
+
+                if (e.MissingSinceTicks == 0)
+                {
+                    ScreenTimers.SetMissingSince(e.Id, now);
+                }
+                else if (now - e.MissingSinceTicks >= e.AnchorGraceMs)
+                {
+                    _lostScratch.Add(e.Id);
+                }
+            }
+
+            foreach (int id in _lostScratch)
+            {
+                ScreenTimers.Remove(id);
+                RaiseTimerEvent(id, ReasonAnchorLost);
+            }
+        }
+
+        private static bool ResolveSerial(World world, uint serial)
+            => SerialResolver != null ? SerialResolver(serial) : world?.Get(serial) != null;
+
+        private static bool ResolvePlayer(World world)
+            => SerialResolver != null ? SerialResolver(0) : world?.Player != null;
 
         public static void RaiseBuffEvent(int id, int reason)
         {
@@ -72,6 +129,7 @@ namespace ClassicUO.Game.Managers
         {
             BuffEventSink = null;
             TimerEventSink = null;
+            SerialResolver = null;
             GumpRefresh = null;
             PluginBuffs.Reset();
             ScreenTimers.Reset();
