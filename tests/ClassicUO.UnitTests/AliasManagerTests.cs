@@ -92,5 +92,47 @@ namespace ClassicUO.UnitTests
 
             File.Delete(path);
         }
+
+        [Fact]
+        public void Set_StoresRealName_AndEntriesExposesIt()
+        {
+            var m = New();
+            m.Set(0xA0, "Ducky", false, "Bazinka");
+            var entry = Assert.Single(m.Entries);
+            Assert.Equal("Bazinka", entry.RealName);
+        }
+
+        [Fact]
+        public void Set_GlobalToggle_PreservesRealName()
+        {
+            var m = New();
+            m.Set(0xA0, "Ducky", false, "Bazinka");
+            m.Set(0xA0, "Ducky", true);
+            var entry = Assert.Single(m.Entries);
+            Assert.Equal("Bazinka", entry.RealName);
+            Assert.True(m.IsGlobal(0xA0));
+        }
+
+        [Fact]
+        public void GlobalStore_RoundTrips_RealName()
+        {
+            var a = New();
+            a.Set(0xA0, "Ducky", true, "Bazinka");
+            a.SaveGlobal(a.GlobalPathOverride);
+
+            var b = New();
+            b.ReadGlobal(a.GlobalPathOverride);
+            var entry = Assert.Single(b.Entries);
+            Assert.Equal("Bazinka", entry.RealName);
+        }
+
+        [Fact]
+        public void Remove_ClearsRealName()
+        {
+            var m = New();
+            m.Set(0xA0, "Ducky", false, "Bazinka");
+            m.Remove(0xA0);
+            Assert.Empty(m.Entries);
+        }
     }
 }

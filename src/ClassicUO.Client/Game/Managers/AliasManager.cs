@@ -15,6 +15,7 @@ namespace ClassicUO.Game.Managers
         public uint Serial { get; set; }
         public string Alias { get; set; }
         public bool Global { get; set; }
+        public string RealName { get; set; }
     }
 
     internal sealed class AliasManager
@@ -22,6 +23,7 @@ namespace ClassicUO.Game.Managers
         private readonly World _world;
         private readonly Dictionary<uint, string> _global = new Dictionary<uint, string>();
         private readonly Dictionary<uint, string> _profile = new Dictionary<uint, string>();
+        private readonly Dictionary<uint, string> _realNames = new Dictionary<uint, string>();
 
         public AliasManager(World world) { _world = world; }
 
@@ -52,7 +54,7 @@ namespace ClassicUO.Game.Managers
             return string.IsNullOrEmpty(alias) ? realName : alias;
         }
 
-        public void Set(uint serial, string alias, bool global)
+        public void Set(uint serial, string alias, bool global, string realName = null)
         {
             if (string.IsNullOrEmpty(alias))
             {
@@ -68,6 +70,9 @@ namespace ClassicUO.Game.Managers
             else
                 _profile[serial] = alias;
 
+            if (realName != null)
+                _realNames[serial] = realName;
+
             Persist();
         }
 
@@ -75,6 +80,7 @@ namespace ClassicUO.Game.Managers
         {
             _global.Remove(serial);
             _profile.Remove(serial);
+            _realNames.Remove(serial);
             Persist();
         }
 
@@ -84,9 +90,9 @@ namespace ClassicUO.Game.Managers
             {
                 var list = new List<AliasEntry>(_profile.Count + _global.Count);
                 foreach (var kv in _profile)
-                    list.Add(new AliasEntry { Serial = kv.Key, Alias = kv.Value, Global = false });
+                    list.Add(new AliasEntry { Serial = kv.Key, Alias = kv.Value, Global = false, RealName = _realNames.TryGetValue(kv.Key, out var rn) ? rn : null });
                 foreach (var kv in _global)
-                    list.Add(new AliasEntry { Serial = kv.Key, Alias = kv.Value, Global = true });
+                    list.Add(new AliasEntry { Serial = kv.Key, Alias = kv.Value, Global = true, RealName = _realNames.TryGetValue(kv.Key, out var rn) ? rn : null });
                 return list;
             }
         }
@@ -95,6 +101,7 @@ namespace ClassicUO.Game.Managers
         {
             _global.Clear();
             _profile.Clear();
+            _realNames.Clear();
 
             ReadGlobal(GlobalPath);
 
@@ -106,7 +113,11 @@ namespace ClassicUO.Game.Managers
                 {
                     foreach (var e in profile.CharacterAliases)
                         if (e != null && !string.IsNullOrEmpty(e.Alias))
+                        {
                             _profile[e.Serial] = e.Alias;
+                            if (!string.IsNullOrEmpty(e.RealName))
+                                _realNames[e.Serial] = e.RealName;
+                        }
                 }
             }
 
@@ -124,7 +135,7 @@ namespace ClassicUO.Game.Managers
             {
                 var list = new List<AliasEntry>(_profile.Count);
                 foreach (var kv in _profile)
-                    list.Add(new AliasEntry { Serial = kv.Key, Alias = kv.Value, Global = false });
+                    list.Add(new AliasEntry { Serial = kv.Key, Alias = kv.Value, Global = false, RealName = _realNames.TryGetValue(kv.Key, out var rn) ? rn : null });
                 profile.CharacterAliases = list;
             }
         }
@@ -149,8 +160,13 @@ namespace ClassicUO.Game.Managers
 
                 string serialText = xml.GetAttribute("serial");
                 string alias = xml.GetAttribute("alias");
+                string realName = xml.GetAttribute("realname");
                 if (uint.TryParse(serialText, out uint serial) && !string.IsNullOrEmpty(alias))
+                {
                     _global[serial] = alias;
+                    if (!string.IsNullOrEmpty(realName))
+                        _realNames[serial] = realName;
+                }
             }
         }
 
@@ -175,6 +191,7 @@ namespace ClassicUO.Game.Managers
                     xml.WriteStartElement("info");
                     xml.WriteAttributeString("serial", kv.Key.ToString());
                     xml.WriteAttributeString("alias", kv.Value);
+                    xml.WriteAttributeString("realname", _realNames.TryGetValue(kv.Key, out var rn) ? rn ?? "" : "");
                     xml.WriteEndElement();
                 }
 

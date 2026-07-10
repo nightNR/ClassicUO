@@ -3403,9 +3403,9 @@ namespace ClassicUO.Game.UI.Gumps
 
                             if (!exists)
                             {
-                                World.AliasManager.Set(ent.Serial, seedAlias, global: false);
+                                World.AliasManager.Set(ent.Serial, seedAlias, global: false, realName: ent.Name);
 
-                                var row = new AliasEntryControl(this, new AliasEntry { Serial = ent.Serial, Alias = seedAlias, Global = false })
+                                var row = new AliasEntryControl(this, new AliasEntry { Serial = ent.Serial, Alias = seedAlias, Global = false, RealName = ent.Name })
                                 {
                                     Y = databox.Children.Count * 26
                                 };

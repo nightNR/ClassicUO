@@ -29,7 +29,9 @@ namespace ClassicUO.Game.UI.Controls
             _aliasBox.TextChanged += (s, e) =>
                 _gump.World.AliasManager.Set(_serial, _aliasBox.Text, _globalBox.IsChecked);
 
-            Label nameLabel = new Label($"0x{_serial:X8}", true, 0x0386, 200, 1) { X = 175, Y = 5 };
+            string display = string.IsNullOrEmpty(entry.RealName) ? $"0x{_serial:X8}" : entry.RealName;
+            Label nameLabel = new Label(display, true, 0x0386, 200, 1) { X = 175, Y = 5 };
+            nameLabel.SetTooltip($"0x{_serial:X8}");
 
             NiceButton deleteButton = new NiceButton(390, 0, 60, 25, ButtonAction.Activate, ResGumps.Delete) { ButtonParameter = 999 };
             deleteButton.MouseUp += (sender, e) =>
