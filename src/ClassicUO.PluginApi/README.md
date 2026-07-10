@@ -191,15 +191,16 @@ track a mobile serial. Areas can expire after a duration (or never, if
 added area wins. Filter which object types tint via `objectTypes` (land, statics,
 items, mobiles, corpses, multis).
 
-Example:
+##### AddArea(...)
 
-    // Tint a specific mobile, losing to poison/paralyze/attacked coloring:
-    context.Highlight.AddCharacter(mobileSerial, hue: 0x0044);
+Adds or replaces an area highlight. Pass an `id` string to identify it; re-adding
+the same `id` replaces the existing area. Configure the zone's center behavior
+via `snap`: use `HighlightSnap.Mouse` to follow the cursor (default),
+`HighlightSnap.Position` with `x`/`y` to pin to a fixed tile, or
+`HighlightSnap.Serial` with `anchorSerial` to follow a mobile or item.
 
-    // Tint a specific mobile, always winning:
-    context.Highlight.AddCharacter(mobileSerial, hue: 0x0044, priorityHighlight: true);
+Example (fixed position, 10-second duration):
 
-    // Paint a 5x5 zone around a fixed world position for 10 seconds, land + statics only:
     context.Highlight.AddArea(
         "danger-zone",
         durationMs: 10000,
@@ -212,7 +213,58 @@ Example:
         y: 5678
     );
 
+Example (follow a mobile, no expiry):
+
+    context.Highlight.AddArea(
+        "follow-target",
+        snap: HighlightSnap.Serial,
+        anchorSerial: targetSerial,
+        hue: 0x0044,
+        rangeX: 3,
+        rangeY: 3
+    );
+
+##### RemoveArea(string id)
+
+Removes the area highlight identified by `id`. The `id` is the same string passed
+to `AddArea`.
+
     context.Highlight.RemoveArea("danger-zone");
+
+##### ClearAreas()
+
+Removes every area highlight owned by this plugin.
+
+##### GetAreaTimer(string id)
+
+Returns the remaining lifetime in milliseconds for the area identified by `id`.
+Returns 0 if the `id` doesn't exist or has expired; returns `int.MaxValue` if the
+area never expires (durationMs was -1).
+
+##### Character highlight methods
+
+In addition to `AddCharacter`, use the following to manage character highlights:
+
+`RemoveCharacter(uint serial, bool priorityHighlight = false)` — Removes the
+character highlight for that serial in the given tier (determined by
+`priorityHighlight`). No-op if no highlight exists for that serial in that tier.
+
+`ClearCharacters(bool priorityHighlight = false)` — Removes every character
+highlight owned by this plugin in the given tier (all priority, or all standard).
+
+Example:
+
+    // Tint a specific mobile, losing to poison/paralyze/attacked coloring:
+    context.Highlight.AddCharacter(mobileSerial, hue: 0x0044);
+
+    // Tint a specific mobile, always winning:
+    context.Highlight.AddCharacter(mobileSerial, hue: 0x0044, priorityHighlight: true);
+
+    // Remove that highlight later:
+    context.Highlight.RemoveCharacter(mobileSerial, priorityHighlight: false);
+
+    // Clear all non-priority highlights owned by this plugin:
+    context.Highlight.ClearCharacters(priorityHighlight: false);
 
 ## Sample
 
