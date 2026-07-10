@@ -2,6 +2,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Runtime.InteropServices;
 using ClassicUO.Game.GameObjects;
 using ClassicUO.PluginApi;
 
@@ -316,6 +317,84 @@ namespace ClassicUO.Game.Managers
             SerialResolver = null;
             MouseWorldResolver = null;
             _nextSeq = 0;
+        }
+    }
+
+    /// <summary>
+    /// Static bind targets for the plugin-&gt;cuo highlight primitives (bound
+    /// into ClientBindings in PluginHost.cs) plus the render-facing resolution
+    /// helper. All run on the game thread (the host marshals before calling).
+    /// Mirrors PluginStatusBars/PluginTimersManager as static binding targets.
+    /// </summary>
+    internal static class PluginHighlights
+    {
+        private static string PtrToString(System.IntPtr p) =>
+            p == System.IntPtr.Zero ? string.Empty : (Marshal.PtrToStringAnsi(p) ?? string.Empty);
+
+        public static void AddArea(
+            System.IntPtr idUtf8,
+            int durationMs,
+            int snapKind,
+            uint anchorSerial,
+            int x,
+            int y,
+            ushort hue,
+            int rangeX,
+            int rangeY,
+            int objectTypes
+        )
+        {
+            string id = PtrToString(idUtf8);
+
+            if (string.IsNullOrEmpty(id))
+            {
+                return;
+            }
+
+            World world = Client.Game?.UO?.World;
+            PluginHighlightAreas.Add(
+                world, id, durationMs, (HighlightSnap)snapKind, anchorSerial,
+                hue, rangeX, rangeY, (HighlightObjectTypes)objectTypes, x, y, Time.Ticks
+            );
+        }
+
+        public static void RemoveArea(System.IntPtr idUtf8) => PluginHighlightAreas.Remove(PtrToString(idUtf8));
+
+        public static void ClearAreas() => PluginHighlightAreas.ClearAll();
+
+        public static int GetAreaTimer(System.IntPtr idUtf8) => PluginHighlightAreas.GetTimer(PtrToString(idUtf8), Time.Ticks);
+
+        public static void AddCharacter(uint serial, ushort hue, byte priorityHighlight) =>
+            PluginHighlightCharacters.Set(serial, hue, priorityHighlight != 0);
+
+        public static void RemoveCharacter(uint serial, byte priorityHighlight) =>
+            PluginHighlightCharacters.Remove(serial, priorityHighlight != 0);
+
+        public static void ClearCharacters(byte priorityHighlight) =>
+            PluginHighlightCharacters.ClearAll(priorityHighlight != 0);
+
+        /// <summary>Per-frame driver, called alongside PluginTimersManager.Update.</summary>
+        public static void Update(World world, long now) => PluginHighlightAreas.Update(world, now);
+
+        /// <summary>
+        /// Composes character-highlight and area-highlight resolution for a
+        /// mobile, in spec priority order: priority character tier, then the
+        /// caller's own status override, then normal character tier, then area.
+        /// </summary>
+        public static bool TryResolveMobileHue(uint serial, bool statusOverrideActive, int x, int y, sbyte z, out ushort hue)
+        {
+            if (PluginHighlightCharacters.TryResolve(serial, statusOverrideActive, out hue))
+            {
+                return true;
+            }
+
+            if (statusOverrideActive)
+            {
+                hue = 0;
+                return false;
+            }
+
+            return PluginHighlightAreas.TryResolve(x, y, z, HighlightObjectTypes.Mobile, out hue);
         }
     }
 }
