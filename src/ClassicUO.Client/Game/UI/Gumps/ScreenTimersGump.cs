@@ -3,6 +3,7 @@
 using System;
 using System.Collections.Generic;
 using ClassicUO.Assets;
+using ClassicUO.Game;
 using ClassicUO.Game.GameObjects;
 using ClassicUO.Game.Managers;
 using ClassicUO.Game.Scenes;
@@ -67,22 +68,124 @@ namespace ClassicUO.Game.UI.Gumps
             {
                 var e = kv.Value;
 
-                StackDirection dir = StackDirection.Down;
-                TimerGroup group = default;
-                if (e.GroupId != 0 && ScreenTimers.TryGetGroup(e.GroupId, out group))
+                int px, py;
+
+                if (e.AnchorKind != AnchorKind.None)
                 {
-                    dir = group.Direction;
+                    if (!TryResolveAnchorScreen(in e, out px, out py))
+                    {
+                        continue; // anchor missing or off-screen: hide, keep counting
+                    }
+                }
+                else
+                {
+                    StackDirection dir = StackDirection.Down;
+                    TimerGroup group = default;
+                    if (e.GroupId != 0 && ScreenTimers.TryGetGroup(e.GroupId, out group))
+                    {
+                        dir = group.Direction;
+                    }
+
+                    int extent = ScreenTimers.DefaultExtent(e.Shape, dir, e.Width, e.Height);
+                    (px, py) = ScreenTimers.ComputePosition(e, group, extent);
                 }
 
-                int extent = ScreenTimers.DefaultExtent(e.Shape, dir, e.Width, e.Height);
-                var (px, py) = ScreenTimers.ComputePosition(e, group, extent);
                 float remaining = ScreenTimers.RemainingFraction(e, now);
-
                 DrawEntry(renderLists, in e, px, py, remaining, depth, now);
             }
 
             PruneStaleTexts();
 
+            return true;
+        }
+
+        // Resolves an anchored timer to a top-left screen pixel, or returns false
+        // when the anchor entity is gone or the placement is outside the camera.
+        // World-space pixel math mirrors NameOverheadGump / GameObject; the camera
+        // transform + bounds cull mirror HealthLinesManager.
+        private bool TryResolveAnchorScreen(in ScreenTimerEntry e, out int outX, out int outY)
+        {
+            outX = 0;
+            outY = 0;
+
+            int wx, wy;
+
+            switch (e.AnchorKind)
+            {
+                case AnchorKind.Serial when SerialHelper.IsMobile(e.AnchorSerial):
+                case AnchorKind.Self:
+                {
+                    Mobile m = e.AnchorKind == AnchorKind.Self
+                        ? World.Player
+                        : World.Mobiles.Get(e.AnchorSerial);
+                    if (m == null)
+                        return false;
+
+                    Client.Game.UO.Animations.GetAnimationDimensions(
+                        m.AnimIndex, m.GetGraphicForAnimation(), 0, 0, m.IsMounted, 0,
+                        out int _, out int centerY, out int _, out int height);
+
+                    wx = (int)(m.RealScreenPosition.X + m.Offset.X + 22);
+                    wy = (int)(m.RealScreenPosition.Y + (m.Offset.Y - m.Offset.Z)
+                             - (height + centerY + 8 + 22)
+                             + (m.IsGargoyle && m.IsFlying ? -22 : !m.IsMounted ? 22 : 0));
+                    break;
+                }
+
+                case AnchorKind.Serial: // item
+                {
+                    Item item = World.Items.Get(e.AnchorSerial);
+                    if (item == null)
+                        return false;
+
+                    var bounds = Client.Game.UO.Arts.GetRealArtBounds(item.Graphic);
+                    wx = item.RealScreenPosition.X + (int)item.Offset.X + 22;
+                    wy = item.RealScreenPosition.Y + (int)(item.Offset.Y - item.Offset.Z)
+                         - (bounds.Height >> 1);
+                    break;
+                }
+
+                case AnchorKind.Absolute:
+                {
+                    // Derive the current draw offset from the player, whose world
+                    // pixel and RealScreenPosition are both known this frame:
+                    //   RealScreenPos = worldPixel - drawOffset - 22   (GameObject.cs:150-154)
+                    Mobile player = World.Player;
+                    if (player == null)
+                        return false;
+
+                    var (pwx, pwy) = ScreenTimers.TileToWorldPixel(player.X, player.Y, player.Z);
+                    float offX = pwx - player.RealScreenPosition.X - 22;
+                    float offY = pwy - player.RealScreenPosition.Y - 22;
+
+                    var (twx, twy) = ScreenTimers.TileToWorldPixel(e.AnchorX, e.AnchorY, e.AnchorZ);
+                    wx = (int)(twx - offX - 22);
+                    wy = (int)(twy - offY - 22);
+                    break;
+                }
+
+                default:
+                    return false;
+            }
+
+            (int w, int h) = ScreenTimers.DefaultSize(e.Shape);
+            if (e.Width > 0) w = e.Width;
+            if (e.Height > 0) h = e.Height;
+
+            var camera = Client.Game.Scene.Camera;
+            Point p = camera.WorldToScreen(new Point(wx, wy));
+
+            // Center horizontally on the anchor, sit above it, then apply nudge.
+            int sx = p.X - (w >> 1) + e.AnchorOffsetX + camera.Bounds.X;
+            int sy = p.Y + e.AnchorOffsetY + camera.Bounds.Y;
+
+            if (sx < camera.Bounds.X || sx + w > camera.Bounds.Right)
+                return false;
+            if (sy < camera.Bounds.Y || sy + h > camera.Bounds.Bottom)
+                return false;
+
+            outX = sx;
+            outY = sy;
             return true;
         }
 
