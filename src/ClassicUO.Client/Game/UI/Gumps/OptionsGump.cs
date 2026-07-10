@@ -160,6 +160,7 @@ namespace ClassicUO.Game.UI.Gumps
 
         private GlobalProfile _globalProfile = ProfileManager.GlobalProfile;
         private Profile _currentProfile = ProfileManager.CurrentProfile;
+        private bool _aliasTargetPending;
 
         public OptionsGump(World world) : base(world, 0, 0)
         {
@@ -445,7 +446,7 @@ namespace ClassicUO.Game.UI.Gumps
 
         public override void Dispose()
         {
-            if (World.TargetManager.IsTargeting)
+            if (_aliasTargetPending && World.TargetManager.IsTargeting)
                 World.TargetManager.CancelTarget();
 
             base.Dispose();
@@ -3377,9 +3378,13 @@ namespace ClassicUO.Game.UI.Gumps
 
             addButton.MouseUp += (sender, e) =>
             {
+                _aliasTargetPending = true;
+
                 World.TargetManager.SetTargeting(
                     obj =>
                     {
+                        _aliasTargetPending = false;
+
                         if (obj is Entity ent)
                         {
                             // seed a non-empty alias so Set actually persists (empty alias == delete)
@@ -3396,10 +3401,10 @@ namespace ClassicUO.Game.UI.Gumps
                                 }
                             }
 
-                            World.AliasManager.Set(ent.Serial, seedAlias, global: false);
-
                             if (!exists)
                             {
+                                World.AliasManager.Set(ent.Serial, seedAlias, global: false);
+
                                 var row = new AliasEntryControl(this, new AliasEntry { Serial = ent.Serial, Alias = seedAlias, Global = false })
                                 {
                                     Y = databox.Children.Count * 26

@@ -109,6 +109,10 @@ namespace ClassicUO.Game.Managers
                             _profile[e.Serial] = e.Alias;
                 }
             }
+
+            // profile wins: never keep the same serial in both stores
+            foreach (var serial in new List<uint>(_profile.Keys))
+                _global.Remove(serial);
         }
 
         private void Persist()
