@@ -13,6 +13,8 @@ namespace ClassicUO.Game.UI.Controls
         private readonly uint _serial;
         private readonly Gump _gump;
 
+        internal uint Serial => _serial;
+
         public AliasEntryControl(Gump gump, AliasEntry entry)
         {
             _gump = gump;

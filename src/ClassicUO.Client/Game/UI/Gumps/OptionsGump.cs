@@ -3382,13 +3382,31 @@ namespace ClassicUO.Game.UI.Gumps
                     {
                         if (obj is Entity ent)
                         {
-                            World.AliasManager.Set(ent.Serial, ent.Name ?? string.Empty, global: false);
-                            var row = new AliasEntryControl(this, new AliasEntry { Serial = ent.Serial, Alias = ent.Name ?? string.Empty, Global = false })
+                            // seed a non-empty alias so Set actually persists (empty alias == delete)
+                            string seedAlias = string.IsNullOrEmpty(ent.Name) ? $"0x{ent.Serial:X8}" : ent.Name;
+
+                            // skip if a row for this serial already exists (avoid duplicate desynced rows)
+                            bool exists = false;
+                            foreach (var child in databox.Children)
                             {
-                                Y = databox.Children.Count * 26
-                            };
-                            databox.Add(row);
-                            databox.ReArrangeChildren();
+                                if (child is AliasEntryControl existing && existing.Serial == ent.Serial)
+                                {
+                                    exists = true;
+                                    break;
+                                }
+                            }
+
+                            World.AliasManager.Set(ent.Serial, seedAlias, global: false);
+
+                            if (!exists)
+                            {
+                                var row = new AliasEntryControl(this, new AliasEntry { Serial = ent.Serial, Alias = seedAlias, Global = false })
+                                {
+                                    Y = databox.Children.Count * 26
+                                };
+                                databox.Add(row);
+                                databox.ReArrangeChildren();
+                            }
                         }
                     },
                     CursorType.Target,
