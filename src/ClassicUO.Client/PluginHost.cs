@@ -59,6 +59,13 @@ namespace ClassicUO
         public IntPtr /*delegate*<int, void>*/ RemoveTimerFn;
         public IntPtr /*delegate*<int, void>*/ RemoveTimerGroupFn;
         public IntPtr /*delegate*<void>*/ ClearTimersFn;
+        public IntPtr /*delegate*<IntPtr, int, int, uint, int, int, ushort, int, int, int, void>*/ AddAreaFn;
+        public IntPtr /*delegate*<IntPtr, void>*/ RemoveAreaFn;
+        public IntPtr /*delegate*<void>*/ ClearAreasFn;
+        public IntPtr /*delegate*<IntPtr, int>*/ GetAreaTimerFn;
+        public IntPtr /*delegate*<uint, ushort, byte, void>*/ AddCharacterFn;
+        public IntPtr /*delegate*<uint, byte, void>*/ RemoveCharacterFn;
+        public IntPtr /*delegate*<byte, void>*/ ClearCharactersFn;
         public IntPtr /*delegate*<uint, ushort, int, int, int, int, void>*/ SetPluginPartyMemberFn;
         public IntPtr /*delegate*<uint, void>*/ RemovePluginPartyMemberFn;
         public IntPtr /*delegate*<void>*/ ClearPluginPartyFn;
@@ -326,6 +333,39 @@ namespace ClassicUO
         private readonly dNoArg _clearTimers = Game.Managers.PluginTimersManager.ClearTimers;
 
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        delegate void dAddArea(IntPtr idUtf8, int durationMs, int snapKind, uint anchorSerial, int x, int y, ushort hue, int rangeX, int rangeY, int objectTypes);
+        [MarshalAs(UnmanagedType.FunctionPtr)]
+        private readonly dAddArea _addArea = Game.Managers.PluginHighlights.AddArea;
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        delegate void dRemoveArea(IntPtr idUtf8);
+        [MarshalAs(UnmanagedType.FunctionPtr)]
+        private readonly dRemoveArea _removeArea = Game.Managers.PluginHighlights.RemoveArea;
+
+        [MarshalAs(UnmanagedType.FunctionPtr)]
+        private readonly dNoArg _clearAreas = Game.Managers.PluginHighlights.ClearAreas;
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        delegate int dGetAreaTimer(IntPtr idUtf8);
+        [MarshalAs(UnmanagedType.FunctionPtr)]
+        private readonly dGetAreaTimer _getAreaTimer = Game.Managers.PluginHighlights.GetAreaTimer;
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        delegate void dAddCharacter(uint serial, ushort hue, byte priorityHighlight);
+        [MarshalAs(UnmanagedType.FunctionPtr)]
+        private readonly dAddCharacter _addCharacter = Game.Managers.PluginHighlights.AddCharacter;
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        delegate void dRemoveCharacter(uint serial, byte priorityHighlight);
+        [MarshalAs(UnmanagedType.FunctionPtr)]
+        private readonly dRemoveCharacter _removeCharacter = Game.Managers.PluginHighlights.RemoveCharacter;
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        delegate void dClearCharacters(byte priorityHighlight);
+        [MarshalAs(UnmanagedType.FunctionPtr)]
+        private readonly dClearCharacters _clearCharacters = Game.Managers.PluginHighlights.ClearCharacters;
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         delegate void dSetPluginPartyMember(uint serial, ushort hue, int x, int y, int hp, int map);
         [MarshalAs(UnmanagedType.FunctionPtr)]
         private readonly dSetPluginPartyMember _setPluginPartyMember = Game.Managers.PluginPartyBridge.SetPluginPartyMember;
@@ -419,6 +459,13 @@ namespace ClassicUO
             cuoHost.RemoveTimerFn = Marshal.GetFunctionPointerForDelegate(_removeTimer);
             cuoHost.RemoveTimerGroupFn = Marshal.GetFunctionPointerForDelegate(_removeTimerGroup);
             cuoHost.ClearTimersFn = Marshal.GetFunctionPointerForDelegate(_clearTimers);
+            cuoHost.AddAreaFn = Marshal.GetFunctionPointerForDelegate(_addArea);
+            cuoHost.RemoveAreaFn = Marshal.GetFunctionPointerForDelegate(_removeArea);
+            cuoHost.ClearAreasFn = Marshal.GetFunctionPointerForDelegate(_clearAreas);
+            cuoHost.GetAreaTimerFn = Marshal.GetFunctionPointerForDelegate(_getAreaTimer);
+            cuoHost.AddCharacterFn = Marshal.GetFunctionPointerForDelegate(_addCharacter);
+            cuoHost.RemoveCharacterFn = Marshal.GetFunctionPointerForDelegate(_removeCharacter);
+            cuoHost.ClearCharactersFn = Marshal.GetFunctionPointerForDelegate(_clearCharacters);
             cuoHost.SetPluginPartyMemberFn = Marshal.GetFunctionPointerForDelegate(_setPluginPartyMember);
             cuoHost.RemovePluginPartyMemberFn = Marshal.GetFunctionPointerForDelegate(_removePluginPartyMember);
             cuoHost.ClearPluginPartyFn = Marshal.GetFunctionPointerForDelegate(_clearPluginParty);
