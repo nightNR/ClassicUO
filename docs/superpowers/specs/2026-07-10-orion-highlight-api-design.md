@@ -66,7 +66,8 @@ registered.
 | Area object-type filter | Full parity: `Mobile \| Item \| Corpse \| Land \| Static \| Multi \| All` flags enum. |
 | Color resolution when character-highlight and status-hue both apply | OrionUO semantics: `priorityHighlight=true` always wins; `priorityHighlight=false` loses to an active status hue (poison/paralyze/invul/attacked/notoriety) but wins over the plain default hue. |
 | Overlapping area highlights on the same tile | Last-added wins (insertion order), no extra priority parameter. |
-| Land/static/multi rendering | **Overlay pass, not mesh exclusion.** Original mesh draw is untouched; matched tiles/statics get a second CPU draw of the same art with a partial-hue (translucent tint) shader pass on top — same mechanism the client already uses for the "selected object" highlight. |
+| Land/static/multi rendering | **Direct mesh hue injection, not an overlay pass.** The mesh path already recomputes a per-instance hue every visible frame (`GameSceneDrawingSorting.ApplyMeshHue` → `MeshLayer.SetHue`); the area lookup slots into that existing call, same as the non-meshed `Draw()` hue chains. No extra draw call, no mesh exclusion. (Corrected during planning — the mesh already supports per-instance hue; the brainstorm's "GPU mesh can't be tinted" premise was inaccurate.) |
+| Area membership test | **Linear scan over active areas** per queried tile/object (bounded by concurrently active area count — realistically tens), not a chunk-keyed spatial index. On-screen tile count is itself capped (~24×24), so `areas × visible-tiles` stays cheap without extra indexing machinery. (Simplified during planning.) |
 | Character-highlight lifecycle | No timer (matches OrionUO — only `AddHighlightArea` takes a duration). Plugin owns add/remove/clear, mirroring the existing `PluginStatusOverlays` convention (no auto-clear on disconnect). |
 
 ## Design
@@ -133,14 +134,14 @@ is bounded by what's drawn, not by how many entries are registered.
 
 **`PluginHighlightAreas`** — `Dictionary<string id, AreaEntry>` holding
 snap kind/anchor, hue, range, object-type flags, and `expireAtTicks` (`-1` =
-never), plus a `Dictionary<(int chunkX, int chunkY), List<string>>` spatial
-index. The index entry for an area is rebuilt only when: the area is added,
-removed, expires, or (for `Mouse`/`Serial` snap) its resolved center moves
-into a different chunk since the last check. A once-per-`Tick` pass
-(`IPluginContext.Tick` already fires every frame) recomputes `Mouse`/`Serial`
-centers, drops expired areas, and updates the index — O(active areas), not
-O(areas × tiles). Draw-time membership test for a tile is: look up its chunk
-in the index, then test only the (typically single-digit) area list.
+never). No spatial index: a once-per-frame pass (driven from the same place
+`PluginTimersManager.Update` is called) recomputes `Mouse`/`Serial` snap
+centers and drops expired areas — O(active areas). Draw-time membership test
+for a tile/object is a **linear scan over the active-area dictionary**,
+testing its resolved center ± range against the queried (x, y). On-screen
+tile/object count is itself capped (isometric view is ~24×24 tiles), and
+active area count is realistically tens, so this stays cheap without a
+spatial index.
 
 ### 3. Read sites / hue resolution
 
@@ -161,15 +162,19 @@ character/area lookup into the existing `overridedHue` chain in this order
 character-highlight concept (items aren't addressable via
 `AddHighlightCharacter`): area lookup only, filtered to `Item`/`Corpse`.
 
-**Land / Static / Multi** (`LandView`/`StaticView`/`MultiView`, plus the mesh
-path in `RenderLists.cs:199-244`) — mesh draw is unchanged. After the mesh
-pass, a new per-frame overlay pass iterates only the area index entries whose
-chunks are in `_visibleChunks`, and for each matched tile/static/multi issues
-one extra `Draw()` call of the same art at the same position/depth with
-`ShaderHueTranslator.GetHueVector(hue, partial: true, alpha)` (the same
-translucent-tint mechanism `MobileView` already uses for the selected-object
-highlight). Cost is proportional to highlighted tiles on screen, typically
-tens with the default 3×3 range, never the full mesh.
+**Land / Static / Multi** — two call sites, both already recompute a hue every
+visible frame, so the area lookup slots into each directly (no new draw call):
+
+- **Meshed objects** (`obj.InChunkMesh == true`, the common case — baked map
+  terrain/furniture) never call `Draw()`; their hue is set once per visible
+  frame by `GameSceneDrawingSorting.ApplyMeshHue` (`GameSceneDrawingSorting.cs:644-686`)
+  into `MeshLayer.SetHue(obj.MeshSpriteIndex, hueX, hueY)`. The area lookup is
+  inserted into `ApplyMeshHue` alongside its existing out-of-range/dead-world
+  hue overrides.
+- **Non-meshed objects** (dynamic ground items masquerading as statics,
+  animated/light-emitting statics, excluded tiles) go through the ordinary
+  per-object `Draw()` hue chain in `LandView.cs`/`StaticView.cs`/`MultiView.cs`
+  — same injection point pattern as `MobileView`/`ItemView`.
 
 ### 4. ABI wiring
 
@@ -200,10 +205,9 @@ Unit tests (`tests/ClassicUO.UnitTests`), pure logic, no render:
 - `PluginHighlightCharacters`: set/clear per tier, priority tier shadows
   normal tier, `Reset()` clears both.
 - `PluginHighlightAreas`: add/remove/clear-all; `GetAreaTimer` remaining-ms
-  math and the `0` cases (unknown id, expired); spatial index correctness
-  after add/remove and after a `Mouse`/`Serial`-snap center crosses a chunk
-  boundary; last-added-wins when two areas overlap the same tile;
-  object-type flag filtering.
+  math and the `0` cases (unknown id, expired); membership test against
+  resolved `Position`/`Serial` centers and range; last-added-wins when two
+  areas overlap the same tile; object-type flag filtering.
 - Priority-resolution order (§3 step order) as a table-driven test against a
   small fake "current hue chain state" input.
 
@@ -225,9 +229,9 @@ when `priorityHighlight=false`.
 | `ClassicUO.Client/Game/Managers/PluginHighlights.cs` | new — `PluginHighlightCharacters`, `PluginHighlightAreas`, `Tick()` |
 | `Game/GameObjects/Views/MobileView.cs` | insert highlight lookup into `overridedHue` chain |
 | `Game/GameObjects/Views/ItemView.cs` | area lookup for Item/Corpse |
-| `Game/GameObjects/Views/LandView.cs`, `StaticView.cs`, `MultiView.cs` | overlay-draw entry point |
-| `Game/Scenes/RenderLists.cs` / `GameSceneDrawingSorting.cs` | drive the post-mesh overlay pass over visible-chunk area matches |
-| `World.Update` call site (wherever `PluginTimersManager.Update` is invoked) | also call `PluginHighlights.Tick()` |
+| `Game/GameObjects/Views/LandView.cs`, `StaticView.cs`, `MultiView.cs` | area lookup in each `Draw()` hue chain (non-meshed path) |
+| `Game/Scenes/GameSceneDrawingSorting.cs` | area lookup inside `ApplyMeshHue` (meshed path) |
+| `Game/World.cs:287` | also call `PluginHighlights.Update(Time.Ticks)` next to `PluginTimersManager.Update` |
 | `PluginApi/README.md` | document `IHighlight` |
 | `tests/ClassicUO.UnitTests/.../PluginHighlightsTests.cs` | cases in §5 |
 
