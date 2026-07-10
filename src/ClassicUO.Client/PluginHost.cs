@@ -59,6 +59,15 @@ namespace ClassicUO
         public IntPtr /*delegate*<int, void>*/ RemoveTimerFn;
         public IntPtr /*delegate*<int, void>*/ RemoveTimerGroupFn;
         public IntPtr /*delegate*<void>*/ ClearTimersFn;
+        public IntPtr /*delegate*<uint, ushort, int, int, int, int, void>*/ SetPluginPartyMemberFn;
+        public IntPtr /*delegate*<uint, void>*/ RemovePluginPartyMemberFn;
+        public IntPtr /*delegate*<void>*/ ClearPluginPartyFn;
+        public IntPtr /*delegate*<int,int,int,int,int,int,int,byte, byte>*/ CheckLosFn;
+        public IntPtr /*delegate*<int,int,int,int*,int,int,byte,byte*, void>*/ CheckLosBatchFn;
+        // Highlight fields (below) and ClientVersion are appended after every
+        // pre-existing field to preserve the ABI for external v1 plugin binaries
+        // (e.g. cuoapi.dll) compiled against the pre-highlight layout — never insert
+        // new fields in the middle of this struct, only ever append.
         public IntPtr /*delegate*<IntPtr, int, int, uint, int, int, ushort, int, int, int, void>*/ AddAreaFn;
         public IntPtr /*delegate*<IntPtr, void>*/ RemoveAreaFn;
         public IntPtr /*delegate*<void>*/ ClearAreasFn;
@@ -66,11 +75,6 @@ namespace ClassicUO
         public IntPtr /*delegate*<uint, ushort, byte, void>*/ AddCharacterFn;
         public IntPtr /*delegate*<uint, byte, void>*/ RemoveCharacterFn;
         public IntPtr /*delegate*<byte, void>*/ ClearCharactersFn;
-        public IntPtr /*delegate*<uint, ushort, int, int, int, int, void>*/ SetPluginPartyMemberFn;
-        public IntPtr /*delegate*<uint, void>*/ RemovePluginPartyMemberFn;
-        public IntPtr /*delegate*<void>*/ ClearPluginPartyFn;
-        public IntPtr /*delegate*<int,int,int,int,int,int,int,byte, byte>*/ CheckLosFn;
-        public IntPtr /*delegate*<int,int,int,int*,int,int,byte,byte*, void>*/ CheckLosBatchFn;
         // Packed client version (major<<24|minor<<16|build<<8|revision). Appended last
         // to preserve ABI; populated in Initialize() after UO.Load has parsed it.
         public int ClientVersion;

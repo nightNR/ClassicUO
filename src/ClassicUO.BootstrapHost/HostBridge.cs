@@ -367,6 +367,17 @@ internal struct ClientBindings
     public nint RemoveTimerFn;         // void(int id)
     public nint RemoveTimerGroupFn;    // void(int groupId)
     public nint ClearTimersFn;         // void()
+    // Unused by v2 (no PluginParty/CheckLos support here) but must exist as
+    // padding: the native ClientBindings struct in PluginHost.cs places these
+    // between ClearTimersFn and the highlight fields below, and this struct's
+    // layout must stay a byte-exact prefix of the native one for every field
+    // it declares. Never insert new fields before this block — only append
+    // after ClearCharactersFn.
+    public nint SetPluginPartyMemberFn;
+    public nint RemovePluginPartyMemberFn;
+    public nint ClearPluginPartyFn;
+    public nint CheckLosFn;
+    public nint CheckLosBatchFn;
     public nint AddAreaFn;             // void(nint idUtf8, int durationMs, int snapKind, uint anchorSerial, int x, int y, ushort hue, int rangeX, int rangeY, int objectTypes)
     public nint RemoveAreaFn;          // void(nint idUtf8)
     public nint ClearAreasFn;          // void()
