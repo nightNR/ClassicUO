@@ -168,6 +168,52 @@ Example:
         AnchorOffsetY = -4,
     });
 
+## Highlighting
+
+`ctx.Highlight` drives plugin-owned object and area highlighting with Orion
+parity. Character highlighting is persistent (no timer); area highlighting
+supports optional expiry and can follow the mouse, a fixed position, or a mobile.
+
+#### Character highlighting (mobiles)
+
+Use `AddCharacter` to tint a mobile by serial. Set `priorityHighlight` to true
+for the tint to always win over the client's own coloring (poison, paralyze,
+invulnerability, attacked, notoriety); false loses to an active status color but
+wins over the default hue. Highlighting persists until removed with
+`RemoveCharacter` or `ClearCharacters`.
+
+#### Area highlighting (zone tints)
+
+Use `AddArea` to paint a rectangular zone of tiles and objects with a tint. The
+zone's center can follow the mouse (default), stay at a fixed world position, or
+track a mobile serial. Areas can expire after a duration (or never, if
+`durationMs` is -1). Overlapping areas render in add-order — the most recently
+added area wins. Filter which object types tint via `objectTypes` (land, statics,
+items, mobiles, corpses, multis).
+
+Example:
+
+    // Tint a specific mobile, losing to poison/paralyze/attacked coloring:
+    context.Highlight.AddCharacter(mobileSerial, hue: 0x0044);
+
+    // Tint a specific mobile, always winning:
+    context.Highlight.AddCharacter(mobileSerial, hue: 0x0044, priorityHighlight: true);
+
+    // Paint a 5x5 zone around a fixed world position for 10 seconds, land + statics only:
+    context.Highlight.AddArea(
+        "danger-zone",
+        durationMs: 10000,
+        snap: HighlightSnap.Position,
+        hue: 0x0021,
+        rangeX: 5,
+        rangeY: 5,
+        objectTypes: HighlightObjectTypes.Land | HighlightObjectTypes.Static,
+        x: 1234,
+        y: 5678
+    );
+
+    context.Highlight.RemoveArea("danger-zone");
+
 ## Sample
 
 A worked example lives at
