@@ -363,7 +363,7 @@ internal struct ClientBindings
     public nint RemoveBuffFn;          // void(int id)
     public nint ClearBuffsFn;          // void()
     public nint DefineTimerGroupFn;    // void(int groupId, int x, int y, int direction, int gap)
-    public nint AddTimerFn;            // void(int id, int shape, int durationMs, ushort hue, int groupId, int x, int y, int width, int height, nint labelUtf8, byte showTime)
+    public nint AddTimerFn;            // void(int id, int shape, int durationMs, ushort hue, int groupId, int x, int y, int width, int height, nint labelUtf8, byte showTime, int anchorKind, uint anchorSerial, ushort ax, ushort ay, sbyte az, short offX, short offY, int graceMs)
     public nint RemoveTimerFn;         // void(int id)
     public nint RemoveTimerGroupFn;    // void(int groupId)
     public nint ClearTimersFn;         // void()

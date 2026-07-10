@@ -13,8 +13,11 @@ public enum StackDirection { Down, Up, Right, Left }
 /// <summary>Placement intent. Reserved; a <c>GroupId == 0</c> already implies Lone.</summary>
 public enum PlacementMode { Lone, Stacking }
 
+/// <summary>What an anchored timer follows. None = fixed screen position / group.</summary>
+public enum AnchorKind { None = 0, Serial = 1, Absolute = 2, Self = 3 }
+
 /// <summary>Why a screen timer was removed.</summary>
-public enum TimerRemoveReason { Expired, RemovedByPlugin, RemovedByUser }
+public enum TimerRemoveReason { Expired, RemovedByPlugin, RemovedByUser, AnchorLost }
 
 /// <summary>Immutable description of a screen timer. Flattened to scalars by the host.</summary>
 public sealed class TimerConfig
@@ -30,6 +33,14 @@ public sealed class TimerConfig
     public int Height { get; init; }          // 0 = default per shape
     public string? Label { get; init; }
     public bool ShowTime { get; init; }
+    public AnchorKind Anchor { get; init; }         // None => fixed X/Y or group
+    public uint AnchorSerial { get; init; }         // Serial kind: mobile/item
+    public ushort AnchorX { get; init; }            // Absolute kind: tile
+    public ushort AnchorY { get; init; }
+    public sbyte AnchorZ { get; init; }
+    public short AnchorOffsetX { get; init; }        // pixel nudge from anchor
+    public short AnchorOffsetY { get; init; }
+    public int AnchorGraceMs { get; init; }          // Serial/Self lost-grace; 0 => host default (5000)
 }
 
 /// <summary>Layout definition for a stacking timer group.</summary>

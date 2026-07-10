@@ -343,11 +343,22 @@ internal sealed class ScreenTimersImpl : IScreenTimers
         ushort hue = timer.Hue;
         int x = timer.X, y = timer.Y, w = timer.Width, h = timer.Height;
         byte showTime = timer.ShowTime ? (byte)1 : (byte)0;
+        int anchorKind = (int)timer.Anchor;
+        uint anchorSerial = timer.AnchorSerial;
+        ushort ax = timer.AnchorX, ay = timer.AnchorY;
+        sbyte az = timer.AnchorZ;
+        short offX = timer.AnchorOffsetX, offY = timer.AnchorOffsetY;
+        int graceMs = timer.AnchorGraceMs;
         nint labelPtr = string.IsNullOrEmpty(timer.Label) ? nint.Zero : Marshal.StringToHGlobalAnsi(timer.Label);
 
         void Call()
         {
-            try { ((delegate* unmanaged[Cdecl]<int, int, int, ushort, int, int, int, int, int, nint, byte, void>)fn)(id, shape, dur, hue, gid, x, y, w, h, labelPtr, showTime); }
+            try
+            {
+                ((delegate* unmanaged[Cdecl]<int, int, int, ushort, int, int, int, int, int, nint, byte, int, uint, ushort, ushort, sbyte, short, short, int, void>)fn)(
+                    id, shape, dur, hue, gid, x, y, w, h, labelPtr, showTime,
+                    anchorKind, anchorSerial, ax, ay, az, offX, offY, graceMs);
+            }
             finally { if (labelPtr != nint.Zero) Marshal.FreeHGlobal(labelPtr); }
         }
 

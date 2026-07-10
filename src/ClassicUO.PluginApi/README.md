@@ -132,6 +132,42 @@ public delegate bool HotkeyHandler(int key, int modifiers, bool pressed);
 - If multiple plugins subscribe, the hotkey is suppressed if **any** handler
   returns `false`.
 
+## Screen timers
+
+`ctx.ScreenTimers` drives plugin-owned on-screen timer overlays (circles,
+bars, or numeric countdowns), optionally arranged into stacking groups via
+`DefineGroup`.
+
+#### Anchoring a timer to the world
+
+Set `TimerConfig.Anchor` to pin a timer to an in-game target instead of a fixed
+screen position:
+
+- `AnchorKind.Serial` + `AnchorSerial` — follow a mobile or item.
+- `AnchorKind.Absolute` + `AnchorX/Y/Z` — pin to a map tile.
+- `AnchorKind.Self` — follow the player.
+
+While the anchor is off-screen the timer is hidden but keeps counting, and
+reappears when the anchor scrolls back into view. If a `Serial`/`Self` anchor is
+destroyed, the timer keeps running for `AnchorGraceMs` (default 5000 ms); if the
+anchor does not return in time the timer is removed and `Removed` fires with
+`TimerRemoveReason.AnchorLost`. Only one Serial-anchored timer may target a given
+serial — adding another replaces it. Anchored timers ignore `GroupId`.
+
+Example:
+
+    ctx.ScreenTimers.AddOrUpdate(new TimerConfig
+    {
+        Id = 1,
+        Shape = TimerShape.Bar,
+        DurationMs = 15000,
+        Label = "Poison",
+        ShowTime = true,
+        Anchor = AnchorKind.Serial,
+        AnchorSerial = mobileSerial,
+        AnchorOffsetY = -4,
+    });
+
 ## Sample
 
 A worked example lives at
