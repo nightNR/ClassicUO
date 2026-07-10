@@ -7,6 +7,7 @@ namespace ClassicUO.Game.Managers
 {
     internal enum TimerShape { Circle, Bar, Numeric }
     internal enum StackDirection { Down, Up, Right, Left }
+    internal enum AnchorKind { None = 0, Serial = 1, Absolute = 2, Self = 3 }
 
     internal struct ScreenTimerEntry
     {
@@ -23,6 +24,15 @@ namespace ClassicUO.Game.Managers
         public string Label;
         public bool ShowTime;
         public int Order;   // insertion order within its group
+        public AnchorKind AnchorKind;
+        public uint AnchorSerial;   // Serial kind
+        public ushort AnchorX;      // Absolute kind
+        public ushort AnchorY;
+        public sbyte AnchorZ;
+        public short AnchorOffsetX; // pixel nudge from resolved anchor point
+        public short AnchorOffsetY;
+        public int AnchorGraceMs;   // Serial/Self lost-grace; 0 => DefaultGraceMs
+        public long MissingSinceTicks; // runtime state; 0 = currently resolvable
     }
 
     internal readonly struct TimerGroup
@@ -55,10 +65,12 @@ namespace ClassicUO.Game.Managers
         private const int DefaultBarW = 120, DefaultBarH = 14;
         private const int DefaultCircle = 32;
         private const int DefaultNumericW = 40, DefaultNumericH = 20;
+        public const int DefaultGraceMs = 5000;
 
         private static readonly Dictionary<int, ScreenTimerEntry> _timers = new Dictionary<int, ScreenTimerEntry>();
         private static readonly Dictionary<int, TimerGroup> _groups = new Dictionary<int, TimerGroup>();
         private static readonly Dictionary<int, int> _nextOrderByGroup = new Dictionary<int, int>();
+        private static readonly List<int> _purgeScratch = new List<int>();
 
         public static IReadOnlyDictionary<int, ScreenTimerEntry> Entries => _timers;
 
@@ -72,14 +84,28 @@ namespace ClassicUO.Game.Managers
         public static bool TryGetGroup(int groupId, out TimerGroup group) => _groups.TryGetValue(groupId, out group);
 
         public static void AddOrUpdate(int id, TimerShape shape, int durationMs, ushort hue, int groupId,
-                                       int x, int y, int width, int height, string label, bool showTime, long now)
+                                       int x, int y, int width, int height, string label, bool showTime, long now,
+                                       AnchorKind anchorKind = AnchorKind.None, uint anchorSerial = 0,
+                                       ushort anchorX = 0, ushort anchorY = 0, sbyte anchorZ = 0,
+                                       short anchorOffsetX = 0, short anchorOffsetY = 0, int anchorGraceMs = 0)
         {
+            // One anchor = one timer: adding a Serial-anchored timer purges any
+            // OTHER entry pinned to the same serial (a same-id update restarts in place).
+            if (anchorKind == AnchorKind.Serial)
+            {
+                _purgeScratch.Clear();
+                foreach (var kv in _timers)
+                    if (kv.Key != id && kv.Value.AnchorKind == AnchorKind.Serial && kv.Value.AnchorSerial == anchorSerial)
+                        _purgeScratch.Add(kv.Key);
+                foreach (int pid in _purgeScratch)
+                    _timers.Remove(pid);
+            }
+
             int order;
             if (_timers.TryGetValue(id, out var existing))
                 order = existing.Order;          // update in place, keep stack slot
             else
             {
-                // new -> append to end of this group's stack order
                 _nextOrderByGroup.TryGetValue(groupId, out order);
                 _nextOrderByGroup[groupId] = order + 1;
             }
@@ -88,7 +114,7 @@ namespace ClassicUO.Game.Managers
             {
                 Id = id,
                 Shape = shape,
-                StartTicks = now,                // set/restart
+                StartTicks = now,
                 DurationMs = durationMs,
                 Hue = hue,
                 GroupId = groupId,
@@ -99,7 +125,25 @@ namespace ClassicUO.Game.Managers
                 Label = label ?? string.Empty,
                 ShowTime = showTime,
                 Order = order,
+                AnchorKind = anchorKind,
+                AnchorSerial = anchorSerial,
+                AnchorX = anchorX,
+                AnchorY = anchorY,
+                AnchorZ = anchorZ,
+                AnchorOffsetX = anchorOffsetX,
+                AnchorOffsetY = anchorOffsetY,
+                AnchorGraceMs = anchorGraceMs <= 0 ? DefaultGraceMs : anchorGraceMs,
+                MissingSinceTicks = 0,
             };
+        }
+
+        public static void SetMissingSince(int id, long ticks)
+        {
+            if (_timers.TryGetValue(id, out var e))
+            {
+                e.MissingSinceTicks = ticks;
+                _timers[id] = e;
+            }
         }
 
         public static bool Remove(int id) => _timers.Remove(id);
