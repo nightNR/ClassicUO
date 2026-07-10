@@ -511,6 +511,8 @@ namespace ClassicUO.Game.UI.Gumps
 
                     _bars[0].IsVisible = false;
                 }
+
+                UpdateStatusColorFill(null);
             }
 
             if (entity != null && !entity.IsDestroyed)
@@ -1904,6 +1906,8 @@ namespace ClassicUO.Game.UI.Gumps
 
                     _bars[0].IsVisible = false;
                 }
+
+                UpdateStatusColorFill(null);
             }
 
             if (entity != null && !entity.IsDestroyed)
