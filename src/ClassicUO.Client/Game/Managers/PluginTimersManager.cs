@@ -169,10 +169,13 @@ namespace ClassicUO.Game.Managers
         }
 
         public static void AddTimer(int id, int shape, int durationMs, ushort hue, int groupId,
-                                    int x, int y, int width, int height, IntPtr labelUtf8, byte showTime)
+                                    int x, int y, int width, int height, IntPtr labelUtf8, byte showTime,
+                                    int anchorKind, uint anchorSerial, ushort ax, ushort ay, sbyte az,
+                                    short offX, short offY, int graceMs)
         {
             ScreenTimers.AddOrUpdate(id, (TimerShape)shape, durationMs, hue, groupId,
-                x, y, width, height, PtrToString(labelUtf8), showTime != 0, Time.Ticks);
+                x, y, width, height, PtrToString(labelUtf8), showTime != 0, Time.Ticks,
+                (AnchorKind)anchorKind, anchorSerial, ax, ay, az, offX, offY, graceMs);
         }
 
         public static void RemoveTimer(int id)

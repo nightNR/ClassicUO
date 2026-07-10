@@ -55,7 +55,7 @@ namespace ClassicUO
         public IntPtr /*delegate*<int, void>*/ RemoveBuffFn;
         public IntPtr /*delegate*<void>*/ ClearBuffsFn;
         public IntPtr /*delegate*<int, int, int, int, int, void>*/ DefineTimerGroupFn;
-        public IntPtr /*delegate*<int, int, int, ushort, int, int, int, int, int, IntPtr, byte, void>*/ AddTimerFn;
+        public IntPtr /*delegate*<int, int, int, ushort, int, int, int, int, int, IntPtr, byte, int, uint, ushort, ushort, sbyte, short, short, int, void>*/ AddTimerFn;
         public IntPtr /*delegate*<int, void>*/ RemoveTimerFn;
         public IntPtr /*delegate*<int, void>*/ RemoveTimerGroupFn;
         public IntPtr /*delegate*<void>*/ ClearTimersFn;
@@ -312,7 +312,7 @@ namespace ClassicUO
         private readonly dDefineTimerGroup _defineTimerGroup = Game.Managers.PluginTimersManager.DefineTimerGroup;
 
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-        delegate void dAddTimer(int id, int shape, int durationMs, ushort hue, int groupId, int x, int y, int width, int height, IntPtr labelUtf8, byte showTime);
+        delegate void dAddTimer(int id, int shape, int durationMs, ushort hue, int groupId, int x, int y, int width, int height, IntPtr labelUtf8, byte showTime, int anchorKind, uint anchorSerial, ushort ax, ushort ay, sbyte az, short offX, short offY, int graceMs);
         [MarshalAs(UnmanagedType.FunctionPtr)]
         private readonly dAddTimer _addTimer = Game.Managers.PluginTimersManager.AddTimer;
 
