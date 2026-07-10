@@ -271,11 +271,15 @@ namespace ClassicUO.Game.UI.Gumps
             if (!string.IsNullOrEmpty(entry.Name) && World.IgnoreManager.IgnoredCharsList.Contains(entry.Name))
                 return;
 
-            string text = $"{usrSend}: {entry.Text}";
+            string displayText = entry.TextType == TextType.OBJECT
+                ? World.AliasManager.Resolve(entry.Serial, entry.Text)
+                : entry.Text;
+
+            string text = $"{usrSend}: {displayText}";
 
             if (string.IsNullOrEmpty(usrSend))
             {
-                text = entry.Text;
+                text = displayText;
             }
 
             _journalEntries.AddEntry
