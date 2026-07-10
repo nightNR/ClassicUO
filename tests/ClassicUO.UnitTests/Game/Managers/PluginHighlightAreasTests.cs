@@ -149,5 +149,83 @@ namespace ClassicUO.UnitTests.Game.Managers
             Assert.False(PluginHighlightAreas.TryResolve(100, 100, 0, HighlightObjectTypes.All, out _));
             Assert.False(PluginHighlightAreas.TryResolve(200, 200, 0, HighlightObjectTypes.All, out _));
         }
+
+        // --- Spatial index (chunk-bucketed lookup) ---
+        // These prove TryResolve stays correct once matching is bucketed by chunk
+        // instead of a full linear scan — the fix for thousands of concurrently
+        // registered areas (e.g. a mass point-of-interest file) freezing the client.
+
+        [Fact]
+        public void TryResolve_FindsMatch_AcrossFarApartAreas_WithoutCrossContamination()
+        {
+            PluginHighlightAreas.Add(null, "near-origin", -1, HighlightSnap.Position, 0, (ushort)0x0011, 3, 3, HighlightObjectTypes.Land, 100, 100, 0);
+            PluginHighlightAreas.Add(null, "far-away", -1, HighlightSnap.Position, 0, (ushort)0x0022, 3, 3, HighlightObjectTypes.Land, 5000, 5000, 0);
+
+            bool foundNear = PluginHighlightAreas.TryResolve(101, 99, 0, HighlightObjectTypes.Land, out ushort hueNear);
+            bool foundFar = PluginHighlightAreas.TryResolve(5001, 5002, 0, HighlightObjectTypes.Land, out ushort hueFar);
+            bool foundBetween = PluginHighlightAreas.TryResolve(2500, 2500, 0, HighlightObjectTypes.Land, out _);
+
+            Assert.True(foundNear);
+            Assert.Equal((ushort)0x0011, hueNear);
+            Assert.True(foundFar);
+            Assert.Equal((ushort)0x0022, hueFar);
+            Assert.False(foundBetween);
+        }
+
+        [Fact]
+        public void TryResolve_MatchesAcrossChunkBoundary_WhenAreaBboxStraddlesIt()
+        {
+            // Chunk size is 8 tiles. Centering exactly on a chunk boundary (x=104
+            // is the start of a new chunk) with range 3 makes the bbox (101..107)
+            // straddle two chunks — both must be indexed, or the tile just past
+            // the boundary would silently miss the match.
+            PluginHighlightAreas.Add(null, "boundary", -1, HighlightSnap.Position, 0, (ushort)0x0055, 3, 3, HighlightObjectTypes.Land, 104, 104, 0);
+
+            bool foundJustBefore = PluginHighlightAreas.TryResolve(102, 104, 0, HighlightObjectTypes.Land, out ushort hueBefore);
+            bool foundJustAfter = PluginHighlightAreas.TryResolve(106, 104, 0, HighlightObjectTypes.Land, out ushort hueAfter);
+
+            Assert.True(foundJustBefore);
+            Assert.Equal((ushort)0x0055, hueBefore);
+            Assert.True(foundJustAfter);
+            Assert.Equal((ushort)0x0055, hueAfter);
+        }
+
+        [Fact]
+        public void Update_SerialSnap_ReindexesWhenAnchorCrossesChunkBoundary()
+        {
+            PluginHighlightAreas.SerialResolver = _ => (true, 100, 100, (sbyte)0);
+            PluginHighlightAreas.Add(null, "follow", -1, HighlightSnap.Serial, 0xAAAA, (ushort)0x0066, 2, 2, HighlightObjectTypes.Mobile, 0, 0, 0);
+
+            Assert.True(PluginHighlightAreas.TryResolve(100, 100, 0, HighlightObjectTypes.Mobile, out _));
+
+            // Move the anchor far enough to land in a completely different chunk.
+            PluginHighlightAreas.SerialResolver = _ => (true, 900, 900, (sbyte)0);
+            PluginHighlightAreas.Update(null, 1);
+
+            bool stillAtOldSpot = PluginHighlightAreas.TryResolve(100, 100, 0, HighlightObjectTypes.Mobile, out _);
+            bool foundAtNewSpot = PluginHighlightAreas.TryResolve(900, 900, 0, HighlightObjectTypes.Mobile, out ushort hue);
+
+            Assert.False(stillAtOldSpot);
+            Assert.True(foundAtNewSpot);
+            Assert.Equal((ushort)0x0066, hue);
+        }
+
+        [Fact]
+        public void TryResolve_StaysCorrect_WithManyScatteredAreas()
+        {
+            for (int i = 0; i < 500; i++)
+            {
+                int x = i * 20;
+                int y = i * 20;
+                PluginHighlightAreas.Add(null, $"area-{i}", -1, HighlightSnap.Position, 0, (ushort)(i + 1), 3, 3, HighlightObjectTypes.Land, x, y, 0);
+            }
+
+            bool found250 = PluginHighlightAreas.TryResolve(250 * 20, 250 * 20, 0, HighlightObjectTypes.Land, out ushort hue250);
+            bool foundGap = PluginHighlightAreas.TryResolve(250 * 20 + 10, 250 * 20, 0, HighlightObjectTypes.Land, out _);
+
+            Assert.True(found250);
+            Assert.Equal((ushort)251, hue250);
+            Assert.False(foundGap);
+        }
     }
 }

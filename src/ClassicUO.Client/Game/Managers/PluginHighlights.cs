@@ -110,15 +110,24 @@ namespace ClassicUO.Game.Managers
 
     /// <summary>
     /// Plugin-driven world-space area highlights, keyed by plugin-chosen id.
-    /// No spatial index: membership is a linear scan over the active-area
-    /// dictionary, which is cheap because both the on-screen tile count
-    /// (isometric view, ~24x24) and the realistic active-area count (tens)
-    /// stay small. Last-added-wins on overlap, tracked via a monotonic
-    /// insertion sequence rather than dictionary iteration order.
+    /// Membership is accelerated by a chunk-bucketed spatial index (8x8 tiles,
+    /// matching <see cref="ClassicUO.Game.Map.Chunk"/>'s own grid): each area is
+    /// indexed under every chunk its range-expanded bounding box overlaps, so
+    /// <see cref="TryResolve"/> only scans the handful of areas registered
+    /// under the queried tile's own chunk instead of every active area. This
+    /// keeps per-frame resolution cheap even with thousands of concurrently
+    /// registered areas (e.g. a mass point-of-interest file), where a flat
+    /// linear scan would be re-run for every visible tile/mobile every frame.
+    /// Last-added-wins on overlap, tracked via a monotonic insertion sequence
+    /// rather than dictionary iteration order.
     /// </summary>
     internal static class PluginHighlightAreas
     {
+        // 8 tiles per chunk (1 << ChunkShift), matching Chunk.cs's own grid.
+        private const int ChunkShift = 3;
+
         private static readonly Dictionary<string, AreaEntry> _areas = new Dictionary<string, AreaEntry>();
+        private static readonly Dictionary<(int cx, int cy), List<string>> _chunkIndex = new Dictionary<(int, int), List<string>>();
         private static readonly List<string> _expiredScratch = new List<string>();
         private static int _nextSeq;
 
@@ -146,6 +155,11 @@ namespace ClassicUO.Game.Managers
                 return;
             }
 
+            if (_areas.TryGetValue(id, out AreaEntry existing))
+            {
+                UnindexArea(existing);
+            }
+
             var entry = new AreaEntry
             {
                 Id = id,
@@ -164,11 +178,23 @@ namespace ClassicUO.Game.Managers
 
             _areas[id] = entry;
             ResolveCenter(world, entry);
+            IndexArea(entry);
         }
 
-        public static void Remove(string id) => _areas.Remove(id);
+        public static void Remove(string id)
+        {
+            if (_areas.TryGetValue(id, out AreaEntry e))
+            {
+                UnindexArea(e);
+                _areas.Remove(id);
+            }
+        }
 
-        public static void ClearAll() => _areas.Clear();
+        public static void ClearAll()
+        {
+            _areas.Clear();
+            _chunkIndex.Clear();
+        }
 
         public static int GetTimer(string id, long now)
         {
@@ -188,11 +214,21 @@ namespace ClassicUO.Game.Managers
 
         public static bool TryResolve(int x, int y, sbyte z, HighlightObjectTypes type, out ushort hue)
         {
+            hue = 0;
+
+            if (!_chunkIndex.TryGetValue((x >> ChunkShift, y >> ChunkShift), out List<string> candidates))
+            {
+                return false;
+            }
+
             AreaEntry best = null;
 
-            foreach (KeyValuePair<string, AreaEntry> kv in _areas)
+            foreach (string id in candidates)
             {
-                AreaEntry e = kv.Value;
+                if (!_areas.TryGetValue(id, out AreaEntry e))
+                {
+                    continue;
+                }
 
                 if ((e.ObjectTypes & type) == 0 || !e.AnchorResolved)
                 {
@@ -212,7 +248,6 @@ namespace ClassicUO.Game.Managers
 
             if (best == null)
             {
-                hue = 0;
                 return false;
             }
 
@@ -220,7 +255,7 @@ namespace ClassicUO.Game.Managers
             return true;
         }
 
-        /// <summary>Per-frame maintenance: expire timed areas, re-resolve Mouse/Serial centers.</summary>
+        /// <summary>Per-frame maintenance: expire timed areas, re-resolve (and re-index) Mouse/Serial centers.</summary>
         public static void Update(World world, long now)
         {
             _expiredScratch.Clear();
@@ -237,18 +272,84 @@ namespace ClassicUO.Game.Managers
 
                 if (e.Snap == HighlightSnap.Mouse || e.Snap == HighlightSnap.Serial)
                 {
+                    // Unindex at the pre-move position before ResolveCenter changes
+                    // it — otherwise the old chunk bucket keeps a stale entry.
+                    UnindexArea(e);
                     ResolveCenter(world, e);
 
                     if (e.Snap == HighlightSnap.Serial && !e.AnchorResolved)
                     {
                         _expiredScratch.Add(kv.Key);
+                        continue;
                     }
+
+                    IndexArea(e);
                 }
             }
 
             foreach (string id in _expiredScratch)
             {
+                if (_areas.TryGetValue(id, out AreaEntry e))
+                {
+                    UnindexArea(e);
+                }
+
                 _areas.Remove(id);
+            }
+        }
+
+        private static void IndexArea(AreaEntry e)
+        {
+            if (!e.AnchorResolved)
+            {
+                return;
+            }
+
+            int minCx = (e.CenterX - e.RangeX) >> ChunkShift;
+            int maxCx = (e.CenterX + e.RangeX) >> ChunkShift;
+            int minCy = (e.CenterY - e.RangeY) >> ChunkShift;
+            int maxCy = (e.CenterY + e.RangeY) >> ChunkShift;
+
+            for (int cx = minCx; cx <= maxCx; cx++)
+            {
+                for (int cy = minCy; cy <= maxCy; cy++)
+                {
+                    var key = (cx, cy);
+
+                    if (!_chunkIndex.TryGetValue(key, out List<string> bucket))
+                    {
+                        bucket = new List<string>();
+                        _chunkIndex[key] = bucket;
+                    }
+
+                    bucket.Add(e.Id);
+                }
+            }
+        }
+
+        private static void UnindexArea(AreaEntry e)
+        {
+            int minCx = (e.CenterX - e.RangeX) >> ChunkShift;
+            int maxCx = (e.CenterX + e.RangeX) >> ChunkShift;
+            int minCy = (e.CenterY - e.RangeY) >> ChunkShift;
+            int maxCy = (e.CenterY + e.RangeY) >> ChunkShift;
+
+            for (int cx = minCx; cx <= maxCx; cx++)
+            {
+                for (int cy = minCy; cy <= maxCy; cy++)
+                {
+                    var key = (cx, cy);
+
+                    if (_chunkIndex.TryGetValue(key, out List<string> bucket))
+                    {
+                        bucket.Remove(e.Id);
+
+                        if (bucket.Count == 0)
+                        {
+                            _chunkIndex.Remove(key);
+                        }
+                    }
+                }
             }
         }
 
@@ -310,10 +411,11 @@ namespace ClassicUO.Game.Managers
             return (true, entity.X, entity.Y, entity.Z);
         }
 
-        /// <summary>Test-only: drops every area and test seam so tests start clean.</summary>
+        /// <summary>Test-only: drops every area, the spatial index, and test seams so tests start clean.</summary>
         public static void Reset()
         {
             _areas.Clear();
+            _chunkIndex.Clear();
             SerialResolver = null;
             MouseWorldResolver = null;
             _nextSeq = 0;
