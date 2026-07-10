@@ -23,6 +23,7 @@ namespace ClassicUO.Configuration
     [JsonSerializable(typeof(GlobalProfile), GenerationMode = JsonSourceGenerationMode.Metadata)]
     [JsonSerializable(typeof(Profile), GenerationMode = JsonSourceGenerationMode.Metadata)]
     [JsonSerializable(typeof(ClassicUO.Game.UI.Gumps.ChatHistoryEntry), GenerationMode = JsonSourceGenerationMode.Metadata)]
+    [JsonSerializable(typeof(ClassicUO.Game.Managers.AliasEntry), GenerationMode = JsonSourceGenerationMode.Metadata)]
     sealed partial class ProfileJsonContext : JsonSerializerContext
     {
         sealed class SnakeCaseNamingPolicy : JsonNamingPolicy
@@ -201,6 +202,8 @@ namespace ClassicUO.Configuration
         public bool ChatUseArrowsForHistory { get; set; } = true;
         public int ChatHistoryLength { get; set; } = 20;
         public List<ChatHistoryEntry> ChatHistory { get; set; } = new List<ChatHistoryEntry>();
+        public bool AliasesEnabled { get; set; } = true;
+        public List<ClassicUO.Game.Managers.AliasEntry> CharacterAliases { get; set; } = new List<ClassicUO.Game.Managers.AliasEntry>();
         public bool DisableAutoMove { get; set; }
         public bool EnableDragSelect { get; set; }
         public int DragSelectModifierKey { get; set; } // 0 = none, 1 = control, 2 = shift
