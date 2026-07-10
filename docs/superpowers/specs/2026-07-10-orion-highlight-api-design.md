@@ -67,7 +67,7 @@ registered.
 | Color resolution when character-highlight and status-hue both apply | OrionUO semantics: `priorityHighlight=true` always wins; `priorityHighlight=false` loses to an active status hue (poison/paralyze/invul/attacked/notoriety) but wins over the plain default hue. |
 | Overlapping area highlights on the same tile | Last-added wins (insertion order), no extra priority parameter. |
 | Land/static/multi rendering | **Direct mesh hue injection, not an overlay pass.** The mesh path already recomputes a per-instance hue every visible frame (`GameSceneDrawingSorting.ApplyMeshHue` → `MeshLayer.SetHue`); the area lookup slots into that existing call, same as the non-meshed `Draw()` hue chains. No extra draw call, no mesh exclusion. (Corrected during planning — the mesh already supports per-instance hue; the brainstorm's "GPU mesh can't be tinted" premise was inaccurate.) |
-| Area membership test | **Linear scan over active areas** per queried tile/object (bounded by concurrently active area count — realistically tens), not a chunk-keyed spatial index. On-screen tile count is itself capped (~24×24), so `areas × visible-tiles` stays cheap without extra indexing machinery. (Simplified during planning.) |
+| Area membership test | **Chunk-bucketed spatial index** (8×8 tiles, matching `Chunk.cs`'s own grid): each area is indexed under every chunk its range-expanded bounding box overlaps; `TryResolve` looks up only the queried tile's own chunk bucket. (Originally simplified to a plain linear scan during planning, on the assumption that active-area count would realistically stay in the tens; real usage — a plugin loading a mass point-of-interest file — registered thousands of concurrent areas, and the O(areas × visible-tiles)-per-frame linear scan measurably stalled the client. Reverted to the indexed design post-ship, 2026-07-10.) |
 | Character-highlight lifecycle | No timer (matches OrionUO — only `AddHighlightArea` takes a duration). Plugin owns add/remove/clear, mirroring the existing `PluginStatusOverlays` convention (no auto-clear on disconnect). |
 
 ## Design
@@ -134,14 +134,22 @@ is bounded by what's drawn, not by how many entries are registered.
 
 **`PluginHighlightAreas`** — `Dictionary<string id, AreaEntry>` holding
 snap kind/anchor, hue, range, object-type flags, and `expireAtTicks` (`-1` =
-never). No spatial index: a once-per-frame pass (driven from the same place
-`PluginTimersManager.Update` is called) recomputes `Mouse`/`Serial` snap
-centers and drops expired areas — O(active areas). Draw-time membership test
-for a tile/object is a **linear scan over the active-area dictionary**,
-testing its resolved center ± range against the queried (x, y). On-screen
-tile/object count is itself capped (isometric view is ~24×24 tiles), and
-active area count is realistically tens, so this stays cheap without a
-spatial index.
+never), plus a `Dictionary<(int chunkX, int chunkY), List<string>>` spatial
+index (8×8-tile chunks, matching `Chunk.cs`'s own grid). Each area is indexed
+under every chunk its range-expanded bounding box overlaps; the index entry
+is rebuilt (unindex old chunks, reindex new ones) whenever a `Mouse`/`Serial`
+snap area's resolved center changes chunk, in the same once-per-frame pass
+(driven from the same place `PluginTimersManager.Update` is called) that also
+drops expired areas. Draw-time membership test for a tile/object looks up
+only the queried tile's own chunk bucket, then tests each candidate's
+resolved center ± range against the queried (x, y) — cost is bounded by
+however many areas overlap that one chunk, not by the total registered count.
+(This was originally simplified to a plain linear scan during planning, on
+the assumption that active-area count would stay in the tens; real-world
+usage — a plugin loading a mass point-of-interest file — registered
+thousands of concurrent areas, and the linear scan, re-run for every visible
+tile/mobile/item every frame, measurably stalled the client. Reverted to the
+indexed design post-ship.)
 
 ### 3. Read sites / hue resolution
 
