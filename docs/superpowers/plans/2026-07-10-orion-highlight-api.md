@@ -957,6 +957,14 @@ Append to the file (add `using System.Runtime.InteropServices;` to the top):
                 return true;
             }
 
+            // Area highlight sits at the same priority level as the normal character
+            // tier (spec rule 4): it must not leak through when a status override is active.
+            if (statusOverrideActive)
+            {
+                hue = 0;
+                return false;
+            }
+
             return PluginHighlightAreas.TryResolve(x, y, z, HighlightObjectTypes.Mobile, out hue);
         }
     }
