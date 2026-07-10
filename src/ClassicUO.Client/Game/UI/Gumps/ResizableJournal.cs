@@ -324,6 +324,12 @@ namespace ClassicUO.Game.UI.Gumps
                 WantUpdateSize = false;
             }
 
+            private string ResolveAlias(JournalEntry e)
+            {
+                var mgr = _resizableJournal?.World?.AliasManager;
+                return mgr != null ? mgr.Resolve(e.Serial, e.Name) : e.Name;
+            }
+
             public override bool AddToRenderLists(RenderLists renderLists, int x, int y, ref float layerDepthRef)
             {
                 base.AddToRenderLists(renderLists, x, y, ref layerDepthRef);
@@ -426,7 +432,7 @@ namespace ClassicUO.Game.UI.Gumps
 
                 journalDatas.AddToBack(
                     new JournalData(
-                        new Label($"{e.Name}: {e.Text}", e.IsUnicode, e.Hue, Width - BORDER_WIDTH - timeS.Width, font: e.Font),
+                        new Label($"{ResolveAlias(e)}: {e.Text}", e.IsUnicode, e.Hue, Width - BORDER_WIDTH - timeS.Width, font: e.Font),
                         timeS,
                         e.TextType,
                         e.MessageType

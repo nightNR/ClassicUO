@@ -38,6 +38,7 @@ namespace ClassicUO.Game.Managers
             entry.Font = font;
             entry.Hue = hue;
             entry.Name = name;
+            entry.Serial = serial ?? 0;
             entry.IsUnicode = isunicode;
             entry.Time = timeNow;
             entry.TextType = type;
@@ -135,6 +136,7 @@ namespace ClassicUO.Game.Managers
         public bool IsUnicode;
         public string Name;
         public string Text;
+        public uint Serial;
 
         public TextType TextType;
         public DateTime Time;
