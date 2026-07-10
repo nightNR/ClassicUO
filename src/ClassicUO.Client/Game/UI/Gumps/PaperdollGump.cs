@@ -551,9 +551,20 @@ namespace ClassicUO.Game.UI.Gumps
         {
             Mobile mobile = World.Mobiles.Get(LocalSerial);
 
-            if (mobile != null && mobile.Title != _titleLabel.Text)
+            if (mobile != null)
             {
-                UpdateTitle(mobile.Title);
+                string title = mobile.Title;
+                if (!string.IsNullOrEmpty(mobile.Name) && !string.IsNullOrEmpty(title) && title.StartsWith(mobile.Name))
+                {
+                    string alias = World.AliasManager.Resolve(mobile.Serial, mobile.Name);
+                    if (!string.Equals(alias, mobile.Name))
+                        title = alias + title.Substring(mobile.Name.Length);
+                }
+
+                if (title != _titleLabel.Text)
+                {
+                    UpdateTitle(title);
+                }
             }
 
             _paperDollInteractable.RequestUpdate();

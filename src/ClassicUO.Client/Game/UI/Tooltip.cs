@@ -242,8 +242,9 @@ namespace ClassicUO.Game.UI
                                 }
                             }
 
-                            sb.Append(name);
-                            sbHTML.Append(name);
+                            string aliasName = _world.AliasManager.Resolve(serial, name);
+                            sb.Append(aliasName);
+                            sbHTML.Append(aliasName);
 
                             if (hasStartColor)
                             {

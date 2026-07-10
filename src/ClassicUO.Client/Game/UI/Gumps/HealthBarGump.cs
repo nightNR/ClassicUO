@@ -526,9 +526,10 @@ namespace ClassicUO.Game.UI.Gumps
                     _isDead = false;
                 }
 
-                if (!string.IsNullOrEmpty(entity.Name) && _name != entity.Name)
+                string _resolved = World.AliasManager.Resolve(entity.Serial, entity.Name);
+                if (!string.IsNullOrEmpty(entity.Name) && _name != _resolved)
                 {
-                    _name = entity.Name;
+                    _name = _resolved;
 
                     if (_textBox != null)
                     {
@@ -1898,9 +1899,10 @@ namespace ClassicUO.Game.UI.Gumps
                     _isDead = false;
                 }
 
-                if (!string.IsNullOrEmpty(entity.Name) && !(inparty && LocalSerial == World.Player.Serial) && _name != entity.Name)
+                string _resolvedB = World.AliasManager.Resolve(entity.Serial, entity.Name);
+                if (!string.IsNullOrEmpty(entity.Name) && !(inparty && LocalSerial == World.Player.Serial) && _name != _resolvedB)
                 {
-                    _name = entity.Name;
+                    _name = _resolvedB;
 
                     if (_textBox != null)
                     {

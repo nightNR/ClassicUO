@@ -237,7 +237,7 @@ namespace ClassicUO.Game.Managers
 
                 if (mobile != null)
                 {
-                    _name = mobile.Name;
+                    _name = _world.AliasManager.Resolve(Serial, mobile.Name);
 
                     if (string.IsNullOrEmpty(_name))
                     {
