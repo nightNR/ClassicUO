@@ -8,7 +8,15 @@ namespace ClassicUO.UnitTests
 {
     public class AliasManagerTests
     {
-        private static AliasManager New() => new AliasManager(null);
+        private static int _seq;
+
+        private static AliasManager New()
+        {
+            var m = new AliasManager(null);
+            m.GlobalPathOverride = Path.Combine(Path.GetTempPath(), $"cuo_alias_unit_{System.Threading.Interlocked.Increment(ref _seq)}.xml");
+            if (File.Exists(m.GlobalPathOverride)) File.Delete(m.GlobalPathOverride);
+            return m;
+        }
 
         [Fact]
         public void Resolve_ReturnsRealName_WhenNoAlias()

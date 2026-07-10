@@ -27,8 +27,10 @@ namespace ClassicUO.Game.Managers
 
         public bool Enabled { get; set; } = true;
 
-        private static string GlobalPath =>
-            Path.Combine(CUOEnviroment.ExecutablePath, "Data", "aliases_global.xml");
+        internal string GlobalPathOverride { get; set; }
+
+        private string GlobalPath =>
+            GlobalPathOverride ?? Path.Combine(CUOEnviroment.ExecutablePath, "Data", "aliases_global.xml");
 
         public string GetAlias(uint serial)
         {
