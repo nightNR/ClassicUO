@@ -226,6 +226,19 @@ namespace ClassicUO.Game.UI.Gumps
                     140,
                     25,
                     ButtonAction.SwitchPage,
+                    "Aliases"
+                ) { ButtonParameter = 13 }
+            );
+
+            Add
+            (
+                new NiceButton
+                (
+                    10,
+                    10 + 30 * i++,
+                    140,
+                    25,
+                    ButtonAction.SwitchPage,
                     ResGumps.Macros
                 ) { ButtonParameter = 4 }
             );
@@ -425,8 +438,17 @@ namespace ClassicUO.Game.UI.Gumps
             BuildInfoBar();
             BuildContainers();
             BuildExperimental();
+            BuildAliases();
 
             ChangePage(1);
+        }
+
+        public override void Dispose()
+        {
+            if (World.TargetManager.IsTargeting)
+                World.TargetManager.CancelTarget();
+
+            base.Dispose();
         }
 
         private static Texture2D LogoTexture
@@ -3323,6 +3345,62 @@ namespace ClassicUO.Game.UI.Gumps
             Add(rightArea, PAGE);
         }
 
+        private void BuildAliases()
+        {
+            const int PAGE = 13;
+
+            ScrollArea rightArea = new ScrollArea(190, 20, WIDTH - 210, 420, true);
+
+            Checkbox enabledBox = new Checkbox(0x00D2, 0x00D3, "Enable character aliases", FONT, HUE_FONT)
+            {
+                IsChecked = World.AliasManager.Enabled,
+                X = 5,
+                Y = 5
+            };
+            enabledBox.ValueChanged += (s, e) =>
+            {
+                World.AliasManager.Enabled = enabledBox.IsChecked;
+                if (_currentProfile != null)
+                    _currentProfile.AliasesEnabled = enabledBox.IsChecked;
+            };
+            rightArea.Add(enabledBox);
+
+            NiceButton addButton = new NiceButton(5, 35, 130, 25, ButtonAction.Activate, "Add (target)") { ButtonParameter = 999 };
+
+            DataBox databox = new DataBox(0, 70, 0, 0) { WantUpdateSize = true };
+
+            foreach (AliasEntry entry in World.AliasManager.Entries)
+            {
+                var row = new AliasEntryControl(this, entry) { Y = databox.Children.Count * 26 };
+                databox.Add(row);
+            }
+
+            addButton.MouseUp += (sender, e) =>
+            {
+                World.TargetManager.SetTargeting(
+                    obj =>
+                    {
+                        if (obj is Entity ent)
+                        {
+                            World.AliasManager.Set(ent.Serial, ent.Name ?? string.Empty, global: false);
+                            var row = new AliasEntryControl(this, new AliasEntry { Serial = ent.Serial, Alias = ent.Name ?? string.Empty, Global = false })
+                            {
+                                Y = databox.Children.Count * 26
+                            };
+                            databox.Add(row);
+                            databox.ReArrangeChildren();
+                        }
+                    },
+                    CursorType.Target,
+                    TargetType.Neutral
+                );
+            };
+
+            rightArea.Add(addButton);
+            rightArea.Add(databox);
+
+            Add(rightArea, PAGE);
+        }
 
         private void BuildInfoBar()
         {
