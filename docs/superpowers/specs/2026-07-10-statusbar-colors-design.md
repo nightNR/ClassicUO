@@ -139,3 +139,36 @@ rule matches, leaving the notoriety behavior untouched.
 - Recoloring name text or HP/mana/stam fill (user chose background only).
 - Global (cross-character) rules — profile only.
 - Matching on anything other than Graphic + Hue.
+
+---
+
+## Follow-up: vivid color rendering (2026-07-10, post-trial)
+
+The notoriety-style tint on `_background` is washed out: the hue shader indexes
+brightness (`get_rgb(color.r, hue)`), and the bar bases are dark (custom =
+`Color.Black` @ alpha 0.7; classic = dark frame art `0x0804` with the shader's
+near-black hue-zeroing). Tinting a dark base can never be vivid.
+
+Fix (user chose **fill-with-transparency + border**, **global opacity slider**):
+draw a dedicated overlay using the vivid path — `SolidColorTextureCache.GetTexture(Color.White)`
+recolored by the rule hue (`GetHueVector(hue, false, alpha)`), exactly like
+`ClickableColorBox`/`LineCHB`. White base → `get_rgb(1, hue)` = full-strength color.
+
+- New control `StatusbarColorFill : Control`: draws a semi-transparent fill rect
+  (rule hue @ global alpha) over its `Width×Height`, plus a 4-edge border (rule
+  hue @ alpha 1). `AcceptMouseInput = false`.
+- Added to every health-bar variant immediately after `_background` (so it draws
+  above the background, below the HP bars — fill sits behind bars, border shows at
+  the edges). Toggled per-frame by a `UpdateStatusColorFill(mobile)` helper on
+  `BaseHealthBarGump`: visible with the matched rule color when
+  `StatusbarColorManager.TryGetColor` hits (and `mobile != World.Player`), hidden
+  otherwise. Sized from the gump's `Width`/`Height`.
+- **Global opacity**: `Profile.StatusbarColorOpacity` (int 0-100, default 80),
+  fed as `alpha = value / 100f` to the fill. Configured by an `HSliderBar` in the
+  Status Bar Colors options tab (label + slider, live-writes the profile like the
+  tab's other controls). The border stays alpha 1 regardless.
+- The existing `barColor → _background.Hue` override (base feature) is left in
+  place (harmless subtle base tint under the fill).
+
+Applies to both the custom and classic variants; both call the shared helper from
+their `Update`. Out of scope: per-rule opacity, recoloring HP fill/name.
