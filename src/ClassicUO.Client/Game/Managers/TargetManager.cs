@@ -410,6 +410,23 @@ namespace ClassicUO.Game.Managers
             }
         }
 
+        internal static bool MatchesAcceptedTypes(BaseGameObject obj, HighlightObjectTypes accepted)
+        {
+            HighlightObjectTypes category = obj switch
+            {
+                Mobile => HighlightObjectTypes.Mobile,
+                Item item when item.IsCorpse => HighlightObjectTypes.Corpse,
+                Item => HighlightObjectTypes.Item,
+                Land => HighlightObjectTypes.Land,
+                Multi => HighlightObjectTypes.Multi,
+                Static => HighlightObjectTypes.Static,
+                GameObject => HighlightObjectTypes.Static,
+                _ => HighlightObjectTypes.None
+            };
+
+            return category != HighlightObjectTypes.None && (accepted & category) != 0;
+        }
+
         public void Target(ushort graphic, ushort x, ushort y, short z, bool wet = false)
         {
             if (!IsTargeting)
