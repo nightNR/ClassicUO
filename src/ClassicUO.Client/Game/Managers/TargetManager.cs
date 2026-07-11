@@ -7,6 +7,7 @@ using ClassicUO.Game.UI.Gumps;
 using ClassicUO.Input;
 using ClassicUO.Assets;
 using ClassicUO.Network;
+using ClassicUO.PluginApi;
 using ClassicUO.Resources;
 using ClassicUO.Utility;
 using System;
@@ -24,7 +25,8 @@ namespace ClassicUO.Game.Managers
         SetGrabBag,
         HueCommandTarget,
         IgnorePlayerTarget,
-        CallbackTarget
+        CallbackTarget,
+        PluginHoverTarget
     }
 
     internal class CursorType
@@ -112,6 +114,8 @@ namespace ClassicUO.Game.Managers
 
         public uint LastAttack, SelectedTarget, NewTargetSystemSerial;
 
+        public HighlightObjectTypes PluginHoverAcceptedTypes { get; private set; } = HighlightObjectTypes.All;
+
         public readonly LastTargetInfo LastTargetInfo = new LastTargetInfo();
 
 
@@ -145,6 +149,7 @@ namespace ClassicUO.Game.Managers
             _targetCursorId = 0;
             MultiTargetInfo = null;
             TargetingType = 0;
+            PluginHoverAcceptedTypes = HighlightObjectTypes.All;
         }
 
         public void SetTargeting(Action<GameObject> callback, uint cursorID, TargetType cursorType)
@@ -154,7 +159,7 @@ namespace ClassicUO.Game.Managers
             _targetCallback = callback;
         }
 
-        public void SetTargeting(CursorTarget targeting, uint cursorID, TargetType cursorType)
+        public void SetTargeting(CursorTarget targeting, uint cursorID, TargetType cursorType, HighlightObjectTypes acceptedTypes = HighlightObjectTypes.All)
         {
             if (targeting == CursorTarget.Invalid)
             {
@@ -165,6 +170,7 @@ namespace ClassicUO.Game.Managers
             IsTargeting = cursorType < TargetType.Cancel;
             TargetingState = targeting;
             TargetingType = cursorType;
+            PluginHoverAcceptedTypes = acceptedTypes;
 
             if (IsTargeting)
             {
