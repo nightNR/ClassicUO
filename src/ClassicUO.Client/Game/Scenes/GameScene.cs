@@ -821,6 +821,8 @@ namespace ClassicUO.Game.Scenes
                 SelectedObject.Object = null;
             }
 
+            _world.TargetManager.CheckPluginHoverTarget(SelectedObject.Object);
+
             if (
                 _world.TargetManager.IsTargeting
                 && _world.TargetManager.TargetingState == CursorTarget.MultiPlacement
