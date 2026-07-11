@@ -537,42 +537,14 @@ namespace ClassicUO.Game.Scenes
                     case CursorTarget.Object:
                     case CursorTarget.MultiPlacement when _world.CustomHouseManager == null:
                     case CursorTarget.CallbackTarget:
+                    case CursorTarget.PluginHoverTarget:
                     {
-                            BaseGameObject obj = lastObj;
+                            _world.TargetManager.TryResolveObject(lastObj);
 
-                            if (obj is TextObject ov)
-                            {
-                                obj = ov.Owner;
-                            }
+                            Mouse.LastLeftButtonClickTime = 0;
 
-                            switch (obj)
-                            {
-                                case Entity ent:
-                                    _world.TargetManager.Target(ent.Serial);
-
-                                    break;
-
-                                case Land land:
-                                    _world.TargetManager.Target(
-                                        0,
-                                        land.X,
-                                        land.Y,
-                                        land.Z,
-                                        land.TileData.IsWet
-                                    );
-
-                                    break;
-
-                                case GameObject o:
-                                    _world.TargetManager.Target(o.Graphic, o.X, o.Y, o.Z);
-
-                                    break;
-                            }
+                            break;
                         }
-
-                        Mouse.LastLeftButtonClickTime = 0;
-
-                        break;
 
                     case CursorTarget.SetTargetClientSide:
 

@@ -427,6 +427,32 @@ namespace ClassicUO.Game.Managers
             return category != HighlightObjectTypes.None && (accepted & category) != 0;
         }
 
+        internal bool TryResolveObject(BaseGameObject obj)
+        {
+            if (obj is TextObject textObject)
+            {
+                obj = textObject.Owner;
+            }
+
+            switch (obj)
+            {
+                case Entity ent:
+                    Target(ent.Serial);
+                    return true;
+
+                case Land land:
+                    Target(0, land.X, land.Y, land.Z, land.TileData.IsWet);
+                    return true;
+
+                case GameObject o:
+                    Target(o.Graphic, o.X, o.Y, o.Z);
+                    return true;
+
+                default:
+                    return false;
+            }
+        }
+
         public void Target(ushort graphic, ushort x, ushort y, short z, bool wet = false)
         {
             if (!IsTargeting)
