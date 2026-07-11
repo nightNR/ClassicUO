@@ -213,7 +213,10 @@ namespace ClassicUO.Game.Managers
 
             if (IsTargeting || TargetingType == TargetType.Cancel)
             {
-                NetClient.Socket.Send_TargetCancel(TargetingState, _targetCursorId, (byte)TargetingType);
+                if (NetClient.Socket?.PacketsTable != null)
+                {
+                    NetClient.Socket.Send_TargetCancel(TargetingState, _targetCursorId, (byte)TargetingType);
+                }
                 IsTargeting = false;
             }
 
@@ -450,6 +453,23 @@ namespace ClassicUO.Game.Managers
 
                 default:
                     return false;
+            }
+        }
+
+        internal void CheckPluginHoverTarget(BaseGameObject hovered)
+        {
+            if (!IsTargeting || TargetingState != CursorTarget.PluginHoverTarget)
+            {
+                return;
+            }
+
+            if (hovered != null && MatchesAcceptedTypes(hovered, PluginHoverAcceptedTypes))
+            {
+                TryResolveObject(hovered);
+            }
+            else
+            {
+                CancelTarget();
             }
         }
 
