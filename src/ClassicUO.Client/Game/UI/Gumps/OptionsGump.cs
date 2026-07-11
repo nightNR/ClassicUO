@@ -36,10 +36,10 @@ namespace ClassicUO.Game.UI.Gumps
         private InputField _autoOpenCorpseRange;
 
         //experimental
-        private Checkbox _autoOpenDoors, _autoOpenCorpse, _skipEmptyCorpse, _disableTabBtn, _disableCtrlQWBtn, _disableDefaultHotkeys, _disableArrowBtn, _disableAutoMove, _overrideContainerLocation, _smoothDoors, _showTargetRangeIndicator, _customBars, _customBarsBBG, _saveHealthbars;
+        private Checkbox _autoOpenDoors, _autoOpenCorpse, _skipEmptyCorpse, _disableTabBtn, _disableCtrlQWBtn, _disableDefaultHotkeys, _disableArrowBtn, _disableAutoMove, _overrideContainerLocation, _smoothDoors, _showTargetRangeIndicator, _customBars, _customBarsBBG, _statValuesOnBars, _saveHealthbars;
         private Checkbox _nameOverheadAlwaysOn, _nameOverheadShowHpBar;
         private HSliderBar _cellSize;
-        private Checkbox _containerScaleItems, _containerDoubleClickToLoot, _relativeDragAnDropItems, _useLargeContianersGumps, _highlightContainersWhenMouseIsOver;
+        private Checkbox _containerScaleItems, _containerDoubleClickToLoot, _relativeDragAnDropItems, _useLargeContianersGumps, _highlightContainersWhenMouseIsOver, _allowItemsOutsideContainerBounds;
 
 
         // containers
@@ -50,10 +50,11 @@ namespace ClassicUO.Game.UI.Gumps
         private Combobox _dragSelectModifierKey;
         private Combobox _backpackStyle;
         private Checkbox _hueContainerGumps;
+        private Checkbox _containerToggleDefaultGrid;
 
 
         //counters
-        private Checkbox _enableCounters, _highlightOnChange, _highlightOnAmount, _enableAbbreviatedAmount;
+        private Checkbox _enableCounters, _highlightOnChange, _highlightOnAmount, _enableAbbreviatedAmount, _useFixedGridCheckbox;
         private Checkbox _enableDragSelect, _dragSelectHumanoidsOnly, _dragSelectHostileOnly;
 
         // sounds
@@ -66,6 +67,8 @@ namespace ClassicUO.Game.UI.Gumps
         private Checkbox _maxJournalFilesEnabled;
         private InputField _maxJournalFiles;
         private Checkbox _journalFileWithSerial;
+        private Checkbox _chatUseArrowsForHistory;
+        private InputField _chatHistoryLength;
 
         private Checkbox _gameWindowLock, _gameWindowFullsize;
         // GameWindowPosition
@@ -109,7 +112,7 @@ namespace ClassicUO.Game.UI.Gumps
         // combat & spells
         private ClickableColorBox _innocentColorPickerBox, _friendColorPickerBox, _crimialColorPickerBox, _canAttackColorPickerBox, _enemyColorPickerBox, _murdererColorPickerBox, _neutralColorPickerBox, _beneficColorPickerBox, _harmfulColorPickerBox;
         private HSliderBar _lightBar;
-        private Checkbox _buffBarTime, _uiButtonsSingleClick, _queryBeforAttackCheckbox, _queryBeforeBeneficialCheckbox, _spellColoringCheckbox, _spellFormatCheckbox, _enableFastSpellsAssign;
+        private Checkbox _buffBarTime, _buffBarShowId, _uiButtonsSingleClick, _queryBeforAttackCheckbox, _queryBeforeBeneficialCheckbox, _spellColoringCheckbox, _spellFormatCheckbox, _enableFastSpellsAssign;
         private Checkbox _newTargetSystem, _showDPSCheckbox;
 
         // macro
@@ -117,6 +120,7 @@ namespace ClassicUO.Game.UI.Gumps
         private Checkbox _overrideAllFonts;
         private Combobox _overrideAllFontsIsUnicodeCheckbox;
         private Combobox _overrideContainerLocationSetting;
+        private Combobox _containerViewMode;
         private ClickableColorBox _poisonColorPickerBox, _paralyzedColorPickerBox, _invulnerableColorPickerBox;
         private NiceButton _randomizeColorsButton;
         private Checkbox _restorezoomCheckbox, _zoomCheckbox;
@@ -156,6 +160,8 @@ namespace ClassicUO.Game.UI.Gumps
 
         private GlobalProfile _globalProfile = ProfileManager.GlobalProfile;
         private Profile _currentProfile = ProfileManager.CurrentProfile;
+        private bool _aliasTargetPending;
+        private bool _statusbarColorTargetPending;
 
         public OptionsGump(World world) : base(world, 0, 0)
         {
@@ -211,6 +217,32 @@ namespace ClassicUO.Game.UI.Gumps
                     ButtonAction.SwitchPage,
                     ResGumps.Video
                 ) { ButtonParameter = 3 }
+            );
+
+            Add
+            (
+                new NiceButton
+                (
+                    10,
+                    10 + 30 * i++,
+                    140,
+                    25,
+                    ButtonAction.SwitchPage,
+                    "Aliases"
+                ) { ButtonParameter = 13 }
+            );
+
+            Add
+            (
+                new NiceButton
+                (
+                    10,
+                    10 + 30 * i++,
+                    140,
+                    25,
+                    ButtonAction.SwitchPage,
+                    "Status Bar Colors"
+                ) { ButtonParameter = 14 }
             );
 
             Add
@@ -421,8 +453,18 @@ namespace ClassicUO.Game.UI.Gumps
             BuildInfoBar();
             BuildContainers();
             BuildExperimental();
+            BuildAliases();
+            BuildStatusbarColors();
 
             ChangePage(1);
+        }
+
+        public override void Dispose()
+        {
+            if ((_aliasTargetPending || _statusbarColorTargetPending) && World.TargetManager.IsTargeting)
+                World.TargetManager.CancelTarget();
+
+            base.Dispose();
         }
 
         private static Texture2D LogoTexture
@@ -1025,6 +1067,18 @@ namespace ClassicUO.Game.UI.Gumps
                     null,
                     ResGumps.UseBlackBackgr,
                     _currentProfile.CBBlackBGToggled,
+                    0,
+                    0
+                )
+            );
+
+            section3.Add
+            (
+                _statValuesOnBars = AddCheckBox
+                (
+                    null,
+                    ResGumps.ShowStatValuesOnBars,
+                    _currentProfile.ShowStatValuesOnBars,
                     0,
                     0
                 )
@@ -2872,6 +2926,17 @@ namespace ClassicUO.Game.UI.Gumps
 
             startY += _buffBarTime.Height + 2;
 
+            _buffBarShowId = AddCheckBox
+            (
+                rightArea,
+                ResGumps.ShowBuffId,
+                _currentProfile.BuffBarShowId,
+                startX,
+                startY
+            );
+
+            startY += _buffBarShowId.Height + 2;
+
             _enableFastSpellsAssign = AddCheckBox
             (
                 rightArea,
@@ -3142,6 +3207,53 @@ namespace ClassicUO.Game.UI.Gumps
                 80
             );
 
+            startX = 5;
+            startX += 40;
+            startY += 40;
+
+            _useFixedGridCheckbox = AddCheckBox
+            (
+                rightArea,
+                ResGumps.CounterUseFixedGrid,
+                _currentProfile.CounterBarUseFixedGrid,
+                startX,
+                startY
+            );
+
+            startY += _useFixedGridCheckbox.Height + 2;
+
+            _rows = AddInputField
+            (
+                rightArea,
+                startX,
+                startY,
+                50,
+                TEXTBOX_HEIGHT,
+                ResGumps.CounterRows,
+                50,
+                false,
+                true,
+                3
+            );
+            _rows.SetText(_currentProfile.CounterBarRows.ToString());
+
+            startX += 120;
+
+            _columns = AddInputField
+            (
+                rightArea,
+                startX,
+                startY,
+                50,
+                TEXTBOX_HEIGHT,
+                ResGumps.CounterColumns,
+                50,
+                false,
+                true,
+                3
+            );
+            _columns.SetText(_currentProfile.CounterBarColumns.ToString());
+
             Add(rightArea, PAGE);
         }
 
@@ -3206,6 +3318,35 @@ namespace ClassicUO.Game.UI.Gumps
 
             startY += _disableCtrlQWBtn.Height + 2;
 
+            _chatUseArrowsForHistory = AddCheckBox
+            (
+                rightArea,
+                ResGumps.ChatHistoryUseArrows,
+                _currentProfile.ChatUseArrowsForHistory,
+                startX,
+                startY
+            );
+
+            startY += _chatUseArrowsForHistory.Height + 2;
+
+            _chatHistoryLength = AddInputField
+            (
+                rightArea,
+                startX,
+                startY,
+                50,
+                TEXTBOX_HEIGHT,
+                ResGumps.ChatHistoryLength,
+                50,
+                false,
+                true,
+                4
+            );
+
+            _chatHistoryLength.SetText(_currentProfile.ChatHistoryLength.ToString());
+
+            startY += _chatHistoryLength.Height + 2;
+
             _disableAutoMove = AddCheckBox
             (
                 rightArea,
@@ -3220,6 +3361,163 @@ namespace ClassicUO.Game.UI.Gumps
             Add(rightArea, PAGE);
         }
 
+        private void BuildAliases()
+        {
+            const int PAGE = 13;
+
+            ScrollArea rightArea = new ScrollArea(190, 20, WIDTH - 210, 420, true);
+
+            Checkbox enabledBox = new Checkbox(0x00D2, 0x00D3, "Enable character aliases", FONT, HUE_FONT)
+            {
+                IsChecked = World.AliasManager.Enabled,
+                X = 5,
+                Y = 5
+            };
+            enabledBox.ValueChanged += (s, e) =>
+            {
+                World.AliasManager.Enabled = enabledBox.IsChecked;
+                if (_currentProfile != null)
+                    _currentProfile.AliasesEnabled = enabledBox.IsChecked;
+            };
+            rightArea.Add(enabledBox);
+
+            NiceButton addButton = new NiceButton(5, 35, 130, 25, ButtonAction.Activate, "Add (target)") { ButtonParameter = 999 };
+
+            DataBox databox = new DataBox(0, 70, 0, 0) { WantUpdateSize = true };
+
+            foreach (AliasEntry entry in World.AliasManager.Entries)
+            {
+                var row = new AliasEntryControl(this, entry) { Y = databox.Children.Count * 26 };
+                databox.Add(row);
+            }
+
+            addButton.MouseUp += (sender, e) =>
+            {
+                _aliasTargetPending = true;
+
+                World.TargetManager.SetTargeting(
+                    obj =>
+                    {
+                        _aliasTargetPending = false;
+
+                        if (obj is Entity ent)
+                        {
+                            // seed a non-empty alias so Set actually persists (empty alias == delete)
+                            string seedAlias = string.IsNullOrEmpty(ent.Name) ? $"0x{ent.Serial:X8}" : ent.Name;
+
+                            // skip if a row for this serial already exists (avoid duplicate desynced rows)
+                            bool exists = false;
+                            foreach (var child in databox.Children)
+                            {
+                                if (child is AliasEntryControl existing && existing.Serial == ent.Serial)
+                                {
+                                    exists = true;
+                                    break;
+                                }
+                            }
+
+                            if (!exists)
+                            {
+                                World.AliasManager.Set(ent.Serial, seedAlias, global: false, realName: ent.Name);
+
+                                var row = new AliasEntryControl(this, new AliasEntry { Serial = ent.Serial, Alias = seedAlias, Global = false, RealName = ent.Name })
+                                {
+                                    Y = databox.Children.Count * 26
+                                };
+                                databox.Add(row);
+                                databox.ReArrangeChildren();
+                            }
+                        }
+                    },
+                    CursorType.Target,
+                    TargetType.Neutral
+                );
+            };
+
+            rightArea.Add(addButton);
+            rightArea.Add(databox);
+
+            Add(rightArea, PAGE);
+        }
+
+        private void BuildStatusbarColors()
+        {
+            const int PAGE = 14;
+
+            ScrollArea rightArea = new ScrollArea(190, 20, WIDTH - 210, 420, true);
+
+            Checkbox enabledBox = new Checkbox(0x00D2, 0x00D3, "Enable status bar colors", FONT, HUE_FONT)
+            {
+                IsChecked = World.StatusbarColorManager.Enabled,
+                X = 5,
+                Y = 5
+            };
+            enabledBox.ValueChanged += (s, e) =>
+            {
+                World.StatusbarColorManager.Enabled = enabledBox.IsChecked;
+                if (_currentProfile != null)
+                    _currentProfile.StatusbarColorsEnabled = enabledBox.IsChecked;
+            };
+            rightArea.Add(enabledBox);
+
+            DataBox databox = new DataBox(0, 70, 0, 0) { WantUpdateSize = true };
+
+            void AddRow(StatusbarColorRule rule)
+            {
+                var row = new StatusbarColorControl(this, rule) { Y = databox.Children.Count * 26 };
+                databox.Add(row);
+                databox.ReArrangeChildren();
+            }
+
+            foreach (StatusbarColorRule rule in World.StatusbarColorManager.Rules)
+            {
+                var row = new StatusbarColorControl(this, rule) { Y = databox.Children.Count * 26 };
+                databox.Add(row);
+            }
+
+            NiceButton addTarget = new NiceButton(5, 35, 130, 25, ButtonAction.Activate, "Add (target)") { ButtonParameter = 999 };
+            addTarget.MouseUp += (sender, e) =>
+            {
+                _statusbarColorTargetPending = true;
+
+                World.TargetManager.SetTargeting(
+                    obj =>
+                    {
+                        _statusbarColorTargetPending = false;
+
+                        if (obj is Mobile m)
+                        {
+                            var rule = new StatusbarColorRule
+                            {
+                                Graphic = m.Graphic,
+                                Hues = new List<ushort> { m.Hue },
+                                Color = 0
+                            };
+                            World.StatusbarColorManager.Add(rule);
+                            World.StatusbarColorManager.Save();
+                            AddRow(rule);
+                        }
+                    },
+                    CursorType.Target,
+                    TargetType.Neutral
+                );
+            };
+
+            NiceButton addManual = new NiceButton(140, 35, 130, 25, ButtonAction.Activate, "Add (manual)") { ButtonParameter = 999 };
+            addManual.MouseUp += (sender, e) =>
+            {
+                var rule = new StatusbarColorRule { Graphic = 0, Hues = new List<ushort>(), Color = 0 };
+                World.StatusbarColorManager.Add(rule);
+                World.StatusbarColorManager.Save();
+                AddRow(rule);
+            };
+
+            rightArea.Add(addTarget);
+            rightArea.Add(addManual);
+            rightArea.Add(databox);
+
+            Add(rightArea, PAGE);
+        }
 
         private void BuildInfoBar()
         {
@@ -3462,6 +3760,17 @@ namespace ClassicUO.Game.UI.Gumps
 
             startY += _relativeDragAnDropItems.Height + 2;
 
+            _allowItemsOutsideContainerBounds = AddCheckBox
+            (
+                rightArea,
+                ResGumps.AllowItemsOutsideContainerBounds,
+                _currentProfile.AllowItemsOutsideContainerBounds,
+                startX,
+                startY
+            );
+
+            startY += _allowItemsOutsideContainerBounds.Height + 2;
+
             _highlightContainersWhenMouseIsOver = AddCheckBox
             (
                 rightArea,
@@ -3511,6 +3820,46 @@ namespace ClassicUO.Game.UI.Gumps
 
             startX = 5;
             startY += _overrideContainerLocation.Height + 2 + 10;
+
+            // Container view mode (Standard / Grid / Toggle)
+            Label containerViewLabel = AddLabel(rightArea, ResGumps.ContainerViewMode, startX, startY);
+            startX += containerViewLabel.Width + 5;
+
+            _containerViewMode = AddCombobox
+            (
+                rightArea,
+                new[]
+                {
+                    ResGumps.ContainerViewMode_Standard,
+                    ResGumps.ContainerViewMode_Grid,
+                    ResGumps.ContainerViewMode_Toggle
+                },
+                _currentProfile.ContainerViewMode,
+                startX,
+                startY,
+                200
+            );
+
+            startX = 5;
+            startY += _containerViewMode.Height + 2;
+
+            _containerToggleDefaultGrid = AddCheckBox
+            (
+                rightArea,
+                ResGumps.ContainerToggleDefaultGrid,
+                _currentProfile.ContainerToggleDefaultGrid,
+                startX,
+                startY
+            );
+
+            // Only meaningful in Toggle mode.
+            _containerToggleDefaultGrid.IsEnabled = _currentProfile.ContainerViewMode == 2;
+            _containerViewMode.OnOptionSelected += (s, index) =>
+            {
+                _containerToggleDefaultGrid.IsEnabled = index == 2;
+            };
+
+            startY += _containerToggleDefaultGrid.Height + 2 + 10;
 
             NiceButton button = new NiceButton
             (
@@ -3635,6 +3984,7 @@ namespace ClassicUO.Game.UI.Gumps
                     _nameOverheadShowHpBar.IsChecked = true;
                     _customBars.IsChecked = false;
                     _customBarsBBG.IsChecked = false;
+                    _statValuesOnBars.IsChecked = false;
                     _autoOpenCorpse.IsChecked = false;
                     _autoOpenDoors.IsChecked = false;
                     _smoothDoors.IsChecked = false;
@@ -3759,6 +4109,7 @@ namespace ClassicUO.Game.UI.Gumps
                     _queryBeforeBeneficialCheckbox.IsChecked = false;
                     _uiButtonsSingleClick.IsChecked = false;
                     _buffBarTime.IsChecked = false;
+                    _buffBarShowId.IsChecked = true;
                     _enableFastSpellsAssign.IsChecked = false;
                     _beneficColorPickerBox.Hue = 0x0059;
                     _harmfulColorPickerBox.Hue = 0x0020;
@@ -3773,8 +4124,9 @@ namespace ClassicUO.Game.UI.Gumps
                     _enableCounters.IsChecked = false;
                     _highlightOnChange.IsChecked = false;
                     _enableAbbreviatedAmount.IsChecked = false;
-                    _columns.SetText("1");
-                    _rows.SetText("1");
+                    _useFixedGridCheckbox.IsChecked = false;
+                    _columns.SetText("10");
+                    _rows.SetText("3");
                     _cellSize.Value = 40;
                     _highlightOnAmount.IsChecked = false;
                     _highlightAmount.SetText("5");
@@ -3793,6 +4145,7 @@ namespace ClassicUO.Game.UI.Gumps
                     _useLargeContianersGumps.IsChecked = false;
                     _containerDoubleClickToLoot.IsChecked = false;
                     _relativeDragAnDropItems.IsChecked = false;
+                    _allowItemsOutsideContainerBounds.IsChecked = false;
                     _highlightContainersWhenMouseIsOver.IsChecked = false;
                     _overrideContainerLocation.IsChecked = false;
                     _overrideContainerLocationSetting.SelectedIndex = 0;
@@ -4170,6 +4523,7 @@ namespace ClassicUO.Game.UI.Gumps
             _currentProfile.EnabledBeneficialCriminalActionQuery = _queryBeforeBeneficialCheckbox.IsChecked;
             _currentProfile.CastSpellsByOneClick = _uiButtonsSingleClick.IsChecked;
             _currentProfile.BuffBarTime = _buffBarTime.IsChecked;
+            _currentProfile.BuffBarShowId = _buffBarShowId.IsChecked;
             _currentProfile.FastSpellsAssign = _enableFastSpellsAssign.IsChecked;
 
             _currentProfile.BeneficHue = _beneficColorPickerBox.Hue;
@@ -4207,6 +4561,24 @@ namespace ClassicUO.Game.UI.Gumps
             _currentProfile.CounterBarHighlightOnAmount = _highlightOnAmount.IsChecked;
             _currentProfile.CounterBarDisplayAbbreviatedAmount = _enableAbbreviatedAmount.IsChecked;
 
+            bool useFixedGrid = _useFixedGridCheckbox.IsChecked;
+
+            if (!int.TryParse(_rows.Text, out int gridRows) || gridRows < 1)
+            {
+                gridRows = 3;
+                _rows.SetText("3");
+            }
+
+            if (!int.TryParse(_columns.Text, out int gridCols) || gridCols < 1)
+            {
+                gridCols = 10;
+                _columns.SetText("10");
+            }
+
+            _currentProfile.CounterBarUseFixedGrid = useFixedGrid;
+            _currentProfile.CounterBarRows = gridRows;
+            _currentProfile.CounterBarColumns = gridCols;
+
             CounterBarGump counterGump = UIManager.GetGump<CounterBarGump>();
 
             if (before != _currentProfile.CounterBarEnabled)
@@ -4215,26 +4587,28 @@ namespace ClassicUO.Game.UI.Gumps
                 {
                     if (_currentProfile.CounterBarEnabled)
                     {
-                        UIManager.Add
+                        CounterBarGump newCounterGump = new CounterBarGump
                         (
-                            new CounterBarGump
-                            (
-                                World,
-                                200,
-                                200,
-                                _currentProfile.CounterBarCellSize
-                            )
+                            World,
+                            200,
+                            200,
+                            _currentProfile.CounterBarCellSize
                         );
+
+                        UIManager.Add(newCounterGump);
+                        newCounterGump.ApplyGridSettings(useFixedGrid, gridRows, gridCols);
                     }
                 }
                 else
                 {
                     counterGump.IsEnabled = counterGump.IsVisible = _currentProfile.CounterBarEnabled;
+                    counterGump.ApplyGridSettings(useFixedGrid, gridRows, gridCols);
                 }
             }
             else if (counterGump != null)
             {
                 counterGump.SetCellSize(_currentProfile.CounterBarCellSize);
+                counterGump.ApplyGridSettings(useFixedGrid, gridRows, gridCols);
             }
 
             // experimental
@@ -4252,6 +4626,13 @@ namespace ClassicUO.Game.UI.Gumps
             _currentProfile.DisableArrowBtn = _disableArrowBtn.IsChecked;
             _currentProfile.DisableTabBtn = _disableTabBtn.IsChecked;
             _currentProfile.DisableCtrlQWBtn = _disableCtrlQWBtn.IsChecked;
+            _currentProfile.ChatUseArrowsForHistory = _chatUseArrowsForHistory.IsChecked;
+
+            if (int.TryParse(_chatHistoryLength.Text, out int chatHistoryLength) && chatHistoryLength >= 0)
+            {
+                _currentProfile.ChatHistoryLength = chatHistoryLength;
+            }
+
             _currentProfile.DisableAutoMove = _disableAutoMove.IsChecked;
             _currentProfile.AutoOpenDoors = _autoOpenDoors.IsChecked;
             _currentProfile.SmoothDoors = _smoothDoors.IsChecked;
@@ -4311,6 +4692,18 @@ namespace ClassicUO.Game.UI.Gumps
             }
 
             _currentProfile.CBBlackBGToggled = _customBarsBBG.IsChecked;
+
+            bool updateStatValues = _currentProfile.ShowStatValuesOnBars != _statValuesOnBars.IsChecked;
+            _currentProfile.ShowStatValuesOnBars = _statValuesOnBars.IsChecked;
+
+            if (updateStatValues)
+            {
+                foreach (HealthBarGumpCustom customhealthbar in UIManager.Gumps.OfType<HealthBarGumpCustom>().ToList())
+                {
+                    customhealthbar.RequestUpdateContents();
+                }
+            }
+
             _currentProfile.SaveHealthbars = _saveHealthbars.IsChecked;
 
 
@@ -4371,8 +4764,21 @@ namespace ClassicUO.Game.UI.Gumps
             _currentProfile.UseLargeContainerGumps = _useLargeContianersGumps.IsChecked;
             _currentProfile.DoubleClickToLootInsideContainers = _containerDoubleClickToLoot.IsChecked;
             _currentProfile.RelativeDragAndDropItems = _relativeDragAnDropItems.IsChecked;
+            _currentProfile.AllowItemsOutsideContainerBounds = _allowItemsOutsideContainerBounds.IsChecked;
             _currentProfile.HighlightContainerWhenSelected = _highlightContainersWhenMouseIsOver.IsChecked;
             _currentProfile.HueContainerGumps = _hueContainerGumps.IsChecked;
+
+            if (_currentProfile.ContainerViewMode != _containerViewMode.SelectedIndex
+                || _currentProfile.ContainerToggleDefaultGrid != _containerToggleDefaultGrid.IsChecked)
+            {
+                _currentProfile.ContainerViewMode = _containerViewMode.SelectedIndex;
+                _currentProfile.ContainerToggleDefaultGrid = _containerToggleDefaultGrid.IsChecked;
+
+                foreach (ContainerGump containerGump in UIManager.Gumps.OfType<ContainerGump>())
+                {
+                    containerGump.RequestUpdateContents();
+                }
+            }
 
             if (_currentProfile.BackpackStyle != _backpackStyle.SelectedIndex)
             {

@@ -14,8 +14,12 @@ internal sealed class PluginContextImpl : IPluginContext
     private readonly PacketPipelineImpl _packets;
     private readonly InputRouterImpl _input;
     private readonly GameActionsImpl _actions;
+    private readonly StatusBarsImpl _statusBars;
+    private readonly HighlightImpl _highlight;
     private readonly ClientImpl _client;
     private readonly DispatcherImpl _dispatcher;
+    private readonly BuffsImpl _buffs;
+    private readonly ScreenTimersImpl _screenTimers;
 
     public PluginContextImpl(HostBridge bridge, PluginRegistration registration, string folderName, string pluginsRoot)
     {
@@ -26,8 +30,12 @@ internal sealed class PluginContextImpl : IPluginContext
         _packets    = new PacketPipelineImpl(bridge);
         _input      = new InputRouterImpl();
         _actions    = new GameActionsImpl(bridge);
+        _statusBars = new StatusBarsImpl(bridge);
+        _highlight  = new HighlightImpl(bridge);
         _client     = new ClientImpl(bridge);
         _dispatcher = new DispatcherImpl(bridge);
+        _buffs = new BuffsImpl(bridge);
+        _screenTimers = new ScreenTimersImpl(bridge);
     }
 
     public string Id { get; }
@@ -38,8 +46,12 @@ internal sealed class PluginContextImpl : IPluginContext
     public IPacketPipeline Packets => _packets;
     public IInputRouter Input => _input;
     public IGameActions Actions => _actions;
+    public IStatusBars StatusBars => _statusBars;
+    public IHighlight Highlight => _highlight;
     public IClient Client => _client;
     public IDispatcher Game => _dispatcher;
+    public IPluginBuffs Buffs => _buffs;
+    public IScreenTimers ScreenTimers => _screenTimers;
 
     public event Action? Connected;
     public event Action? Disconnected;
@@ -71,6 +83,9 @@ internal sealed class PluginContextImpl : IPluginContext
     public void RaiseFocusGained()           => FocusGained?.Invoke();
     public void RaiseFocusLost()             => FocusLost?.Invoke();
     public void RaisePlayerPositionChanged(int x, int y, int z) => PlayerPositionChanged?.Invoke(x, y, z);
+    public void RaiseWalkProgress(WalkState state) => _actions.RaiseWalkProgress(state);
+    public void RaiseBuffEvent(int id, int reason) => _buffs.RaiseEvent(id, reason);
+    public void RaiseTimerEvent(int id, int reason) => _screenTimers.RaiseEvent(id, reason);
     public void RaiseTick()                  => Tick?.Invoke();
     public void RaiseClosing()               => Closing?.Invoke();
     public void RaiseMouse(int button, int wheel) => _input.RaiseMouse(button, wheel);
@@ -182,6 +197,195 @@ internal sealed class GameActionsImpl : IGameActions
         x = xx; y = yy; z = zz;
         return ok;
     }
+
+    public unsafe bool WalkTo(int x, int y, int z, int distance, bool run)
+    {
+        var fn = _bridge.ClientBindings.WalkToFn;
+        if (fn == 0) return false;
+        if (!_bridge.IsGameThread)
+            throw new InvalidOperationException("WalkTo must be called from the game thread; use IDispatcher.Post.");
+        return ((delegate* unmanaged[Cdecl]<int, int, int, int, byte, byte>)fn)(x, y, z, distance, run ? (byte)1 : (byte)0) != 0;
+    }
+
+    public unsafe void StopWalk()
+    {
+        var fn = _bridge.ClientBindings.StopWalkFn;
+        if (fn == 0) return;
+        if (_bridge.IsGameThread)
+            ((delegate* unmanaged[Cdecl]<void>)fn)();
+        else
+            _bridge.PostToGameThread(() => ((delegate* unmanaged[Cdecl]<void>)fn)());
+    }
+
+    public event Action<WalkState>? WalkProgress;
+    internal void RaiseWalkProgress(WalkState state) => WalkProgress?.Invoke(state);
+}
+
+internal sealed class StatusBarsImpl : IStatusBars
+{
+    private readonly HostBridge _bridge;
+    public StatusBarsImpl(HostBridge bridge) { _bridge = bridge; }
+
+    public unsafe void OpenStatusBar(uint serial, int x, int y, bool moveIfExists = true, int groupId = 0)
+    {
+        var fn = _bridge.ClientBindings.OpenStatusBarFn;
+        if (fn == 0) return;
+        byte move = moveIfExists ? (byte)1 : (byte)0;
+        if (_bridge.IsGameThread)
+            ((delegate* unmanaged[Cdecl]<uint, int, int, byte, int, void>)fn)(serial, x, y, move, groupId);
+        else
+            _bridge.PostToGameThread(() => ((delegate* unmanaged[Cdecl]<uint, int, int, byte, int, void>)fn)(serial, x, y, move, groupId));
+    }
+
+    public unsafe void CloseStatusBar(uint serial)
+    {
+        var fn = _bridge.ClientBindings.CloseStatusBarFn;
+        if (fn == 0) return;
+        if (_bridge.IsGameThread)
+            ((delegate* unmanaged[Cdecl]<uint, void>)fn)(serial);
+        else
+            _bridge.PostToGameThread(() => ((delegate* unmanaged[Cdecl]<uint, void>)fn)(serial));
+    }
+
+    public unsafe void SetOverlay(uint serial, ushort hue, ushort backgroundHue = 0)
+    {
+        var fn = _bridge.ClientBindings.SetOverlayFn;
+        if (fn == 0) return;
+        if (_bridge.IsGameThread)
+            ((delegate* unmanaged[Cdecl]<uint, ushort, ushort, void>)fn)(serial, hue, backgroundHue);
+        else
+            _bridge.PostToGameThread(() => ((delegate* unmanaged[Cdecl]<uint, ushort, ushort, void>)fn)(serial, hue, backgroundHue));
+    }
+}
+
+internal sealed class BuffsImpl : IPluginBuffs
+{
+    private readonly HostBridge _bridge;
+    public BuffsImpl(HostBridge bridge) { _bridge = bridge; }
+
+    public event Action<int>? Expired;
+    public event Action<int, BuffRemoveReason>? Removed;
+
+    internal void RaiseEvent(int id, int reason)
+    {
+        var r = (BuffRemoveReason)reason;
+        if (r == BuffRemoveReason.Expired)
+            Expired?.Invoke(id);
+        Removed?.Invoke(id, r);
+    }
+
+    public unsafe void AddOrUpdate(BuffConfig config)
+    {
+        var fn = _bridge.ClientBindings.AddBuffFn;
+        if (fn == 0 || config is null) return;
+
+        int id = config.Id;
+        ushort graphic = config.Graphic;
+        int dur = config.DurationMs;
+        int kind = (int)config.Kind;
+        nint textPtr = string.IsNullOrEmpty(config.Text) ? nint.Zero : Marshal.StringToHGlobalAnsi(config.Text);
+
+        void Call()
+        {
+            try { ((delegate* unmanaged[Cdecl]<int, ushort, int, int, nint, void>)fn)(id, graphic, dur, kind, textPtr); }
+            finally { if (textPtr != nint.Zero) Marshal.FreeHGlobal(textPtr); }
+        }
+
+        if (_bridge.IsGameThread) Call();
+        else _bridge.PostToGameThread(Call);
+    }
+
+    public unsafe void Remove(int id)
+    {
+        var fn = _bridge.ClientBindings.RemoveBuffFn;
+        if (fn == 0) return;
+        if (_bridge.IsGameThread) ((delegate* unmanaged[Cdecl]<int, void>)fn)(id);
+        else _bridge.PostToGameThread(() => ((delegate* unmanaged[Cdecl]<int, void>)fn)(id));
+    }
+
+    public unsafe void ClearAll()
+    {
+        var fn = _bridge.ClientBindings.ClearBuffsFn;
+        if (fn == 0) return;
+        if (_bridge.IsGameThread) ((delegate* unmanaged[Cdecl]<void>)fn)();
+        else _bridge.PostToGameThread(() => ((delegate* unmanaged[Cdecl]<void>)fn)());
+    }
+}
+
+internal sealed class ScreenTimersImpl : IScreenTimers
+{
+    private readonly HostBridge _bridge;
+    public ScreenTimersImpl(HostBridge bridge) { _bridge = bridge; }
+
+    public event Action<int>? Expired;
+    public event Action<int, TimerRemoveReason>? Removed;
+
+    internal void RaiseEvent(int id, int reason)
+    {
+        var r = (TimerRemoveReason)reason;
+        if (r == TimerRemoveReason.Expired)
+            Expired?.Invoke(id);
+        Removed?.Invoke(id, r);
+    }
+
+    public unsafe void DefineGroup(TimerGroupConfig group)
+    {
+        var fn = _bridge.ClientBindings.DefineTimerGroupFn;
+        if (fn == 0 || group is null) return;
+        int gid = group.GroupId, x = group.X, y = group.Y, dir = (int)group.Direction, gap = group.Gap;
+        if (_bridge.IsGameThread) ((delegate* unmanaged[Cdecl]<int, int, int, int, int, void>)fn)(gid, x, y, dir, gap);
+        else _bridge.PostToGameThread(() => ((delegate* unmanaged[Cdecl]<int, int, int, int, int, void>)fn)(gid, x, y, dir, gap));
+    }
+
+    public unsafe void AddOrUpdate(TimerConfig timer)
+    {
+        var fn = _bridge.ClientBindings.AddTimerFn;
+        if (fn == 0 || timer is null) return;
+
+        int id = timer.Id, shape = (int)timer.Shape, dur = timer.DurationMs, gid = timer.GroupId;
+        ushort hue = timer.Hue;
+        int x = timer.X, y = timer.Y, w = timer.Width, h = timer.Height;
+        byte showTime = timer.ShowTime ? (byte)1 : (byte)0;
+        int anchorKind = (int)timer.Anchor;
+        uint anchorSerial = timer.AnchorSerial;
+        ushort ax = timer.AnchorX, ay = timer.AnchorY;
+        sbyte az = timer.AnchorZ;
+        short offX = timer.AnchorOffsetX, offY = timer.AnchorOffsetY;
+        int graceMs = timer.AnchorGraceMs;
+        nint labelPtr = string.IsNullOrEmpty(timer.Label) ? nint.Zero : Marshal.StringToHGlobalAnsi(timer.Label);
+
+        void Call()
+        {
+            try
+            {
+                ((delegate* unmanaged[Cdecl]<int, int, int, ushort, int, int, int, int, int, nint, byte, int, uint, ushort, ushort, sbyte, short, short, int, void>)fn)(
+                    id, shape, dur, hue, gid, x, y, w, h, labelPtr, showTime,
+                    anchorKind, anchorSerial, ax, ay, az, offX, offY, graceMs);
+            }
+            finally { if (labelPtr != nint.Zero) Marshal.FreeHGlobal(labelPtr); }
+        }
+
+        if (_bridge.IsGameThread) Call();
+        else _bridge.PostToGameThread(Call);
+    }
+
+    public unsafe void Remove(int id) => CallById(_bridge.ClientBindings.RemoveTimerFn, id);
+    public unsafe void RemoveGroup(int groupId) => CallById(_bridge.ClientBindings.RemoveTimerGroupFn, groupId);
+
+    public unsafe void ClearAll()
+    {
+        var fn = _bridge.ClientBindings.ClearTimersFn;
+        if (fn == 0) return;
+        if (_bridge.IsGameThread) ((delegate* unmanaged[Cdecl]<void>)fn)();
+        else _bridge.PostToGameThread(() => ((delegate* unmanaged[Cdecl]<void>)fn)());
+    }
+
+    private unsafe void CallById(nint fn, int id)
+    {
+        if (fn == 0) return;
+        if (_bridge.IsGameThread) ((delegate* unmanaged[Cdecl]<int, void>)fn)(id);
+        else _bridge.PostToGameThread(() => ((delegate* unmanaged[Cdecl]<int, void>)fn)(id));
+    }
 }
 
 internal sealed class ClientImpl : IClient
@@ -247,5 +451,114 @@ internal sealed class DispatcherImpl : IDispatcher
             catch (Exception ex) { tcs.SetException(ex); }
         });
         return tcs.Task;
+    }
+}
+
+internal sealed class HighlightImpl : IHighlight
+{
+    private readonly HostBridge _bridge;
+    public HighlightImpl(HostBridge bridge) { _bridge = bridge; }
+
+    public unsafe void AddArea(
+        string id,
+        int durationMs = -1,
+        HighlightSnap snap = HighlightSnap.Mouse,
+        uint anchorSerial = 0,
+        ushort hue = 0x0386,
+        int rangeX = 3,
+        int rangeY = 3,
+        HighlightObjectTypes objectTypes = HighlightObjectTypes.All,
+        int x = 0,
+        int y = 0)
+    {
+        var fn = _bridge.ClientBindings.AddAreaFn;
+        if (fn == 0 || string.IsNullOrEmpty(id)) return;
+
+        nint idPtr = Marshal.StringToHGlobalAnsi(id);
+        int snapKind = (int)snap;
+        int types = (int)objectTypes;
+
+        void Call()
+        {
+            try
+            {
+                ((delegate* unmanaged[Cdecl]<nint, int, int, uint, int, int, ushort, int, int, int, void>)fn)(
+                    idPtr, durationMs, snapKind, anchorSerial, x, y, hue, rangeX, rangeY, types);
+            }
+            finally { Marshal.FreeHGlobal(idPtr); }
+        }
+
+        if (_bridge.IsGameThread) Call();
+        else _bridge.PostToGameThread(Call);
+    }
+
+    public unsafe void RemoveArea(string id)
+    {
+        var fn = _bridge.ClientBindings.RemoveAreaFn;
+        if (fn == 0 || string.IsNullOrEmpty(id)) return;
+
+        nint idPtr = Marshal.StringToHGlobalAnsi(id);
+
+        void Call()
+        {
+            try { ((delegate* unmanaged[Cdecl]<nint, void>)fn)(idPtr); }
+            finally { Marshal.FreeHGlobal(idPtr); }
+        }
+
+        if (_bridge.IsGameThread) Call();
+        else _bridge.PostToGameThread(Call);
+    }
+
+    public unsafe void ClearAreas()
+    {
+        var fn = _bridge.ClientBindings.ClearAreasFn;
+        if (fn == 0) return;
+        if (_bridge.IsGameThread) ((delegate* unmanaged[Cdecl]<void>)fn)();
+        else _bridge.PostToGameThread(() => ((delegate* unmanaged[Cdecl]<void>)fn)());
+    }
+
+    // Direct synchronous read (no thread marshal), matching IGameActions.TryGetPlayerPosition:
+    // it only reads live state, and off-thread callers need the value immediately.
+    public unsafe int GetAreaTimer(string id)
+    {
+        var fn = _bridge.ClientBindings.GetAreaTimerFn;
+        if (fn == 0 || string.IsNullOrEmpty(id)) return 0;
+
+        nint idPtr = Marshal.StringToHGlobalAnsi(id);
+        try { return ((delegate* unmanaged[Cdecl]<nint, int>)fn)(idPtr); }
+        finally { Marshal.FreeHGlobal(idPtr); }
+    }
+
+    public unsafe void AddCharacter(uint serial, ushort hue, bool priorityHighlight = false)
+    {
+        var fn = _bridge.ClientBindings.AddCharacterFn;
+        if (fn == 0) return;
+        byte p = priorityHighlight ? (byte)1 : (byte)0;
+        if (_bridge.IsGameThread)
+            ((delegate* unmanaged[Cdecl]<uint, ushort, byte, void>)fn)(serial, hue, p);
+        else
+            _bridge.PostToGameThread(() => ((delegate* unmanaged[Cdecl]<uint, ushort, byte, void>)fn)(serial, hue, p));
+    }
+
+    public unsafe void RemoveCharacter(uint serial, bool priorityHighlight = false)
+    {
+        var fn = _bridge.ClientBindings.RemoveCharacterFn;
+        if (fn == 0) return;
+        byte p = priorityHighlight ? (byte)1 : (byte)0;
+        if (_bridge.IsGameThread)
+            ((delegate* unmanaged[Cdecl]<uint, byte, void>)fn)(serial, p);
+        else
+            _bridge.PostToGameThread(() => ((delegate* unmanaged[Cdecl]<uint, byte, void>)fn)(serial, p));
+    }
+
+    public unsafe void ClearCharacters(bool priorityHighlight = false)
+    {
+        var fn = _bridge.ClientBindings.ClearCharactersFn;
+        if (fn == 0) return;
+        byte p = priorityHighlight ? (byte)1 : (byte)0;
+        if (_bridge.IsGameThread)
+            ((delegate* unmanaged[Cdecl]<byte, void>)fn)(p);
+        else
+            _bridge.PostToGameThread(() => ((delegate* unmanaged[Cdecl]<byte, void>)fn)(p));
     }
 }

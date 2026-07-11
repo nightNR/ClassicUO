@@ -1,0 +1,502 @@
+// SPDX-License-Identifier: BSD-2-Clause
+
+using System;
+using System.Collections.Generic;
+using System.Runtime.InteropServices;
+using ClassicUO.Game.GameObjects;
+using ClassicUO.PluginApi;
+
+namespace ClassicUO.Game.Managers
+{
+    /// <summary>
+    /// Plugin-driven per-serial highlight hues, two priority tiers. Policy
+    /// (which serial gets which hue, and whether it should override the
+    /// client's own status coloring) lives entirely in the plugin; the client
+    /// only stores and resolves. Mirrors <see cref="PluginStatusOverlays"/>.
+    /// </summary>
+    internal static class PluginHighlightCharacters
+    {
+        private static readonly Dictionary<uint, ushort> _priority = new Dictionary<uint, ushort>();
+        private static readonly Dictionary<uint, ushort> _normal = new Dictionary<uint, ushort>();
+
+        public static void Set(uint serial, ushort hue, bool priorityHighlight)
+        {
+            if (priorityHighlight)
+            {
+                _priority[serial] = hue;
+            }
+            else
+            {
+                _normal[serial] = hue;
+            }
+        }
+
+        public static void Remove(uint serial, bool priorityHighlight)
+        {
+            if (priorityHighlight)
+            {
+                _priority.Remove(serial);
+            }
+            else
+            {
+                _normal.Remove(serial);
+            }
+        }
+
+        public static void ClearAll(bool priorityHighlight)
+        {
+            if (priorityHighlight)
+            {
+                _priority.Clear();
+            }
+            else
+            {
+                _normal.Clear();
+            }
+        }
+
+        /// <summary>
+        /// Resolves the highlight hue for <paramref name="serial"/>. The
+        /// priority tier always wins. The normal tier only applies when
+        /// <paramref name="statusOverrideActive"/> is false (the client's own
+        /// status/notoriety coloring did not already set an override hue).
+        /// </summary>
+        public static bool TryResolve(uint serial, bool statusOverrideActive, out ushort hue)
+        {
+            if (_priority.TryGetValue(serial, out hue))
+            {
+                return true;
+            }
+
+            if (statusOverrideActive)
+            {
+                hue = 0;
+                return false;
+            }
+
+            if (_normal.TryGetValue(serial, out hue))
+            {
+                return true;
+            }
+
+            hue = 0;
+            return false;
+        }
+
+        /// <summary>Test-only: drops both tiers so tests start clean.</summary>
+        public static void Reset()
+        {
+            _priority.Clear();
+            _normal.Clear();
+        }
+    }
+
+    internal sealed class AreaEntry
+    {
+        public string Id;
+        public HighlightSnap Snap;
+        public uint AnchorSerial;
+        public ushort Hue;
+        public int RangeX;
+        public int RangeY;
+        public HighlightObjectTypes ObjectTypes;
+        public long ExpireAtTicks; // -1 = never
+        public int CenterX;
+        public int CenterY;
+        public sbyte CenterZ;
+        public bool AnchorResolved;
+        public int InsertionSeq;
+    }
+
+    /// <summary>
+    /// Plugin-driven world-space area highlights, keyed by plugin-chosen id.
+    /// Membership is accelerated by a chunk-bucketed spatial index (8x8 tiles,
+    /// matching <see cref="ClassicUO.Game.Map.Chunk"/>'s own grid): each area is
+    /// indexed under every chunk its range-expanded bounding box overlaps, so
+    /// <see cref="TryResolve"/> only scans the handful of areas registered
+    /// under the queried tile's own chunk instead of every active area. This
+    /// keeps per-frame resolution cheap even with thousands of concurrently
+    /// registered areas (e.g. a mass point-of-interest file), where a flat
+    /// linear scan would be re-run for every visible tile/mobile every frame.
+    /// Last-added-wins on overlap, tracked via a monotonic insertion sequence
+    /// rather than dictionary iteration order.
+    /// </summary>
+    internal static class PluginHighlightAreas
+    {
+        // 8 tiles per chunk (1 << ChunkShift), matching Chunk.cs's own grid.
+        private const int ChunkShift = 3;
+
+        private static readonly Dictionary<string, AreaEntry> _areas = new Dictionary<string, AreaEntry>();
+        private static readonly Dictionary<(int cx, int cy), List<string>> _chunkIndex = new Dictionary<(int, int), List<string>>();
+        private static readonly List<string> _expiredScratch = new List<string>();
+        private static int _nextSeq;
+
+        // Test seams; when null, resolution uses the live World / SelectedObject.
+        internal static Func<uint, (bool found, int x, int y, sbyte z)> SerialResolver;
+        internal static Func<(int x, int y, sbyte z)> MouseWorldResolver;
+
+        public static void Add(
+            World world,
+            string id,
+            int durationMs,
+            HighlightSnap snap,
+            uint anchorSerial,
+            ushort hue,
+            int rangeX,
+            int rangeY,
+            HighlightObjectTypes objectTypes,
+            int x,
+            int y,
+            long now
+        )
+        {
+            if (string.IsNullOrEmpty(id))
+            {
+                return;
+            }
+
+            if (_areas.TryGetValue(id, out AreaEntry existing))
+            {
+                UnindexArea(existing);
+            }
+
+            var entry = new AreaEntry
+            {
+                Id = id,
+                Snap = snap,
+                AnchorSerial = anchorSerial,
+                Hue = hue,
+                RangeX = rangeX,
+                RangeY = rangeY,
+                ObjectTypes = objectTypes,
+                ExpireAtTicks = durationMs < 0 ? -1 : now + durationMs,
+                CenterX = x,
+                CenterY = y,
+                CenterZ = 0,
+                InsertionSeq = _nextSeq++
+            };
+
+            _areas[id] = entry;
+            ResolveCenter(world, entry);
+            IndexArea(entry);
+        }
+
+        public static void Remove(string id)
+        {
+            if (_areas.TryGetValue(id, out AreaEntry e))
+            {
+                UnindexArea(e);
+                _areas.Remove(id);
+            }
+        }
+
+        public static void ClearAll()
+        {
+            _areas.Clear();
+            _chunkIndex.Clear();
+        }
+
+        public static int GetTimer(string id, long now)
+        {
+            if (!_areas.TryGetValue(id, out AreaEntry e))
+            {
+                return 0;
+            }
+
+            if (e.ExpireAtTicks < 0)
+            {
+                return int.MaxValue;
+            }
+
+            long remaining = e.ExpireAtTicks - now;
+            return remaining > 0 ? (int)remaining : 0;
+        }
+
+        public static bool TryResolve(int x, int y, sbyte z, HighlightObjectTypes type, out ushort hue)
+        {
+            hue = 0;
+
+            if (!_chunkIndex.TryGetValue((x >> ChunkShift, y >> ChunkShift), out List<string> candidates))
+            {
+                return false;
+            }
+
+            AreaEntry best = null;
+
+            foreach (string id in candidates)
+            {
+                if (!_areas.TryGetValue(id, out AreaEntry e))
+                {
+                    continue;
+                }
+
+                if ((e.ObjectTypes & type) == 0 || !e.AnchorResolved)
+                {
+                    continue;
+                }
+
+                if (Math.Abs(x - e.CenterX) > e.RangeX || Math.Abs(y - e.CenterY) > e.RangeY)
+                {
+                    continue;
+                }
+
+                if (best == null || e.InsertionSeq > best.InsertionSeq)
+                {
+                    best = e;
+                }
+            }
+
+            if (best == null)
+            {
+                return false;
+            }
+
+            hue = best.Hue;
+            return true;
+        }
+
+        /// <summary>Per-frame maintenance: expire timed areas, re-resolve (and re-index) Mouse/Serial centers.</summary>
+        public static void Update(World world, long now)
+        {
+            _expiredScratch.Clear();
+
+            foreach (KeyValuePair<string, AreaEntry> kv in _areas)
+            {
+                AreaEntry e = kv.Value;
+
+                if (e.ExpireAtTicks >= 0 && now >= e.ExpireAtTicks)
+                {
+                    _expiredScratch.Add(kv.Key);
+                    continue;
+                }
+
+                if (e.Snap == HighlightSnap.Mouse || e.Snap == HighlightSnap.Serial)
+                {
+                    // Unindex at the pre-move position before ResolveCenter changes
+                    // it — otherwise the old chunk bucket keeps a stale entry.
+                    UnindexArea(e);
+                    ResolveCenter(world, e);
+
+                    if (e.Snap == HighlightSnap.Serial && !e.AnchorResolved)
+                    {
+                        _expiredScratch.Add(kv.Key);
+                        continue;
+                    }
+
+                    IndexArea(e);
+                }
+            }
+
+            foreach (string id in _expiredScratch)
+            {
+                if (_areas.TryGetValue(id, out AreaEntry e))
+                {
+                    UnindexArea(e);
+                }
+
+                _areas.Remove(id);
+            }
+        }
+
+        private static void IndexArea(AreaEntry e)
+        {
+            if (!e.AnchorResolved)
+            {
+                return;
+            }
+
+            int minCx = (e.CenterX - e.RangeX) >> ChunkShift;
+            int maxCx = (e.CenterX + e.RangeX) >> ChunkShift;
+            int minCy = (e.CenterY - e.RangeY) >> ChunkShift;
+            int maxCy = (e.CenterY + e.RangeY) >> ChunkShift;
+
+            for (int cx = minCx; cx <= maxCx; cx++)
+            {
+                for (int cy = minCy; cy <= maxCy; cy++)
+                {
+                    var key = (cx, cy);
+
+                    if (!_chunkIndex.TryGetValue(key, out List<string> bucket))
+                    {
+                        bucket = new List<string>();
+                        _chunkIndex[key] = bucket;
+                    }
+
+                    bucket.Add(e.Id);
+                }
+            }
+        }
+
+        private static void UnindexArea(AreaEntry e)
+        {
+            int minCx = (e.CenterX - e.RangeX) >> ChunkShift;
+            int maxCx = (e.CenterX + e.RangeX) >> ChunkShift;
+            int minCy = (e.CenterY - e.RangeY) >> ChunkShift;
+            int maxCy = (e.CenterY + e.RangeY) >> ChunkShift;
+
+            for (int cx = minCx; cx <= maxCx; cx++)
+            {
+                for (int cy = minCy; cy <= maxCy; cy++)
+                {
+                    var key = (cx, cy);
+
+                    if (_chunkIndex.TryGetValue(key, out List<string> bucket))
+                    {
+                        bucket.Remove(e.Id);
+
+                        if (bucket.Count == 0)
+                        {
+                            _chunkIndex.Remove(key);
+                        }
+                    }
+                }
+            }
+        }
+
+        private static void ResolveCenter(World world, AreaEntry e)
+        {
+            switch (e.Snap)
+            {
+                case HighlightSnap.Position:
+                    e.AnchorResolved = true;
+                    break;
+
+                case HighlightSnap.Mouse:
+                    (int mx, int my, sbyte mz) = MouseWorldResolver != null ? MouseWorldResolver() : DefaultMouseWorld(world);
+                    e.CenterX = mx;
+                    e.CenterY = my;
+                    e.CenterZ = mz;
+                    e.AnchorResolved = true;
+                    break;
+
+                case HighlightSnap.Serial:
+                    (bool found, int sx, int sy, sbyte sz) = SerialResolver != null
+                        ? SerialResolver(e.AnchorSerial)
+                        : DefaultSerialWorld(world, e.AnchorSerial);
+                    e.AnchorResolved = found;
+                    if (found)
+                    {
+                        e.CenterX = sx;
+                        e.CenterY = sy;
+                        e.CenterZ = sz;
+                    }
+                    break;
+            }
+        }
+
+        private static (int x, int y, sbyte z) DefaultMouseWorld(World world)
+        {
+            if (SelectedObject.Object is GameObject g)
+            {
+                return (g.X, g.Y, g.Z);
+            }
+
+            if (world?.Player != null)
+            {
+                return (world.Player.X, world.Player.Y, world.Player.Z);
+            }
+
+            return (0, 0, 0);
+        }
+
+        private static (bool found, int x, int y, sbyte z) DefaultSerialWorld(World world, uint serial)
+        {
+            Entity entity = world?.Get(serial);
+
+            if (entity == null)
+            {
+                return (false, 0, 0, 0);
+            }
+
+            return (true, entity.X, entity.Y, entity.Z);
+        }
+
+        /// <summary>Test-only: drops every area, the spatial index, and test seams so tests start clean.</summary>
+        public static void Reset()
+        {
+            _areas.Clear();
+            _chunkIndex.Clear();
+            SerialResolver = null;
+            MouseWorldResolver = null;
+            _nextSeq = 0;
+        }
+    }
+
+    /// <summary>
+    /// Static bind targets for the plugin-&gt;cuo highlight primitives (bound
+    /// into ClientBindings in PluginHost.cs) plus the render-facing resolution
+    /// helper. All run on the game thread (the host marshals before calling).
+    /// Mirrors PluginStatusBars/PluginTimersManager as static binding targets.
+    /// </summary>
+    internal static class PluginHighlights
+    {
+        private static string PtrToString(System.IntPtr p) =>
+            p == System.IntPtr.Zero ? string.Empty : (Marshal.PtrToStringAnsi(p) ?? string.Empty);
+
+        public static void AddArea(
+            System.IntPtr idUtf8,
+            int durationMs,
+            int snapKind,
+            uint anchorSerial,
+            int x,
+            int y,
+            ushort hue,
+            int rangeX,
+            int rangeY,
+            int objectTypes
+        )
+        {
+            string id = PtrToString(idUtf8);
+
+            if (string.IsNullOrEmpty(id))
+            {
+                return;
+            }
+
+            World world = Client.Game?.UO?.World;
+            PluginHighlightAreas.Add(
+                world, id, durationMs, (HighlightSnap)snapKind, anchorSerial,
+                hue, rangeX, rangeY, (HighlightObjectTypes)objectTypes, x, y, Time.Ticks
+            );
+        }
+
+        public static void RemoveArea(System.IntPtr idUtf8) => PluginHighlightAreas.Remove(PtrToString(idUtf8));
+
+        public static void ClearAreas() => PluginHighlightAreas.ClearAll();
+
+        public static int GetAreaTimer(System.IntPtr idUtf8) => PluginHighlightAreas.GetTimer(PtrToString(idUtf8), Time.Ticks);
+
+        public static void AddCharacter(uint serial, ushort hue, byte priorityHighlight) =>
+            PluginHighlightCharacters.Set(serial, hue, priorityHighlight != 0);
+
+        public static void RemoveCharacter(uint serial, byte priorityHighlight) =>
+            PluginHighlightCharacters.Remove(serial, priorityHighlight != 0);
+
+        public static void ClearCharacters(byte priorityHighlight) =>
+            PluginHighlightCharacters.ClearAll(priorityHighlight != 0);
+
+        /// <summary>Per-frame driver, called alongside PluginTimersManager.Update.</summary>
+        public static void Update(World world, long now) => PluginHighlightAreas.Update(world, now);
+
+        /// <summary>
+        /// Composes character-highlight and area-highlight resolution for a
+        /// mobile, in spec priority order: priority character tier, then the
+        /// caller's own status override, then normal character tier, then area.
+        /// </summary>
+        public static bool TryResolveMobileHue(uint serial, bool statusOverrideActive, int x, int y, sbyte z, out ushort hue)
+        {
+            if (PluginHighlightCharacters.TryResolve(serial, statusOverrideActive, out hue))
+            {
+                return true;
+            }
+
+            if (statusOverrideActive)
+            {
+                hue = 0;
+                return false;
+            }
+
+            return PluginHighlightAreas.TryResolve(x, y, z, HighlightObjectTypes.Mobile, out hue);
+        }
+    }
+}

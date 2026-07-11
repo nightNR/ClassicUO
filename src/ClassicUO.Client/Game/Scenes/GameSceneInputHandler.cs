@@ -206,16 +206,7 @@ namespace ClassicUO.Game.Scenes
                             continue;
                         }
 
-                        BaseHealthBarGump hbgc;
-
-                        if (useCHB)
-                        {
-                            hbgc = new HealthBarGumpCustom(_world, mobile);
-                        }
-                        else
-                        {
-                            hbgc = new HealthBarGump(_world, mobile);
-                        }
+                        BaseHealthBarGump hbgc = HealthBarFactory.Create(_world, mobile);
 
                         if (finalY >= Camera.Bounds.Bottom - 20)
                         {
@@ -872,7 +863,7 @@ namespace ClassicUO.Game.Scenes
                     {
                         // previously we only triggered the pathfinder if the target was a surface
                         // now we trigger it always and the pathfinder decides if the target is blocked and then only walks next to it
-                        if (_world.Player.Pathfinder.WalkTo(obj.X, obj.Y, obj.Z, 0))
+                        if (_world.Player.Pathfinder.WalkTo(obj.X, obj.Y, obj.Z, 0, false))
                         {
                             _world.Player.AddMessage(
                                 MessageType.Label,
@@ -886,7 +877,7 @@ namespace ClassicUO.Game.Scenes
                             return true;
                         }
                     }
-                    else if (obj is Land && _world.Player.Pathfinder.WalkTo(obj.X, obj.Y, obj.Z, 0))
+                    else if (obj is Land && _world.Player.Pathfinder.WalkTo(obj.X, obj.Y, obj.Z, 0, false))
                     {
                         _world.Player.AddMessage(
                             MessageType.Label,

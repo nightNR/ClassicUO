@@ -207,9 +207,13 @@ namespace ClassicUO.Game.Managers
                     if (_world.IgnoreManager.IgnoredCharsList.Contains(parent.Name) && type != MessageType.Spell)
                         break;
 
+                    string overheadText = (textType == TextType.OBJECT && parent != null)
+                        ? _world.AliasManager.ResolveObjectText(parent.Serial, text)
+                        : text;
+
                     TextObject msg = CreateMessage
                     (
-                        text,
+                        overheadText,
                         hue,
                         font,
                         unicode,

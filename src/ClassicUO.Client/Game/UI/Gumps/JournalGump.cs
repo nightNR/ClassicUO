@@ -264,17 +264,22 @@ namespace ClassicUO.Game.UI.Gumps
 
         private void AddJournalEntry(object sender, JournalEntry entry)
         {
-            var usrSend = entry.Name != string.Empty ? $"{entry.Name}" : string.Empty;
+            string aliasName = World.AliasManager.Resolve(entry.Serial, entry.Name);
+            var usrSend = !string.IsNullOrEmpty(aliasName) ? $"{aliasName}" : string.Empty;
 
             // Check if ignored person
-            if (!string.IsNullOrEmpty(usrSend) && World.IgnoreManager.IgnoredCharsList.Contains(usrSend))
+            if (!string.IsNullOrEmpty(entry.Name) && World.IgnoreManager.IgnoredCharsList.Contains(entry.Name))
                 return;
 
-            string text = $"{usrSend}: {entry.Text}";
+            string displayText = entry.TextType == TextType.OBJECT
+                ? World.AliasManager.ResolveObjectText(entry.Serial, entry.Text)
+                : entry.Text;
+
+            string text = $"{usrSend}: {displayText}";
 
             if (string.IsNullOrEmpty(usrSend))
             {
-                text = entry.Text;
+                text = displayText;
             }
 
             _journalEntries.AddEntry

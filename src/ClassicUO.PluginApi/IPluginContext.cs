@@ -32,6 +32,18 @@ public interface IPluginContext
     /// <summary>Player movement, spell casting, position queries.</summary>
     IGameActions Actions { get; }
 
+    /// <summary>Status-bar open/close at a position, grouping, and priority overlay hue.</summary>
+    IStatusBars StatusBars { get; }
+
+    /// <summary>Add/update/remove plugin buff icons in the client's BuffGump.</summary>
+    IPluginBuffs Buffs { get; }
+
+    /// <summary>Plugin-driven on-screen timer overlay.</summary>
+    IScreenTimers ScreenTimers { get; }
+
+    /// <summary>Plugin-driven object/area highlighting.</summary>
+    IHighlight Highlight { get; }
+
     /// <summary>Window title, cliloc translation, and other client-level services.</summary>
     IClient Client { get; }
 

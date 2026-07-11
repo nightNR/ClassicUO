@@ -24,18 +24,21 @@ namespace ClassicUO.Game
         private readonly EffectManager _effectManager;
         private readonly List<uint> _toRemove = new List<uint>();
         private uint _timeToDelete;
+        private RegionMapProvider _regionMapProvider;
 
         public World()
         {
             WMapManager = new WorldMapEntityManager(this);
             CorpseManager = new CorpseManager(this);
             Party = new PartyManager(this);
+            PluginParty = new PluginPartyManager();
             HouseManager = new HouseManager(this);
             WorldTextManager = new WorldTextManager(this);
             _effectManager = new EffectManager(this);
             MessageManager = new MessageManager(this);
             ContainerManager = new ContainerManager(this);
             IgnoreManager = new IgnoreManager(this);
+            AliasManager = new AliasManager(this);
             SkillsGroupManager = new SkillsGroupManager(this);
             ChatManager = new ChatManager(this);
             AuraManager = new AuraManager(this);
@@ -48,6 +51,7 @@ namespace ClassicUO.Game
             CommandManager = new CommandManager(this);
             Weather = new Weather(this);
             InfoBars = new InfoBarManager(this);
+            StatusbarColorManager = new StatusbarColorManager(this);
         }
 
         public Point RangeSize;
@@ -68,6 +72,8 @@ namespace ClassicUO.Game
 
         public PartyManager Party { get; }
 
+        public PluginPartyManager PluginParty { get; }
+
         public HouseManager HouseManager { get; }
 
         public MessageManager MessageManager { get; }
@@ -75,6 +81,8 @@ namespace ClassicUO.Game
         public ContainerManager ContainerManager { get; }
 
         public IgnoreManager IgnoreManager { get; }
+
+        public AliasManager AliasManager { get; }
 
         public SkillsGroupManager SkillsGroupManager { get; }
 
@@ -99,6 +107,8 @@ namespace ClassicUO.Game
         public Weather Weather { get; }
 
         public InfoBarManager InfoBars { get; }
+
+        public StatusbarColorManager StatusbarColorManager { get; }
 
         public Dictionary<uint, Item> Items { get; } = new Dictionary<uint, Item>();
 
@@ -157,6 +167,7 @@ namespace ClassicUO.Game
 
                         Client.Game.UO.FileManager.Maps.LoadMap(value, ClientFeatures.Flags.HasFlag(CharacterListFlags.CLF_UNLOCK_FELUCCA_AREAS));
                         Map = new Map.Map(this, value);
+                        EnsureRegionMap(value);
 
                         Player.SetInWorldTile(x, y, z);
                         Player.ClearSteps();
@@ -165,6 +176,7 @@ namespace ClassicUO.Game
                     {
                         Client.Game.UO.FileManager.Maps.LoadMap(value, ClientFeatures.Flags.HasFlag(CharacterListFlags.CLF_UNLOCK_FELUCCA_AREAS));
                         Map = new Map.Map(this, value);
+                        EnsureRegionMap(value);
                     }
 
                     // force cursor update when switching map
@@ -194,7 +206,28 @@ namespace ClassicUO.Game
 
         public string ServerName { get; set; } = "_";
 
+        internal RegionMap RegionMap
+        {
+            get
+            {
+                RegionMap m = _regionMapProvider?.Current;
+                return m != null && m.Facet == MapIndex ? m : null;
+            }
+        }
 
+        private void EnsureRegionMap(int facet)
+        {
+            if (facet < 0)
+            {
+                return;
+            }
+
+            _regionMapProvider ??= new RegionMapProvider(
+                Client.Game.UO.FileManager,
+                System.IO.Path.Combine(ClassicUO.CUOEnviroment.ExecutablePath, "Data", "regioncache"));
+
+            _regionMapProvider.EnsureFor(facet);
+        }
 
         public void CreatePlayer(uint serial)
         {
@@ -254,6 +287,8 @@ namespace ClassicUO.Game
 
         public void Update()
         {
+            Managers.PluginTimersManager.Update(this, Time.Ticks);
+            Managers.PluginHighlights.Update(this, Time.Ticks);
             if (Player != null)
             {
                 if (SerialHelper.IsValid(ObjectToRemove))
@@ -801,6 +836,7 @@ namespace ClassicUO.Game
             Light.Personal = Light.RealPersonal = 0;
             ClientLockedFeatures.SetFlags(0);
             Party?.Clear();
+            PluginParty?.Clear();
             TargetManager.LastAttack = 0;
             MessageManager.PromptData = default;
             _effectManager.Clear();

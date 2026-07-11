@@ -34,7 +34,7 @@ namespace ClassicUO.Game.UI.Gumps
             GameActions.RequestMobileStatus(world, entity.Serial, true);
             LocalSerial = entity.Serial;
             CanCloseWithRightClick = true;
-            _name = entity.Name;
+            _name = World.AliasManager.Resolve(entity.Serial, entity.Name);
             _isDead = entity is Mobile mm && mm.IsDead;
 
             BuildGump();
@@ -312,6 +312,19 @@ namespace ClassicUO.Game.UI.Gumps
         private const int HPB_BAR_HEIGHT = 8;
         private const int HPB_BAR_SPACELEFT = (HPB_WIDTH - HPB_BAR_WIDTH) / 2;
 
+        // Thicker bars + row layout used when the "show stat values" option is on,
+        // so a centered current/max number fits vertically inside each bar.
+        private const int HPB_BAR_HEIGHT_TEXT = 11;
+        private const int HPB_BAR_PITCH = 9;        // default row spacing (27/36/45)
+        private const int HPB_BAR_PITCH_TEXT = 12;  // row spacing with text (21/33/45)
+        private const int HPB_ROW_TOP = 27;         // multiline first bar Y, no text
+        private const int HPB_ROW_TOP_TEXT = 21;    // multiline first bar Y, with text
+        private const int HPB_SINGLE_ROW = 21;      // singleline bar Y (both modes)
+
+        // Constant white with black outline. Stat numbers do not follow the name's
+        // notoriety hue nor the HP fill's poison/yellow recolor.
+        private const ushort HPB_TEXT_HUE = 0x0481; // white
+
 
         private static Color HPB_COLOR_DRAW_RED = Color.Red;
         private static Color HPB_COLOR_DRAW_BLUE = Color.DodgerBlue;
@@ -324,10 +337,23 @@ namespace ClassicUO.Game.UI.Gumps
         private static readonly Texture2D HPB_COLOR_POISON = SolidColorTextureCache.GetTexture(Color.LimeGreen);
         private static readonly Texture2D HPB_COLOR_BLACK = SolidColorTextureCache.GetTexture(Color.Black);
 
+        // A white source texture so a UO priority hue colorizes the outline ring.
+        private static readonly Texture2D HPB_COLOR_WHITE = SolidColorTextureCache.GetTexture(Color.White);
+
         private readonly LineCHB[] _bars = new LineCHB[3];
         private readonly LineCHB[] _border = new LineCHB[4];
 
         private LineCHB _hpLineRed, _manaLineRed, _stamLineRed, _outline;
+
+        // Centered current/max labels drawn over the bars (option-gated). Cached
+        // values avoid rebuilding the RenderedText every frame.
+        private Label _hpText, _manaText, _stamText;
+        // Name's notoriety hue captured at build time, so the stat numbers match
+        // the name's color but stay fixed if the name later recolors.
+        private ushort _nameHue = HPB_TEXT_HUE;
+        private int _textHits = -1, _textHitsMax = -1;
+        private int _textMana = -1, _textManaMax = -1;
+        private int _textStam = -1, _textStamMax = -1;
 
 
         private bool _oldWarMode, _normalHits, _poisoned, _yellowHits;
@@ -354,6 +380,8 @@ namespace ClassicUO.Game.UI.Gumps
 
             _background = null;
             _hpLineRed = _manaLineRed = _stamLineRed = null;
+            _hpText = _manaText = _stamText = null;
+            _textHits = _textHitsMax = _textMana = _textManaMax = _textStam = _textStamMax = -1;
 
             if (_textBox != null)
             {
@@ -375,7 +403,7 @@ namespace ClassicUO.Game.UI.Gumps
                 return;
             }
 
-            bool inparty = World.Party.Contains(LocalSerial);
+            bool inparty = (World.Party.Contains(LocalSerial) || World.PluginParty.Contains(LocalSerial));
 
 
             ushort textColor = 0x0386;
@@ -498,9 +526,10 @@ namespace ClassicUO.Game.UI.Gumps
                     _isDead = false;
                 }
 
-                if (!string.IsNullOrEmpty(entity.Name) && _name != entity.Name)
+                string _resolved = World.AliasManager.Resolve(entity.Serial, entity.Name);
+                if (!string.IsNullOrEmpty(entity.Name) && _name != _resolved)
                 {
-                    _name = entity.Name;
+                    _name = _resolved;
 
                     if (_textBox != null)
                     {
@@ -580,6 +609,11 @@ namespace ClassicUO.Game.UI.Gumps
                 }
 
                 ushort barColor = mobile != null ? Notoriety.GetHue(mobile.NotorietyFlag) : (ushort) 912;
+
+                if (mobile != null && mobile != World.Player && World.StatusbarColorManager.TryGetColor(mobile.Graphic, mobile.Hue, out ushort sbcColor))
+                {
+                    barColor = sbcColor;
+                }
 
                 if (_background.Hue != barColor)
                 {
@@ -685,6 +719,89 @@ namespace ClassicUO.Game.UI.Gumps
                     }
                 }
             }
+
+            UpdateStatLabels(entity);
+
+            ApplyPriorityOverlay();
+        }
+
+        // Refresh the current/max labels (option-gated; fields null when off).
+        // Values follow the same source as the bars: HP from the entity, mana/
+        // stamina from the mobile (self/party only). Labels track bar visibility.
+        private void UpdateStatLabels(Entity entity)
+        {
+            if (_hpText == null && _manaText == null && _stamText == null)
+            {
+                return;
+            }
+
+            int hits = entity?.Hits ?? 0;
+            int hitsMax = entity?.HitsMax ?? 0;
+
+            // Stat numbers keep the name's notoriety hue captured at build time;
+            // they do not follow the HP fill's poison/yellow recolor.
+            UpdateStatLabel(_hpText, _bars[0], hits, hitsMax, ref _textHits, ref _textHitsMax);
+
+            Mobile mobile = entity as Mobile;
+
+            UpdateStatLabel
+            (
+                _manaText,
+                _bars.Length > 1 && mobile != null ? _bars[1] : null,
+                mobile?.Mana ?? 0,
+                mobile?.ManaMax ?? 0,
+                ref _textMana,
+                ref _textManaMax
+            );
+
+            UpdateStatLabel
+            (
+                _stamText,
+                _bars.Length > 2 && mobile != null ? _bars[2] : null,
+                mobile?.Stamina ?? 0,
+                mobile?.StaminaMax ?? 0,
+                ref _textStam,
+                ref _textStamMax
+            );
+        }
+
+        // Feature A: tint the outline ring with the plugin's priority hue, if
+        // any, leaving the state _border[] colors (low-HP red / war / target)
+        // untouched. A white source texture + UO hue renders as the hue color;
+        // hue 0 restores the default black ring.
+        private void ApplyPriorityOverlay()
+        {
+            if (_outline != null)
+            {
+                ushort overlayHue = PluginStatusOverlays.Get(LocalSerial);
+
+                if (overlayHue != 0)
+                {
+                    if (_outline.Hue != overlayHue)
+                    {
+                        _outline.Hue = overlayHue;
+                        _outline.LineColor = HPB_COLOR_WHITE;
+                    }
+                }
+                else if (_outline.Hue != 0)
+                {
+                    _outline.Hue = 0;
+                    _outline.LineColor = HPB_COLOR_BLACK;
+                }
+            }
+
+            // Background tint override: runs after the HP-state logic sets
+            // _background.Hue, so a non-zero plugin hue wins. Hue 0 leaves the
+            // state-driven color untouched (the update recomputes it each frame).
+            if (_background != null)
+            {
+                ushort bgHue = PluginStatusOverlays.GetBackground(LocalSerial);
+
+                if (bgHue != 0 && _background.Hue != bgHue)
+                {
+                    _background.Hue = bgHue;
+                }
+            }
         }
 
         protected override void BuildGump()
@@ -693,8 +810,24 @@ namespace ClassicUO.Game.UI.Gumps
 
             Entity entity = World.Get(LocalSerial);
 
+            // Match the stat numbers to the name's notoriety hue (captured once).
+            _nameHue = Notoriety.GetHue
+            (
+                LocalSerial == World.Player
+                    ? World.Player.NotorietyFlag
+                    : (entity as Mobile)?.NotorietyFlag ?? NotorietyFlag.Gray
+            );
 
-            if (World.Party.Contains(LocalSerial))
+            bool showValues = ProfileManager.CurrentProfile.ShowStatValuesOnBars;
+            int barHeight = showValues ? HPB_BAR_HEIGHT_TEXT : HPB_BAR_HEIGHT;
+            int barPitch = showValues ? HPB_BAR_PITCH_TEXT : HPB_BAR_PITCH;
+            int row0 = showValues ? HPB_ROW_TOP_TEXT : HPB_ROW_TOP;
+            int row1 = row0 + barPitch;
+            int row2 = row0 + 2 * barPitch;
+            int outlineH = barPitch * 2 + barHeight + HPB_OUTLINESIZE * 2;
+
+
+            if (World.Party.Contains(LocalSerial) || World.PluginParty.Contains(LocalSerial))
             {
                 Height = HPB_HEIGHT_MULTILINE;
                 Width = HPB_WIDTH;
@@ -754,9 +887,9 @@ namespace ClassicUO.Game.UI.Gumps
                     _outline = new LineCHB
                     (
                         HPB_BAR_SPACELEFT - HPB_OUTLINESIZE,
-                        27 - HPB_OUTLINESIZE,
+                        row0 - HPB_OUTLINESIZE,
                         HPB_BAR_WIDTH + HPB_OUTLINESIZE * 2,
-                        HPB_BAR_HEIGHT * 3 + 2 + HPB_OUTLINESIZE * 2,
+                        outlineH,
                         HPB_COLOR_DRAW_BLACK.PackedValue
                     )
                 );
@@ -766,9 +899,9 @@ namespace ClassicUO.Game.UI.Gumps
                     _hpLineRed = new LineCHB
                     (
                         HPB_BAR_SPACELEFT,
-                        27,
+                        row0,
                         HPB_BAR_WIDTH,
-                        HPB_BAR_HEIGHT,
+                        barHeight,
                         HPB_COLOR_DRAW_RED.PackedValue
                     )
                 );
@@ -778,9 +911,9 @@ namespace ClassicUO.Game.UI.Gumps
                     _manaLineRed = new LineCHB
                     (
                         HPB_BAR_SPACELEFT,
-                        36,
+                        row1,
                         HPB_BAR_WIDTH,
-                        HPB_BAR_HEIGHT,
+                        barHeight,
                         HPB_COLOR_DRAW_RED.PackedValue
                     )
                 );
@@ -790,9 +923,9 @@ namespace ClassicUO.Game.UI.Gumps
                     _stamLineRed = new LineCHB
                     (
                         HPB_BAR_SPACELEFT,
-                        45,
+                        row2,
                         HPB_BAR_WIDTH,
-                        HPB_BAR_HEIGHT,
+                        barHeight,
                         HPB_COLOR_DRAW_RED.PackedValue
                     )
                 );
@@ -802,9 +935,9 @@ namespace ClassicUO.Game.UI.Gumps
                     _bars[0] = new LineCHB
                     (
                         HPB_BAR_SPACELEFT,
-                        27,
+                        row0,
                         HPB_BAR_WIDTH,
-                        HPB_BAR_HEIGHT,
+                        barHeight,
                         HPB_COLOR_DRAW_BLUE.PackedValue
                     ) { LineWidth = 0 }
                 );
@@ -814,9 +947,9 @@ namespace ClassicUO.Game.UI.Gumps
                     _bars[1] = new LineCHB
                     (
                         HPB_BAR_SPACELEFT,
-                        36,
+                        row1,
                         HPB_BAR_WIDTH,
-                        HPB_BAR_HEIGHT,
+                        barHeight,
                         HPB_COLOR_DRAW_BLUE.PackedValue
                     ) { LineWidth = 0 }
                 );
@@ -826,12 +959,19 @@ namespace ClassicUO.Game.UI.Gumps
                     _bars[2] = new LineCHB
                     (
                         HPB_BAR_SPACELEFT,
-                        45,
+                        row2,
                         HPB_BAR_WIDTH,
-                        HPB_BAR_HEIGHT,
+                        barHeight,
                         HPB_COLOR_DRAW_BLUE.PackedValue
                     ) { LineWidth = 0 }
                 );
+
+                if (showValues)
+                {
+                    Add(_hpText = CreateStatLabel());
+                    Add(_manaText = CreateStatLabel());
+                    Add(_stamText = CreateStatLabel());
+                }
 
                 Add
                 (
@@ -917,9 +1057,9 @@ namespace ClassicUO.Game.UI.Gumps
                         _outline = new LineCHB
                         (
                             HPB_BAR_SPACELEFT - HPB_OUTLINESIZE,
-                            27 - HPB_OUTLINESIZE,
+                            row0 - HPB_OUTLINESIZE,
                             HPB_BAR_WIDTH + HPB_OUTLINESIZE * 2,
-                            HPB_BAR_HEIGHT * 3 + 2 + HPB_OUTLINESIZE * 2,
+                            outlineH,
                             HPB_COLOR_DRAW_BLACK.PackedValue
                         )
                     );
@@ -929,33 +1069,33 @@ namespace ClassicUO.Game.UI.Gumps
                         _hpLineRed = new LineCHB
                         (
                             HPB_BAR_SPACELEFT,
-                            27,
+                            row0,
                             HPB_BAR_WIDTH,
-                            HPB_BAR_HEIGHT,
+                            barHeight,
                             HPB_COLOR_DRAW_RED.PackedValue
                         )
                     );
 
                     Add
                     (
-                        new LineCHB
+                        _manaLineRed = new LineCHB
                         (
                             HPB_BAR_SPACELEFT,
-                            36,
+                            row1,
                             HPB_BAR_WIDTH,
-                            HPB_BAR_HEIGHT,
+                            barHeight,
                             HPB_COLOR_DRAW_RED.PackedValue
                         )
                     );
 
                     Add
                     (
-                        new LineCHB
+                        _stamLineRed = new LineCHB
                         (
                             HPB_BAR_SPACELEFT,
-                            45,
+                            row2,
                             HPB_BAR_WIDTH,
-                            HPB_BAR_HEIGHT,
+                            barHeight,
                             HPB_COLOR_DRAW_RED.PackedValue
                         )
                     );
@@ -965,9 +1105,9 @@ namespace ClassicUO.Game.UI.Gumps
                         _bars[0] = new LineCHB
                         (
                             HPB_BAR_SPACELEFT,
-                            27,
+                            row0,
                             HPB_BAR_WIDTH,
-                            HPB_BAR_HEIGHT,
+                            barHeight,
                             HPB_COLOR_DRAW_BLUE.PackedValue
                         ) { LineWidth = 0 }
                     );
@@ -977,9 +1117,9 @@ namespace ClassicUO.Game.UI.Gumps
                         _bars[1] = new LineCHB
                         (
                             HPB_BAR_SPACELEFT,
-                            36,
+                            row1,
                             HPB_BAR_WIDTH,
-                            HPB_BAR_HEIGHT,
+                            barHeight,
                             HPB_COLOR_DRAW_BLUE.PackedValue
                         ) { LineWidth = 0 }
                     );
@@ -989,12 +1129,19 @@ namespace ClassicUO.Game.UI.Gumps
                         _bars[2] = new LineCHB
                         (
                             HPB_BAR_SPACELEFT,
-                            45,
+                            row2,
                             HPB_BAR_WIDTH,
-                            HPB_BAR_HEIGHT,
+                            barHeight,
                             HPB_COLOR_DRAW_BLUE.PackedValue
                         ) { LineWidth = 0 }
                     );
+
+                    if (showValues)
+                    {
+                        Add(_hpText = CreateStatLabel());
+                        Add(_manaText = CreateStatLabel());
+                        Add(_stamText = CreateStatLabel());
+                    }
 
                     Add
                     (
@@ -1065,9 +1212,9 @@ namespace ClassicUO.Game.UI.Gumps
                         _outline = new LineCHB
                         (
                             HPB_BAR_SPACELEFT - HPB_OUTLINESIZE,
-                            21 - HPB_OUTLINESIZE,
+                            HPB_SINGLE_ROW - HPB_OUTLINESIZE,
                             HPB_BAR_WIDTH + HPB_OUTLINESIZE * 2,
-                            HPB_BAR_HEIGHT + HPB_OUTLINESIZE * 2,
+                            barHeight + HPB_OUTLINESIZE * 2,
                             HPB_COLOR_DRAW_BLACK.PackedValue
                         )
                     );
@@ -1077,9 +1224,9 @@ namespace ClassicUO.Game.UI.Gumps
                         _hpLineRed = new LineCHB
                         (
                             HPB_BAR_SPACELEFT,
-                            21,
+                            HPB_SINGLE_ROW,
                             HPB_BAR_WIDTH,
-                            HPB_BAR_HEIGHT,
+                            barHeight,
                             HPB_COLOR_DRAW_RED.PackedValue
                         )
                     );
@@ -1089,12 +1236,17 @@ namespace ClassicUO.Game.UI.Gumps
                         _bars[0] = new LineCHB
                         (
                             HPB_BAR_SPACELEFT,
-                            21,
+                            HPB_SINGLE_ROW,
                             HPB_BAR_WIDTH,
-                            HPB_BAR_HEIGHT,
+                            barHeight,
                             HPB_COLOR_DRAW_BLUE.PackedValue
                         ) { LineWidth = 0 }
                     );
+
+                    if (showValues)
+                    {
+                        Add(_hpText = CreateStatLabel());
+                    }
 
                     Add
                     (
@@ -1198,6 +1350,42 @@ namespace ClassicUO.Game.UI.Gumps
             return true;
         }
 
+        private Label CreateStatLabel()
+        {
+            return new Label(string.Empty, true, _nameHue, font: 1, style: FontStyle.BlackBorder)
+            {
+                AcceptMouseInput = false,
+                CanMove = true
+            };
+        }
+
+        // Refresh a centered current/max label over its bar. The RenderedText is
+        // rebuilt only when a value changed; the label follows the bar's
+        // visibility (hidden out of range / dead).
+        private static void UpdateStatLabel(Label label, LineCHB bar, int cur, int max, ref int cachedCur, ref int cachedMax)
+        {
+            if (label == null)
+            {
+                return;
+            }
+
+            label.IsVisible = bar != null && bar.IsVisible;
+
+            if (!label.IsVisible)
+            {
+                return;
+            }
+
+            if (cur != cachedCur || max != cachedMax)
+            {
+                cachedCur = cur;
+                cachedMax = max;
+                label.Text = $"{cur}/{max}";
+                label.X = HPB_BAR_SPACELEFT + (HPB_BAR_WIDTH - label.Width) / 2;
+                label.Y = bar.Y + (bar.Height - label.Height) / 2;
+            }
+        }
+
         private class LineCHB : Line
         {
             public LineCHB(int x, int y, int w, int h, uint color) : base
@@ -1219,10 +1407,13 @@ namespace ClassicUO.Game.UI.Gumps
             public int LineWidth { get; set; }
             public Texture2D LineColor { get; set; }
 
+            // Plugin priority-overlay hue applied to this line only. 0 = none.
+            public ushort Hue { get; set; }
+
             public override bool AddToRenderLists(RenderLists renderLists, int x, int y, ref float layerDepthRef)
             {
                 float layerDepth = layerDepthRef;
-                Vector3 hueVector = ShaderHueTranslator.GetHueVector(0, false, Alpha);
+                Vector3 hueVector = ShaderHueTranslator.GetHueVector(Hue, false, Alpha);
                 renderLists.AddGumpNoAtlas(
                     batcher =>
                     {
@@ -1319,6 +1510,13 @@ namespace ClassicUO.Game.UI.Gumps
             Clear();
             Children.Clear();
 
+            // The bars are recreated below at Percent 0. Update() only writes a bar when the
+            // computed value differs from its cached _old* — so without resetting these, a
+            // rebuild that keeps the same underlying hits/mana/stam (e.g. single->party layout on
+            // a plugin-party join) leaves the fresh bars stuck at 0 until the value next changes
+            // (or another rebuild). Reset so the first Update after any rebuild repaints them.
+            _oldHits = _oldMana = _oldStam = -1;
+
             _background = _hpLineRed = _manaLineRed = _stamLineRed = null;
             _buttonHeal1 = _buttonHeal2 = null;
 
@@ -1338,7 +1536,7 @@ namespace ClassicUO.Game.UI.Gumps
 
             Entity entity = World.Get(LocalSerial);
 
-            if (World.Party.Contains(LocalSerial))
+            if (World.Party.Contains(LocalSerial) || World.PluginParty.Contains(LocalSerial))
             {
                 Add
                 (
@@ -1518,6 +1716,11 @@ namespace ClassicUO.Game.UI.Gumps
 
                     ushort barColor = entity == null || entity == World.Player || mobile == null || mobile.NotorietyFlag == NotorietyFlag.Criminal || mobile.NotorietyFlag == NotorietyFlag.Gray ? (ushort) 0 : Notoriety.GetHue(mobile.NotorietyFlag);
 
+                    if (mobile != null && mobile != World.Player && World.StatusbarColorManager.TryGetColor(mobile.Graphic, mobile.Hue, out ushort sbcColorBuild))
+                    {
+                        barColor = sbcColorBuild;
+                    }
+
                     Add(_background = new GumpPic(0, 0, 0x0804, barColor) { ContainsByBounds = true });
                     Add(_hpLineRed = new GumpPic(34, 38, LINE_RED, hitsColor));
 
@@ -1580,7 +1783,7 @@ namespace ClassicUO.Game.UI.Gumps
                 return;
             }
 
-            bool inparty = World.Party.Contains(LocalSerial);
+            bool inparty = (World.Party.Contains(LocalSerial) || World.PluginParty.Contains(LocalSerial));
 
 
             ushort textColor = 0x0386;
@@ -1706,9 +1909,10 @@ namespace ClassicUO.Game.UI.Gumps
                     _isDead = false;
                 }
 
-                if (!string.IsNullOrEmpty(entity.Name) && !(inparty && LocalSerial == World.Player.Serial) && _name != entity.Name)
+                string _resolvedB = World.AliasManager.Resolve(entity.Serial, entity.Name);
+                if (!string.IsNullOrEmpty(entity.Name) && !(inparty && LocalSerial == World.Player.Serial) && _name != _resolvedB)
                 {
-                    _name = entity.Name;
+                    _name = _resolvedB;
 
                     if (_textBox != null)
                     {
@@ -1773,6 +1977,11 @@ namespace ClassicUO.Game.UI.Gumps
                 }
 
                 ushort barColor = entity == World.Player || mobile == null || mobile.NotorietyFlag == NotorietyFlag.Criminal || mobile.NotorietyFlag == NotorietyFlag.Gray ? (ushort) 0 : Notoriety.GetHue(mobile.NotorietyFlag);
+
+                if (mobile != null && mobile != World.Player && World.StatusbarColorManager.TryGetColor(mobile.Graphic, mobile.Hue, out ushort sbcColorUpd))
+                {
+                    barColor = sbcColorUpd;
+                }
 
                 if (_background.Hue != barColor)
                 {
@@ -1902,6 +2111,27 @@ namespace ClassicUO.Game.UI.Gumps
         {
             Heal1,
             Heal2
+        }
+    }
+
+    /// <summary>
+    /// Single decision point for custom-vs-classic health bars. Every spawn
+    /// site (including party members) should route through here so the
+    /// <see cref="Configuration.Profile.CustomBarsToggled"/> choice is honored
+    /// consistently. Feature B of the Plugin v2 status-bars work.
+    /// </summary>
+    internal static class HealthBarFactory
+    {
+        public static bool ShouldUseCustomBar(Configuration.Profile profile)
+        {
+            return profile != null && profile.CustomBarsToggled;
+        }
+
+        public static BaseHealthBarGump Create(World world, GameObjects.Entity entity)
+        {
+            return ShouldUseCustomBar(Configuration.ProfileManager.CurrentProfile)
+                ? new HealthBarGumpCustom(world, entity)
+                : new HealthBarGump(world, entity);
         }
     }
 }

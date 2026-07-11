@@ -114,6 +114,8 @@ namespace ClassicUO.Game.Scenes
             _healthLinesManager = new HealthLinesManager(_world);
 
             _world.CommandManager.Initialize();
+            _world.AliasManager.Initialize();
+            _world.StatusbarColorManager.Initialize();
 
             WorldViewportGump viewport = new WorldViewportGump(_world, this);
             UIManager.Add(viewport, false);
@@ -147,6 +149,11 @@ namespace ClassicUO.Game.Scenes
                 h = Math.Max(Client.Game.ScaleWithDpi(480), h);
 
                 Client.Game.SetWindowSize(w, h);
+            }
+
+            if (UIManager.GetGump<ScreenTimersGump>() == null)
+            {
+                UIManager.Add(new ScreenTimersGump(_world));
             }
 
             Plugin.OnConnected();
@@ -786,7 +793,7 @@ namespace ClassicUO.Game.Scenes
                     }
                     else if (distance > 3)
                     {
-                        _world.Player.Pathfinder.WalkTo(follow.X, follow.Y, follow.Z, 1);
+                        _world.Player.Pathfinder.WalkTo(follow.X, follow.Y, follow.Z, 1, false);
                     }
                 }
                 else

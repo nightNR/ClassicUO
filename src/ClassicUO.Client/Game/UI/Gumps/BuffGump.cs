@@ -9,10 +9,38 @@ using ClassicUO.Renderer;
 using ClassicUO.Resources;
 using Microsoft.Xna.Framework;
 using System;
+using System.Linq;
 using System.Xml;
 
 namespace ClassicUO.Game.UI.Gumps
 {
+    /// <summary>Which buff kinds a <see cref="BuffGump"/> instance displays.</summary>
+    internal enum BuffGumpMode
+    {
+        All = 0,    // joined: every icon
+        Buffs = 1,  // buffs + neutral (None)
+        Debuffs = 2 // debuffs only
+    }
+
+    /// <summary>Rendering input for one buff icon, from either a server BuffIcon or a plugin buff.</summary>
+    internal readonly struct BuffEntryInput
+    {
+        public readonly ushort Graphic;
+        public readonly long Timer;          // 0xFFFF_FFFF == infinite
+        public readonly string Text;
+        public readonly Data.BuffDisplayKind Kind;
+        public readonly string TooltipId;    // "ID: <type>" or "ID: <pluginId>"
+
+        public BuffEntryInput(ushort graphic, long timer, string text, Data.BuffDisplayKind kind, string tooltipId)
+        {
+            Graphic = graphic;
+            Timer = timer;
+            Text = text ?? string.Empty;
+            Kind = kind;
+            TooltipId = tooltipId ?? string.Empty;
+        }
+    }
+
     internal class BuffGump : Gump
     {
         private GumpPic _background;
@@ -21,6 +49,12 @@ namespace ClassicUO.Game.UI.Gumps
         private ushort _graphic;
         private DataBox _box;
         private int _shiftX, _shiftY;
+        private BuffGumpMode _mode = BuffGumpMode.All;
+
+        // Vertical gap between the Buffs and Debuffs windows when first split.
+        private const int SplitFallbackOffsetY = 100;
+
+        public BuffGumpMode Mode => _mode;
 
         public BuffGump(World world) : base(world, 0, 0)
         {
@@ -29,8 +63,17 @@ namespace ClassicUO.Game.UI.Gumps
             AcceptMouseInput = true;
         }
 
-        public BuffGump(World world, int x, int y) : this(world)
+        public BuffGump(World world, int x, int y) : this(world, x, y, BuffGumpMode.All)
         {
+        }
+
+        public BuffGump(World world, int x, int y, BuffGumpMode mode) : this(world)
+        {
+            _mode = mode;
+            // Distinct serial per mode so the two split windows save/restore
+            // independently; All stays 0 to preserve existing saved layouts.
+            LocalSerial = (uint)mode;
+
             X = x;
             Y = y;
 
@@ -43,6 +86,85 @@ namespace ClassicUO.Game.UI.Gumps
         }
 
         public override GumpType GumpType => GumpType.Buff;
+
+        public override void Dispose()
+        {
+            base.Dispose();
+
+            // Drop the shared refresh hook only when the last buff window closes.
+            if (!Managers.UIManager.Gumps.OfType<BuffGump>().Any(g => g != this && !g.IsDisposed))
+            {
+                Managers.PluginTimersManager.GumpRefresh = null;
+            }
+        }
+
+        /// <summary>Rebuilds every open buff window; used by the shared refresh hook.</summary>
+        public static void RequestUpdateContentsAll()
+        {
+            foreach (BuffGump g in Managers.UIManager.Gumps.OfType<BuffGump>())
+            {
+                g.RequestUpdateContents();
+            }
+        }
+
+        /// <summary>
+        /// Status-window button action: open the joined gump when none exist,
+        /// otherwise toggle between joined (single) and split (Buffs + Debuffs).
+        /// </summary>
+        public static void ToggleFromStatusButton(World world)
+        {
+            var list = Managers.UIManager.Gumps.OfType<BuffGump>().Where(g => !g.IsDisposed).ToList();
+
+            if (list.Count == 0)
+            {
+                Managers.UIManager.Add(new BuffGump(world, 100, 100, BuffGumpMode.All));
+                return;
+            }
+
+            BuffGump joined = list.FirstOrDefault(g => g.Mode == BuffGumpMode.All);
+
+            if (joined != null)
+            {
+                // Joined -> split. Buffs inherits the joined position; Debuffs
+                // offsets below it.
+                int x = joined.X;
+                int y = joined.Y;
+                joined.Dispose();
+
+                var buffs = new BuffGump(world, x, y, BuffGumpMode.Buffs);
+                Managers.UIManager.Add(buffs);
+
+                int offset = buffs.Height > 0 ? buffs.Height + 5 : SplitFallbackOffsetY;
+                Managers.UIManager.Add(new BuffGump(world, x, y + offset, BuffGumpMode.Debuffs));
+            }
+            else
+            {
+                // Split -> join. New joined window inherits the Buffs position.
+                BuffGump buffs = list.FirstOrDefault(g => g.Mode == BuffGumpMode.Buffs) ?? list[0];
+                int x = buffs.X;
+                int y = buffs.Y;
+
+                foreach (BuffGump g in list)
+                {
+                    g.Dispose();
+                }
+
+                Managers.UIManager.Add(new BuffGump(world, x, y, BuffGumpMode.All));
+            }
+        }
+
+        private bool Accepts(Data.BuffDisplayKind kind)
+        {
+            switch (_mode)
+            {
+                case BuffGumpMode.Buffs:
+                    return kind != Data.BuffDisplayKind.Debuff; // buff + neutral
+                case BuffGumpMode.Debuffs:
+                    return kind == Data.BuffDisplayKind.Debuff;
+                default:
+                    return true;
+            }
+        }
 
         private void BuildGump()
         {
@@ -102,8 +224,38 @@ namespace ClassicUO.Game.UI.Gumps
             {
                 foreach (var k in World.Player.BuffIcons)
                 {
-                    _box.Add(new BuffControlEntry(World.Player.BuffIcons[k.Key]));
+                    BuffIcon icon = World.Player.BuffIcons[k.Key];
+
+                    if (!Accepts(icon.Kind))
+                    {
+                        continue;
+                    }
+
+                    _box.Add(new BuffControlEntry(new BuffEntryInput(
+                        icon.Graphic, icon.Timer, icon.Text, icon.Kind, $"ID: {icon.Type}")));
                 }
+            }
+
+            foreach (var kv in Managers.PluginBuffs.Entries)
+            {
+                var e = kv.Value;
+
+                if (!Accepts(e.Kind))
+                {
+                    continue;
+                }
+
+                long timer = e.IsInfinite ? 0xFFFF_FFFF : e.ExpiryTicks;
+
+                // Accept a BuffIconType id (e.g. 1078 = Surge) and resolve it to a
+                // gump graphic like the server path does; fall back to treating the
+                // value as a raw gump graphic for custom icons outside the table.
+                ushort graphic = Data.BuffTable.TryResolveIcon(e.Graphic, out ushort mapped)
+                    ? mapped
+                    : e.Graphic;
+
+                _box.Add(new BuffControlEntry(new BuffEntryInput(
+                    graphic, timer, e.Text, e.Kind, $"ID: {e.Id}")));
             }
 
             _background.Graphic = _graphic;
@@ -111,6 +263,10 @@ namespace ClassicUO.Game.UI.Gumps
             _background.Y = 0;
 
             UpdateElements();
+
+            // Wire the shared refresh hook on every build so both construction and
+            // restore paths keep plugin-buff expiry updates flowing to all windows.
+            Managers.PluginTimersManager.GumpRefresh = RequestUpdateContentsAll;
         }
 
         public override void Save(XmlTextWriter writer)
@@ -124,6 +280,7 @@ namespace ClassicUO.Game.UI.Gumps
 
             writer.WriteAttributeString("graphic", _graphic.ToString());
             writer.WriteAttributeString("direction", ((int)_direction).ToString());
+            writer.WriteAttributeString("mode", ((int)_mode).ToString());
         }
 
         public override void Restore(XmlElement xml)
@@ -132,6 +289,13 @@ namespace ClassicUO.Game.UI.Gumps
 
             _graphic = ushort.Parse(xml.GetAttribute("graphic"));
             _direction = (GumpDirection)byte.Parse(xml.GetAttribute("direction"));
+
+            string modeAttr = xml.GetAttribute("mode");
+            _mode = string.IsNullOrEmpty(modeAttr)
+                ? BuffGumpMode.All
+                : (BuffGumpMode)int.Parse(modeAttr);
+            LocalSerial = (uint)_mode;
+
             BuildGump();
         }
         protected override void UpdateContents()
@@ -287,15 +451,22 @@ namespace ClassicUO.Game.UI.Gumps
             private bool _decreaseAlpha;
             private readonly RenderedText _gText;
             private float _updateTooltipTime;
+            private readonly long _timer;
+            private readonly string _text;
+            private readonly string _tooltipId;
+            private readonly Data.BuffDisplayKind _kind;
 
-            public BuffControlEntry(BuffIcon icon) : base(0, 0, icon.Graphic, 0)
+            public BuffControlEntry(BuffEntryInput input) : base(0, 0, input.Graphic, 0)
             {
                 if (IsDisposed)
                 {
                     return;
                 }
 
-                Icon = icon;
+                _timer = input.Timer;
+                _text = input.Text;
+                _tooltipId = input.TooltipId;
+                _kind = input.Kind;
                 _alpha = 0xFF;
                 _decreaseAlpha = true;
 
@@ -313,30 +484,49 @@ namespace ClassicUO.Game.UI.Gumps
                 WantUpdateSize = false;
                 CanMove = true;
 
-                SetTooltip(icon.Text + $"\nID: {icon.Type}");
+                SetTooltip(BuildTooltip(null));
             }
 
-            public BuffIcon Icon { get; }
+            /// <summary>
+            /// Composes the tooltip: base text, optional remaining-time line, and
+            /// the buff ID line when <see cref="Profile.BuffBarShowId"/> is on.
+            /// </summary>
+            private string BuildTooltip(string timeLine)
+            {
+                string body = string.IsNullOrEmpty(timeLine) ? _text : timeLine;
+
+                bool showId = ProfileManager.CurrentProfile == null
+                    || ProfileManager.CurrentProfile.BuffBarShowId;
+
+                if (showId && !string.IsNullOrEmpty(_tooltipId))
+                {
+                    return body + "\n" + _tooltipId;
+                }
+
+                return body;
+            }
 
             public override void Update()
             {
                 base.Update();
 
-                if (!IsDisposed && Icon != null)
+                if (!IsDisposed)
                 {
-                    int delta = (int)(Icon.Timer - Time.Ticks);
+                    int delta = (int)(_timer - Time.Ticks);
 
                     if (_updateTooltipTime < Time.Ticks && delta > 0)
                     {
                         TimeSpan span = TimeSpan.FromMilliseconds(delta);
 
                         SetTooltip(
-                            string.Format(
-                                ResGumps.TimeLeft,
-                                Icon.Text + $"\nID: {Icon.Type}",
-                                span.Hours,
-                                span.Minutes,
-                                span.Seconds
+                            BuildTooltip(
+                                string.Format(
+                                    ResGumps.TimeLeft,
+                                    _text,
+                                    span.Hours,
+                                    span.Minutes,
+                                    span.Seconds
+                                )
                             )
                         );
 
@@ -355,7 +545,7 @@ namespace ClassicUO.Game.UI.Gumps
                         }
                     }
 
-                    if (Icon.Timer != 0xFFFF_FFFF && delta < 10000)
+                    if (_timer != 0xFFFF_FFFF && delta < 10000)
                     {
                         if (delta <= 0)
                         {
@@ -396,7 +586,14 @@ namespace ClassicUO.Game.UI.Gumps
             public override bool AddToRenderLists(RenderLists renderLists, int x, int y, ref float layerDepthRef)
             {
                 float layerDepth = layerDepthRef;
-                Vector3 hueVector = ShaderHueTranslator.GetHueVector(0, false, _alpha / 255f, true);
+
+                ushort hue = _kind switch
+                {
+                    Data.BuffDisplayKind.Debuff => 0x0021,   // red
+                    Data.BuffDisplayKind.Buff => 0x0044,     // green
+                    _ => (ushort)0,
+                };
+                Vector3 hueVector = ShaderHueTranslator.GetHueVector(hue, false, _alpha / 255f, true);
 
                 ref readonly var gumpInfo = ref Client.Game.UO.Gumps.GetGump(Graphic);
                 var texture = gumpInfo.Texture;

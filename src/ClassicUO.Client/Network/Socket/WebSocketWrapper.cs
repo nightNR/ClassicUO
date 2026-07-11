@@ -136,8 +136,8 @@ sealed class WebSocketWrapper : SocketWrapper
 
         Log.Trace($"Connected WebSocket: {uri}");
 
-        // Kicks off the async receiving loop 
-        StartReceiveAsync().ConfigureAwait(false);
+        // Kicks off the async receiving loop (intentional fire-and-forget)
+        _ = StartReceiveAsync();
     }
 
     private async Task StartReceiveAsync()

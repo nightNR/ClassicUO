@@ -203,6 +203,44 @@ namespace ClassicUO.Game.Data
 
         public static ushort[] Table => _table;
 
+        // Buff-icon id ranges as sent on the wire (see PacketHandlers buff packet).
+        private const ushort BUFF_ICON_START = 0x03E9;
+        private const ushort BUFF_ICON_START_NEW = 0x0466;
+
+        /// <summary>
+        /// Resolves a wire buff-icon id (a <see cref="BuffIconType"/> value such as
+        /// 1078 = Surge) into the gump graphic used to draw it, mirroring the server
+        /// buff packet path. Returns false for ids outside the table so callers can
+        /// treat the input as a raw gump graphic instead.
+        /// </summary>
+        public static bool TryResolveIcon(ushort ic, out ushort graphic)
+        {
+            graphic = 0;
+
+            if (_table == null || ic < BUFF_ICON_START)
+            {
+                return false;
+            }
+
+            int iconID = ic >= BUFF_ICON_START_NEW
+                ? ic - (BUFF_ICON_START_NEW - 125)
+                : ic - BUFF_ICON_START;
+
+            if (iconID < 0 || iconID >= _table.Length)
+            {
+                return false;
+            }
+
+            ushort g = _table[iconID];
+            if (g == 0)
+            {
+                return false;
+            }
+
+            graphic = g;
+            return true;
+        }
+
         public static void Load()
         {
             string path = Path.Combine(CUOEnviroment.ExecutablePath, "Data", "Client");

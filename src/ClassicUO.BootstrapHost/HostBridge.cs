@@ -3,6 +3,7 @@
 using System.Collections.Concurrent;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
+using ClassicUO.PluginApi;
 
 namespace ClassicUO.BootstrapHost;
 
@@ -40,12 +41,24 @@ internal sealed unsafe class HostBridge
             p.AttachHost();
     }
 
+    /// <summary>Test-only: inject a ClientBindings table without going through cuo's Initialize.</summary>
+    internal void InstallClientBindingsForTest(ClientBindings bindings) => _clientBindings = bindings;
+
+    /// <summary>Test-only: install a ClientBindings table and mark the current
+    /// thread as the game thread, so action impls dispatch synchronously.</summary>
+    internal void SetClientBindingsForTest(ClientBindings bindings)
+    {
+        _gameThread = Thread.CurrentThread;
+        _clientBindings = bindings;
+    }
+
     /// <summary>Test-only: drive lifecycle events without going through native callbacks.</summary>
     internal void TestRaiseConnected()    { foreach (var p in _loader.Plugins) p.RaiseConnected(); }
     internal void TestRaiseDisconnected() { foreach (var p in _loader.Plugins) p.RaiseDisconnected(); }
     internal void TestRaiseTick()         { DrainGameThreadQueue(); foreach (var p in _loader.Plugins) p.RaiseTick(); }
     internal void TestRaiseClosing()      { foreach (var p in _loader.Plugins) p.RaiseClosing(); }
     internal void TestRaisePlayerPositionChanged(int x, int y, int z) { foreach (var p in _loader.Plugins) p.RaisePlayerPositionChanged(x, y, z); }
+    internal void TestRaiseWalkProgress(int state) { foreach (var p in _loader.Plugins) p.RaiseWalkProgress((WalkState)state); }
     internal void TestRaiseMouse(int button, int wheel) { foreach (var p in _loader.Plugins) p.RaiseMouse(button, wheel); }
     internal bool TestRaiseHotkey(int key, int mod, bool pressed)
     {
@@ -144,6 +157,9 @@ internal sealed unsafe class HostBridge
         UpdatePlayerPosFn = (nint)(delegate* unmanaged[Cdecl]<int, int, int, void>)     &OnUpdatePlayerPos,
         PacketInFn        = (nint)(delegate* unmanaged[Cdecl]<nint, int*, byte>)        &OnPacketIn,
         PacketOutFn       = (nint)(delegate* unmanaged[Cdecl]<nint, int*, byte>)        &OnPacketOut,
+        WalkProgressFn    = (nint)(delegate* unmanaged[Cdecl]<int, void>)               &OnWalkProgress,
+        BuffEventFn       = (nint)(delegate* unmanaged[Cdecl]<int, int, void>)         &OnBuffEvent,
+        TimerEventFn      = (nint)(delegate* unmanaged[Cdecl]<int, int, void>)         &OnTimerEvent,
     };
 
     // ─── cuo → host callbacks ────────────────────────────────────────────────
@@ -195,6 +211,18 @@ internal sealed unsafe class HostBridge
     [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
     private static void OnUpdatePlayerPos(int x, int y, int z)
         => _instance?.RaiseEachPlugin(p => p.RaisePlayerPositionChanged(x, y, z));
+
+    [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
+    private static void OnWalkProgress(int state)
+        => _instance?.RaiseEachPlugin(p => p.RaiseWalkProgress((WalkState)state));
+
+    [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
+    private static void OnBuffEvent(int id, int reason)
+        => _instance?.RaiseEachPlugin(p => p.RaiseBuffEvent(id, reason));
+
+    [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
+    private static void OnTimerEvent(int id, int reason)
+        => _instance?.RaiseEachPlugin(p => p.RaiseTimerEvent(id, reason));
 
     [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
     private static byte OnPacketIn(nint data, int* lengthRef)
@@ -309,6 +337,9 @@ internal struct HostBindings
     public nint UpdatePlayerPosFn;
     public nint PacketInFn;
     public nint PacketOutFn;
+    public nint WalkProgressFn;
+    public nint BuffEventFn;   // void(int id, int reason)
+    public nint TimerEventFn;  // void(int id, int reason)
 }
 
 [StructLayout(LayoutKind.Sequential)]
@@ -323,4 +354,35 @@ internal struct ClientBindings
     public nint RequestMoveFn;         // bool(int dir, bool run)
     public nint GetPlayerPositionFn;   // bool(out int x, out int y, out int z)
     public nint ReflectionCmdFn;       // legacy reflection commands; unused by v2
+    public nint WalkToFn;              // bool(int x, int y, int z, int distance, byte run)
+    public nint StopWalkFn;            // void()
+    public nint OpenStatusBarFn;       // void(uint serial, int x, int y, byte moveIfExists, int groupId)
+    public nint CloseStatusBarFn;      // void(uint serial)
+    public nint SetOverlayFn;          // void(uint serial, ushort hue, ushort backgroundHue)
+    public nint AddBuffFn;             // void(int id, ushort graphic, int durationMs, int kind, nint textUtf8)
+    public nint RemoveBuffFn;          // void(int id)
+    public nint ClearBuffsFn;          // void()
+    public nint DefineTimerGroupFn;    // void(int groupId, int x, int y, int direction, int gap)
+    public nint AddTimerFn;            // void(int id, int shape, int durationMs, ushort hue, int groupId, int x, int y, int width, int height, nint labelUtf8, byte showTime, int anchorKind, uint anchorSerial, ushort ax, ushort ay, sbyte az, short offX, short offY, int graceMs)
+    public nint RemoveTimerFn;         // void(int id)
+    public nint RemoveTimerGroupFn;    // void(int groupId)
+    public nint ClearTimersFn;         // void()
+    // Unused by v2 (no PluginParty/CheckLos support here) but must exist as
+    // padding: the native ClientBindings struct in PluginHost.cs places these
+    // between ClearTimersFn and the highlight fields below, and this struct's
+    // layout must stay a byte-exact prefix of the native one for every field
+    // it declares. Never insert new fields before this block — only append
+    // after ClearCharactersFn.
+    public nint SetPluginPartyMemberFn;
+    public nint RemovePluginPartyMemberFn;
+    public nint ClearPluginPartyFn;
+    public nint CheckLosFn;
+    public nint CheckLosBatchFn;
+    public nint AddAreaFn;             // void(nint idUtf8, int durationMs, int snapKind, uint anchorSerial, int x, int y, ushort hue, int rangeX, int rangeY, int objectTypes)
+    public nint RemoveAreaFn;          // void(nint idUtf8)
+    public nint ClearAreasFn;          // void()
+    public nint GetAreaTimerFn;        // int(nint idUtf8)
+    public nint AddCharacterFn;        // void(uint serial, ushort hue, byte priorityHighlight)
+    public nint RemoveCharacterFn;     // void(uint serial, byte priorityHighlight)
+    public nint ClearCharactersFn;     // void(byte priorityHighlight)
 }

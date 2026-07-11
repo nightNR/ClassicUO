@@ -51,11 +51,6 @@ namespace ClassicUO.Renderer
 
         public Vector2 MeasureString(ReadOnlySpan<char> text)
         {
-            if (text == null)
-            {
-                throw new ArgumentNullException("text");
-            }
-
             if (text.Length == 0)
             {
                 return Vector2.Zero;

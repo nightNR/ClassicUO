@@ -2083,7 +2083,7 @@ namespace ClassicUO.Network
             ushort y = p.ReadUInt16BE();
             ushort z = p.ReadUInt16BE();
 
-            world.Player.Pathfinder.WalkTo(x, y, z, 0);
+            world.Player.Pathfinder.WalkTo(x, y, z, 0, false);
         }
 
         private static void UpdateContainedItems(World world, ref StackDataReader p)
@@ -5499,13 +5499,12 @@ namespace ClassicUO.Network
 
             if (iconID < BuffTable.Table.Length)
             {
-                BuffGump gump = UIManager.GetGump<BuffGump>();
                 ushort count = p.ReadUInt16BE();
 
                 if (count == 0)
                 {
                     world.Player.RemoveBuff(ic);
-                    gump?.RequestUpdateContents();
+                    BuffGump.RequestUpdateContentsAll();
                 }
                 else
                 {
@@ -5576,7 +5575,7 @@ namespace ClassicUO.Network
 
                         if (!alreadyExists)
                         {
-                            gump?.RequestUpdateContents();
+                            BuffGump.RequestUpdateContentsAll();
                         }
                     }
                 }

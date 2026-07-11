@@ -41,8 +41,7 @@ namespace ClassicUO.Game
         //       values in index 2 and 3 is for the wrap size of map (virtual size), x and y
         private ushort[,] MapSizeWrapSize;
         public static bool UltimaLiveActive => _UL != null && !string.IsNullOrEmpty(_UL.ShardName);
-        protected string RealShardName;
-        protected string ShardName;
+        private string ShardName;
 
         public static void Enable()
         {
@@ -425,12 +424,9 @@ namespace ClassicUO.Game
                         return;
                     }
 
-                    string[] split = name.Split(_pathSeparatorChars, StringSplitOptions.RemoveEmptyEntries);
-
                     _UL = new UltimaLive
                     {
-                        ShardName = name,
-                        RealShardName = split[split.Length - 1]
+                        ShardName = name
                     };
 
                     //TODO: create shard directory, copy map and statics to that directory, use that files instead of the original ones

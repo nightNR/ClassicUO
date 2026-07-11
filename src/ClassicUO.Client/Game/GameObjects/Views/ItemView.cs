@@ -132,6 +132,11 @@ namespace ClassicUO.Game.GameObjects
                 }
             }
 
+            if (PluginHighlightAreas.TryResolve(X, Y, Z, ClassicUO.PluginApi.HighlightObjectTypes.Item, out ushort pluginItemHue))
+            {
+                hue = pluginItemHue;
+            }
+
             hueVec = ShaderHueTranslator.GetHueVector(hue, partial, alpha);
 
             if (!IsMulti && !IsCoin && Amount > 1 && ItemData.IsStackable)
@@ -197,6 +202,10 @@ namespace ClassicUO.Game.GameObjects
                 || Amount == 0x02E8
                 || Amount == 0x02E9;
 
+            ushort corpseHue = PluginHighlightAreas.TryResolve(X, Y, Z, ClassicUO.PluginApi.HighlightObjectTypes.Corpse, out ushort pluginCorpseHue)
+                ? pluginCorpseHue
+                : Hue;
+
             DrawLayer(
                 batcher,
                 posX,
@@ -205,7 +214,7 @@ namespace ClassicUO.Game.GameObjects
                 Layer.Invalid,
                 animIndex,
                 ishuman,
-                Hue,
+                corpseHue,
                 IsFlipped,
                 hueVec.Z,
                 group,

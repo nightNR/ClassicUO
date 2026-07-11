@@ -276,6 +276,26 @@ namespace ClassicUO.Game.Managers
                 controlMatrix = new AnchorableGump[0, 0];
             }
 
+            /// <summary>True when no control occupies any cell of the matrix.</summary>
+            public bool IsEmpty
+            {
+                get
+                {
+                    for (int x = 0; x < controlMatrix.GetLength(0); x++)
+                    {
+                        for (int y = 0; y < controlMatrix.GetLength(1); y++)
+                        {
+                            if (controlMatrix[x, y] != null)
+                            {
+                                return false;
+                            }
+                        }
+                    }
+
+                    return true;
+                }
+            }
+
             public void AddControlToMatrix(int xinit, int yInit, AnchorableGump control)
             {
                 for (int x = 0; x < control.WidthMultiplier; x++)

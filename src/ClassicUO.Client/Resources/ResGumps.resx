@@ -219,6 +219,21 @@
   <data name="GridLoot_None" xml:space="preserve">
     <value>None</value>
   </data>
+  <data name="ContainerViewMode" xml:space="preserve">
+    <value>Container view:</value>
+  </data>
+  <data name="ContainerViewMode_Standard" xml:space="preserve">
+    <value>Standard</value>
+  </data>
+  <data name="ContainerViewMode_Grid" xml:space="preserve">
+    <value>Grid</value>
+  </data>
+  <data name="ContainerViewMode_Toggle" xml:space="preserve">
+    <value>Toggle</value>
+  </data>
+  <data name="ContainerToggleDefaultGrid" xml:space="preserve">
+    <value>Default toggled containers to grid</value>
+  </data>
   <data name="HideRoofTiles" xml:space="preserve">
     <value>Hide roof tiles</value>
   </data>
@@ -350,6 +365,9 @@
   </data>
   <data name="UseBlackBackgr" xml:space="preserve">
     <value>Opaque background</value>
+  </data>
+  <data name="ShowStatValuesOnBars" xml:space="preserve">
+    <value>Show stat values on bars</value>
   </data>
   <data name="UseCustomHPBars" xml:space="preserve">
     <value>Use custom healthbars gump</value>
@@ -608,6 +626,9 @@ Murderers, Criminals, Grays (Monsters/Animals)</value>
   <data name="ShowBuffDuration" xml:space="preserve">
     <value>Show buff duration</value>
   </data>
+  <data name="ShowBuffId" xml:space="preserve">
+    <value>Show buff ID in tooltip</value>
+  </data>
   <data name="InnocentColor" xml:space="preserve">
     <value>Innocent Color</value>
   </data>
@@ -657,6 +678,15 @@ when amount is or exceeds</value>
   <data name="CellSize" xml:space="preserve">
     <value>Cell size:</value>
   </data>
+  <data name="CounterUseFixedGrid" xml:space="preserve">
+    <value>Use fixed grid (locks resize)</value>
+  </data>
+  <data name="CounterRows" xml:space="preserve">
+    <value>Rows:</value>
+  </data>
+  <data name="CounterColumns" xml:space="preserve">
+    <value>Columns:</value>
+  </data>
   <data name="DisableDefaultUOHotkeys" xml:space="preserve">
     <value>Disable default UO hotkeys</value>
   </data>
@@ -665,6 +695,12 @@ when amount is or exceeds</value>
   </data>
   <data name="DisableTab" xml:space="preserve">
     <value>Disable TAB (toggle warmode)</value>
+  </data>
+  <data name="ChatHistoryUseArrows" xml:space="preserve">
+    <value>Use Up/Down arrows for chat history</value>
+  </data>
+  <data name="ChatHistoryLength" xml:space="preserve">
+    <value>Chat history length</value>
   </data>
   <data name="DisableMessageHistory" xml:space="preserve">
     <value>Disable Ctrl + Q/W (messageHistory)</value>
@@ -710,6 +746,9 @@ when amount is or exceeds</value>
   </data>
   <data name="RelativeDragAndDropContainers" xml:space="preserve">
     <value>Relative drag and drop items in containers</value>
+  </data>
+  <data name="AllowItemsOutsideContainerBounds" xml:space="preserve">
+    <value>Allow dropping items outside container bounds</value>
   </data>
   <data name="OverrideContainerGumpLocation" xml:space="preserve">
     <value>Override container gump location</value>

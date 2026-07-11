@@ -8,6 +8,7 @@ using System.Runtime.InteropServices;
 using ClassicUO.Configuration;
 using ClassicUO.Game;
 using ClassicUO.Game.Data;
+using ClassicUO.Game.GameObjects;
 using ClassicUO.Game.Managers;
 using ClassicUO.IO;
 using ClassicUO.Assets;
@@ -494,6 +495,102 @@ namespace ClassicUO.Network
             x = y = z = 0;
 
             return false;
+        }
+
+        internal static bool WalkTo(int x, int y, int z, int distance, bool run)
+        {
+            return Client.Game.UO?.World?.Player?.Pathfinder?.WalkTo(x, y, z, distance, run) ?? false;
+        }
+
+        internal static byte CheckLos(int fx, int fy, int fz, int tx, int ty, int tz, int map, byte includeDynamic)
+        {
+            var world = Client.Game.UO?.World;
+            if (world?.Map == null) return 1;                 // no map => don't hide
+            if (map >= 0 && world.MapIndex != map) return 1;  // different facet => can't judge, don't hide
+
+            // Bresenham over 2D cells from (fx,fy) to (tx,ty); interpolate Z linearly for the blocker Z-span test.
+            int dx = Math.Abs(tx - fx), dy = Math.Abs(ty - fy);
+            int sx = fx < tx ? 1 : -1, sy = fy < ty ? 1 : -1;
+            int err = dx - dy;
+            int cx = fx, cy = fy;
+            int steps = Math.Max(dx, dy);
+            int step = 0;
+
+            while (!(cx == tx && cy == ty))
+            {
+                // advance one cell
+                int e2 = 2 * err;
+                if (e2 > -dy) { err -= dy; cx += sx; }
+                if (e2 < dx) { err += dx; cy += sy; }
+                step++;
+
+                // Skip the endpoints themselves (source and target cells never block their own LOS).
+                if (cx == tx && cy == ty) break;
+
+                // Interpolated ray Z at this cell.
+                int rayZ = steps == 0 ? fz : fz + (tz - fz) * step / steps;
+
+                if (CellBlocksLos(world, cx, cy, rayZ, includeDynamic != 0))
+                    return 0;
+            }
+            return 1;
+        }
+
+        // A cell blocks LOS if a land/static (or, when includeDynamic, item/mobile) tile flagged
+        // NoShoot|Window|Impassable straddles the ray's Z at this cell.
+        private static bool CellBlocksLos(World world, int x, int y, int rayZ, bool includeDynamic)
+        {
+            GameObject obj = world.Map.GetTile(x, y, true); // load:true streams the chunk (game thread only)
+            if (obj == null) return false;
+            while (obj.TPrevious != null) obj = obj.TPrevious; // rewind to bottom of the stack
+
+            var tiledata = Client.Game.UO.FileManager.TileData;
+            for (; obj != null; obj = obj.TNext)
+            {
+                if (obj is Land land)
+                {
+                    // Land blocks only if it rises above the ray at this cell.
+                    if (land.Z > rayZ && land.TileData.IsImpassable) return true;
+                    continue;
+                }
+
+                int objZ, height; bool blocksLos;
+                if (obj is Static st)
+                {
+                    ref StaticTiles sd = ref tiledata.StaticData[st.Graphic];
+                    blocksLos = sd.IsNoShoot || sd.IsWindow || sd.IsImpassable;
+                    objZ = obj.Z; height = sd.Height;
+                }
+                else if (includeDynamic && (obj is Item || obj is Mobile))
+                {
+                    ushort g = obj.Graphic;
+                    ref StaticTiles sd = ref tiledata.StaticData[g];
+                    blocksLos = sd.IsNoShoot || sd.IsWindow || sd.IsImpassable;
+                    objZ = obj.Z; height = sd.Height;
+                }
+                else continue;
+
+                if (!blocksLos) continue;
+                // Block when the object's vertical extent straddles the ray's Z at this cell.
+                if (rayZ >= objZ && rayZ <= objZ + Math.Max(height, 1)) return true;
+            }
+            return false;
+        }
+
+        internal static unsafe void CheckLosBatch(int fx, int fy, int fz, int* toXYZ, int count, int map, byte includeDynamic, byte* results)
+        {
+            for (int i = 0; i < count; i++)
+                results[i] = CheckLos(fx, fy, fz, toXYZ[i * 3], toXYZ[i * 3 + 1], toXYZ[i * 3 + 2], map, includeDynamic);
+        }
+
+        internal static void StopWalk()
+        {
+            Client.Game.UO?.World?.Player?.Pathfinder?.StopAutoWalk();
+        }
+
+        internal static void OnWalkProgress(ClassicUO.Game.WalkState state)
+        {
+            Client.Game.PluginHost?.WalkProgress((int)state);
         }
 
         internal static void Tick()

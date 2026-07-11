@@ -132,6 +132,140 @@ public delegate bool HotkeyHandler(int key, int modifiers, bool pressed);
 - If multiple plugins subscribe, the hotkey is suppressed if **any** handler
   returns `false`.
 
+## Screen timers
+
+`ctx.ScreenTimers` drives plugin-owned on-screen timer overlays (circles,
+bars, or numeric countdowns), optionally arranged into stacking groups via
+`DefineGroup`.
+
+#### Anchoring a timer to the world
+
+Set `TimerConfig.Anchor` to pin a timer to an in-game target instead of a fixed
+screen position:
+
+- `AnchorKind.Serial` + `AnchorSerial` — follow a mobile or item.
+- `AnchorKind.Absolute` + `AnchorX/Y/Z` — pin to a map tile.
+- `AnchorKind.Self` — follow the player.
+
+While the anchor is off-screen the timer is hidden but keeps counting, and
+reappears when the anchor scrolls back into view. If a `Serial`/`Self` anchor is
+destroyed, the timer keeps running for `AnchorGraceMs` (default 5000 ms); if the
+anchor does not return in time the timer is removed and `Removed` fires with
+`TimerRemoveReason.AnchorLost`. Only one Serial-anchored timer may target a given
+serial — adding another replaces it. Anchored timers ignore `GroupId`.
+
+Example:
+
+    ctx.ScreenTimers.AddOrUpdate(new TimerConfig
+    {
+        Id = 1,
+        Shape = TimerShape.Bar,
+        DurationMs = 15000,
+        Label = "Poison",
+        ShowTime = true,
+        Anchor = AnchorKind.Serial,
+        AnchorSerial = mobileSerial,
+        AnchorOffsetY = -4,
+    });
+
+## Highlighting
+
+`ctx.Highlight` drives plugin-owned object and area highlighting with Orion
+parity. Character highlighting is persistent (no timer); area highlighting
+supports optional expiry and can follow the mouse, a fixed position, or a mobile.
+
+#### Character highlighting (mobiles)
+
+Use `AddCharacter` to tint a mobile by serial. Set `priorityHighlight` to true
+for the tint to always win over the client's own coloring (poison, paralyze,
+invulnerability, attacked, notoriety); false loses to an active status color but
+wins over the default hue. Highlighting persists until removed with
+`RemoveCharacter` or `ClearCharacters`.
+
+#### Area highlighting (zone tints)
+
+Use `AddArea` to paint a rectangular zone of tiles and objects with a tint. The
+zone's center can follow the mouse (default), stay at a fixed world position, or
+track a mobile serial. Areas can expire after a duration (or never, if
+`durationMs` is -1). Overlapping areas render in add-order — the most recently
+added area wins. Filter which object types tint via `objectTypes` (land, statics,
+items, mobiles, corpses, multis).
+
+##### AddArea(...)
+
+Adds or replaces an area highlight. Pass an `id` string to identify it; re-adding
+the same `id` replaces the existing area. Configure the zone's center behavior
+via `snap`: use `HighlightSnap.Mouse` to follow the cursor (default),
+`HighlightSnap.Position` with `x`/`y` to pin to a fixed tile, or
+`HighlightSnap.Serial` with `anchorSerial` to follow a mobile or item.
+
+Example (fixed position, 10-second duration):
+
+    context.Highlight.AddArea(
+        "danger-zone",
+        durationMs: 10000,
+        snap: HighlightSnap.Position,
+        hue: 0x0021,
+        rangeX: 5,
+        rangeY: 5,
+        objectTypes: HighlightObjectTypes.Land | HighlightObjectTypes.Static,
+        x: 1234,
+        y: 5678
+    );
+
+Example (follow a mobile, no expiry):
+
+    context.Highlight.AddArea(
+        "follow-target",
+        snap: HighlightSnap.Serial,
+        anchorSerial: targetSerial,
+        hue: 0x0044,
+        rangeX: 3,
+        rangeY: 3
+    );
+
+##### RemoveArea(string id)
+
+Removes the area highlight identified by `id`. The `id` is the same string passed
+to `AddArea`.
+
+    context.Highlight.RemoveArea("danger-zone");
+
+##### ClearAreas()
+
+Removes every area highlight owned by this plugin.
+
+##### GetAreaTimer(string id)
+
+Returns the remaining lifetime in milliseconds for the area identified by `id`.
+Returns 0 if the `id` doesn't exist or has expired; returns `int.MaxValue` if the
+area never expires (durationMs was -1).
+
+##### Character highlight methods
+
+In addition to `AddCharacter`, use the following to manage character highlights:
+
+`RemoveCharacter(uint serial, bool priorityHighlight = false)` — Removes the
+character highlight for that serial in the given tier (determined by
+`priorityHighlight`). No-op if no highlight exists for that serial in that tier.
+
+`ClearCharacters(bool priorityHighlight = false)` — Removes every character
+highlight owned by this plugin in the given tier (all priority, or all standard).
+
+Example:
+
+    // Tint a specific mobile, losing to poison/paralyze/attacked coloring:
+    context.Highlight.AddCharacter(mobileSerial, hue: 0x0044);
+
+    // Tint a specific mobile, always winning:
+    context.Highlight.AddCharacter(mobileSerial, hue: 0x0044, priorityHighlight: true);
+
+    // Remove that highlight later:
+    context.Highlight.RemoveCharacter(mobileSerial, priorityHighlight: false);
+
+    // Clear all non-priority highlights owned by this plugin:
+    context.Highlight.ClearCharacters(priorityHighlight: false);
+
 ## Sample
 
 A worked example lives at

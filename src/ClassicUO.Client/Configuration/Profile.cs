@@ -22,6 +22,8 @@ namespace ClassicUO.Configuration
     //[JsonSourceGenerationOptions(WriteIndented = true, PropertyNamingPolicy = JsonKnownNamingPolicy.Unspecified)]
     [JsonSerializable(typeof(GlobalProfile), GenerationMode = JsonSourceGenerationMode.Metadata)]
     [JsonSerializable(typeof(Profile), GenerationMode = JsonSourceGenerationMode.Metadata)]
+    [JsonSerializable(typeof(ClassicUO.Game.UI.Gumps.ChatHistoryEntry), GenerationMode = JsonSourceGenerationMode.Metadata)]
+    [JsonSerializable(typeof(ClassicUO.Game.Managers.AliasEntry), GenerationMode = JsonSourceGenerationMode.Metadata)]
     sealed partial class ProfileJsonContext : JsonSerializerContext
     {
         sealed class SnakeCaseNamingPolicy : JsonNamingPolicy
@@ -185,6 +187,7 @@ namespace ClassicUO.Configuration
         // Experimental
         public bool CastSpellsByOneClick { get; set; }
         public bool BuffBarTime { get; set; }
+        public bool BuffBarShowId { get; set; } = true;
         public bool FastSpellsAssign { get; set; }
         public bool AutoOpenDoors { get; set; }
         public bool SmoothDoors { get; set; }
@@ -196,6 +199,11 @@ namespace ClassicUO.Configuration
         public bool DisableArrowBtn { get; set; }
         public bool DisableTabBtn { get; set; }
         public bool DisableCtrlQWBtn { get; set; }
+        public bool ChatUseArrowsForHistory { get; set; } = true;
+        public int ChatHistoryLength { get; set; } = 20;
+        public List<ChatHistoryEntry> ChatHistory { get; set; } = new List<ChatHistoryEntry>();
+        public bool AliasesEnabled { get; set; } = true;
+        public List<ClassicUO.Game.Managers.AliasEntry> CharacterAliases { get; set; } = new List<ClassicUO.Game.Managers.AliasEntry>();
         public bool DisableAutoMove { get; set; }
         public bool EnableDragSelect { get; set; }
         public int DragSelectModifierKey { get; set; } // 0 = none, 1 = control, 2 = shift
@@ -217,7 +225,9 @@ namespace ClassicUO.Configuration
         public bool ShowTargetRangeIndicator { get; set; }
         public bool PartyInviteGump { get; set; }
         public bool CustomBarsToggled { get; set; }
+        public bool StatusbarColorsEnabled { get; set; } = true;
         public bool CBBlackBGToggled { get; set; }
+        public bool ShowStatValuesOnBars { get; set; }
 
         public bool ShowInfoBar { get; set; }
         public int InfoBarHighlightType { get; set; } // 0 = text colour changes, 1 = underline
@@ -229,6 +239,9 @@ namespace ClassicUO.Configuration
         public int CounterBarAbbreviatedAmount { get; set; } = 1000;
         public int CounterBarHighlightAmount { get; set; } = 5;
         public int CounterBarCellSize { get; set; } = 40;
+        public bool CounterBarUseFixedGrid { get; set; } = false;
+        public int CounterBarRows { get; set; } = 3;
+        public int CounterBarColumns { get; set; } = 10;
 
         public bool ShowSkillsChangedMessage { get; set; } = true;
         public int ShowSkillsChangedDeltaValue { get; set; } = 1;
@@ -276,6 +289,19 @@ namespace ClassicUO.Configuration
 
         public bool RelativeDragAndDropItems { get; set; }
 
+        public bool AllowItemsOutsideContainerBounds { get; set; }
+
+        // 0 = Standard (default), 1 = Grid, 2 = Toggle
+        public int ContainerViewMode { get; set; }
+
+        // In Toggle mode, the view used for a serial the user has never toggled.
+        // false = standard, true = grid.
+        public bool ContainerToggleDefaultGrid { get; set; }
+
+        // Explicit per-serial choice in Toggle mode. true = grid, false = standard.
+        // Absent key => fall back to ContainerToggleDefaultGrid.
+        public Dictionary<uint, bool> ContainerGridStates { get; set; } = new();
+
         public bool HighlightContainerWhenSelected { get; set; }
 
         public bool UseNewTargetSystem { get; set; } = true;
@@ -316,6 +342,7 @@ namespace ClassicUO.Configuration
         public string WorldMapHiddenZoneFiles { get; set; } = string.Empty;
         public bool WorldMapShowGridIfZoomed { get; set; } = true;
         public bool WorldMapAllowPositionalTarget { get; set; } = false;
+        public bool WorldMapShowPath { get; set; } = true;
         public bool ShowDPSWithDamageNumbers { get; set; } = true;
 
         public static uint GumpsVersion { get; private set; }

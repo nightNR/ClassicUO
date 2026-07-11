@@ -1,6 +1,7 @@
 ﻿// SPDX-License-Identifier: BSD-2-Clause
 
 using ClassicUO.Assets;
+using ClassicUO.Configuration;
 using ClassicUO.Game.Managers;
 using ClassicUO.Game.Scenes;
 using ClassicUO.Input;
@@ -486,6 +487,15 @@ namespace ClassicUO.Game.UI.Controls
             base.OnFocusLost();
         }
 
+        private bool IsChatHistoryArrow()
+        {
+            return !Keyboard.Ctrl
+                && ProfileManager.CurrentProfile != null
+                && ProfileManager.CurrentProfile.ChatUseArrowsForHistory
+                && UIManager.SystemChat != null
+                && UIManager.SystemChat.TextBoxControl == this;
+        }
+
         protected override void OnKeyDown(SDL.SDL_Keycode key, SDL.SDL_Keymod mod)
         {
             ControlKeys? stb_key = null;
@@ -621,12 +631,22 @@ namespace ClassicUO.Game.UI.Controls
                     break;
 
                 case SDL.SDL_Keycode.SDLK_UP:
+                    if (IsChatHistoryArrow())
+                    {
+                        break; // history handled by SystemChatControl; do not move caret
+                    }
+
                     stb_key = ApplyShiftIfNecessary(ControlKeys.Up);
                     update_caret = true;
 
                     break;
 
                 case SDL.SDL_Keycode.SDLK_DOWN:
+                    if (IsChatHistoryArrow())
+                    {
+                        break; // history handled by SystemChatControl; do not move caret
+                    }
+
                     stb_key = ApplyShiftIfNecessary(ControlKeys.Down);
                     update_caret = true;
 

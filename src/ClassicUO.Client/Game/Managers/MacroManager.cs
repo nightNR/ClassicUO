@@ -1431,11 +1431,14 @@ namespace ClassicUO.Game.Managers
                     break;
 
                 case MacroType.ToggleBuffIconGump:
-                    BuffGump buff = UIManager.GetGump<BuffGump>();
+                    var buffGumps = UIManager.Gumps.OfType<BuffGump>().Where(g => !g.IsDisposed).ToList();
 
-                    if (buff != null)
+                    if (buffGumps.Count > 0)
                     {
-                        buff.Dispose();
+                        foreach (BuffGump g in buffGumps)
+                        {
+                            g.Dispose();
+                        }
                     }
                     else
                     {

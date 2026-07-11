@@ -133,7 +133,7 @@ namespace ClassicUO.Game.UI.Gumps
 
             if (!string.IsNullOrEmpty(entity.Name))
             {
-                string t = entity.Name;
+                string t = World.AliasManager.Resolve(entity.Serial, entity.Name);
 
                 int width = Client.Game.UO.FileManager.Fonts.GetWidthUnicode(_renderedText.Font, t);
 

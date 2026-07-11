@@ -80,6 +80,12 @@ namespace ClassicUO.Game.GameObjects
                 partial = false;
             }
 
+            if (PluginHighlightAreas.TryResolve(X, Y, Z, ClassicUO.PluginApi.HighlightObjectTypes.Multi, out ushort pluginMultiHue))
+            {
+                hue = pluginMultiHue;
+                partial = false;
+            }
+
             bool cot = TransparentTest(World.Player.Z + 5);
             Vector3 hueVec = ShaderHueTranslator.GetHueVector(hue, partial, AlphaHue / 255f, circletrans: cot);
 

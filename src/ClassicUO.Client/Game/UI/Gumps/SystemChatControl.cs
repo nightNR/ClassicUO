@@ -38,8 +38,7 @@ namespace ClassicUO.Game.UI.Gumps
         private const int TEXTBOX_LENGTH = 500;
         private const int CHAT_X_OFFSET = 3;
         private const int CHAT_HEIGHT = 15;
-        private static readonly List<Tuple<ChatMode, string>> _messageHistory = new List<Tuple<ChatMode, string>>();
-        private static int _messageHistoryIndex = -1;
+        private readonly ChatMessageHistory _history = new ChatMessageHistory();
 
         private readonly Label _currentChatModeLabel;
 
@@ -113,6 +112,9 @@ namespace ClassicUO.Game.UI.Gumps
             TextBoxControl.Hue = GetChatHue(Mode);
 
             IsActive = !ProfileManager.CurrentProfile.ActivateChatAfterEnter;
+
+            _history.MaxLength = ProfileManager.CurrentProfile.ChatHistoryLength;
+            _history.Load(ProfileManager.CurrentProfile.ChatHistory);
 
             SetFocus();
         }
@@ -602,11 +604,9 @@ namespace ClassicUO.Game.UI.Gumps
         {
             switch (key)
             {
-                case SDL.SDL_Keycode.SDLK_Q when Keyboard.Ctrl && _messageHistoryIndex > -1 && !ProfileManager.CurrentProfile.DisableCtrlQWBtn:
+                case SDL.SDL_Keycode.SDLK_Q when Keyboard.Ctrl && !ProfileManager.CurrentProfile.ChatUseArrowsForHistory && !ProfileManager.CurrentProfile.DisableCtrlQWBtn:
 
-                    GameScene scene = Client.Game.GetScene<GameScene>();
-
-                    if (scene == null)
+                    if (Client.Game.GetScene<GameScene>() == null)
                     {
                         return;
                     }
@@ -616,27 +616,13 @@ namespace ClassicUO.Game.UI.Gumps
                         return;
                     }
 
-                    if (!IsActive)
-                    {
-                        return;
-                    }
-
-                    if (_messageHistoryIndex > 0)
-                    {
-                        _messageHistoryIndex--;
-                    }
-
-                    Mode = _messageHistory[_messageHistoryIndex].Item1;
-
-                    TextBoxControl.SetText(_messageHistory[_messageHistoryIndex].Item2);
+                    HistoryPrevious();
 
                     break;
 
-                case SDL.SDL_Keycode.SDLK_W when Keyboard.Ctrl && !ProfileManager.CurrentProfile.DisableCtrlQWBtn:
+                case SDL.SDL_Keycode.SDLK_W when Keyboard.Ctrl && !ProfileManager.CurrentProfile.ChatUseArrowsForHistory && !ProfileManager.CurrentProfile.DisableCtrlQWBtn:
 
-                    scene = Client.Game.GetScene<GameScene>();
-
-                    if (scene == null)
+                    if (Client.Game.GetScene<GameScene>() == null)
                     {
                         return;
                     }
@@ -646,23 +632,17 @@ namespace ClassicUO.Game.UI.Gumps
                         return;
                     }
 
-                    if (!IsActive)
-                    {
-                        return;
-                    }
+                    HistoryNext();
 
-                    if (_messageHistoryIndex < _messageHistory.Count - 1)
-                    {
-                        _messageHistoryIndex++;
+                    break;
 
-                        Mode = _messageHistory[_messageHistoryIndex].Item1;
+                case SDL.SDL_Keycode.SDLK_UP when ProfileManager.CurrentProfile.ChatUseArrowsForHistory && !Keyboard.Ctrl && IsActive:
+                    HistoryPrevious();
 
-                        TextBoxControl.SetText(_messageHistory[_messageHistoryIndex].Item2);
-                    }
-                    else
-                    {
-                        TextBoxControl.ClearText();
-                    }
+                    break;
+
+                case SDL.SDL_Keycode.SDLK_DOWN when ProfileManager.CurrentProfile.ChatUseArrowsForHistory && !Keyboard.Ctrl && IsActive:
+                    HistoryNext();
 
                     break;
 
@@ -717,6 +697,40 @@ namespace ClassicUO.Game.UI.Gumps
                     Mode = ChatMode.Default;
 
                     break;
+            }
+        }
+
+        private void HistoryPrevious()
+        {
+            if (!IsActive)
+            {
+                return;
+            }
+
+            ChatHistoryEntry entry = _history.MovePrevious();
+
+            if (entry != null)
+            {
+                Mode = entry.Mode;
+                TextBoxControl.SetText(entry.Text);
+            }
+        }
+
+        private void HistoryNext()
+        {
+            if (!IsActive)
+            {
+                return;
+            }
+
+            if (_history.MoveNext(out ChatHistoryEntry entry))
+            {
+                Mode = entry.Mode;
+                TextBoxControl.SetText(entry.Text);
+            }
+            else
+            {
+                TextBoxControl.ClearText();
             }
         }
 
@@ -818,8 +832,9 @@ namespace ClassicUO.Game.UI.Gumps
 
         private void HandleMessageSend(string text, ChatMode sentMode)
         {
-            _messageHistory.Add(new Tuple<ChatMode, string>(Mode, text));
-            _messageHistoryIndex = _messageHistory.Count;
+            _history.MaxLength = ProfileManager.CurrentProfile.ChatHistoryLength;
+            _history.Add(new ChatHistoryEntry { Mode = Mode, Text = text });
+            ProfileManager.CurrentProfile.ChatHistory = new List<ChatHistoryEntry>(_history.Entries);
 
 
             switch (sentMode)

@@ -45,17 +45,8 @@ namespace ClassicUO.Game.UI.Gumps
             {
                 case ButtonType.BuffIcon:
 
-                    BuffGump gump = UIManager.GetGump<BuffGump>();
-
-                    if (gump == null)
-                    {
-                        UIManager.Add(new BuffGump(World, 100, 100));
-                    }
-                    else
-                    {
-                        gump.SetInScreen();
-                        gump.BringOnTop();
-                    }
+                    // Open the joined gump when closed; toggle split/join when open.
+                    BuffGump.ToggleFromStatusButton(World);
 
                     break;
             }

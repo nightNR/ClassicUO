@@ -29,6 +29,9 @@ namespace ClassicUO
         public IntPtr /*delegate*<int, int, int, void>*/ UpdatePlayerPosFn;
         public IntPtr PacketInFn;
         public IntPtr PacketOutFn;
+        public IntPtr /*delegate*<int, void>*/ WalkProgressFn;
+        public IntPtr /*delegate*<int, int, void>*/ BuffEventFn;
+        public IntPtr /*delegate*<int, int, void>*/ TimerEventFn;
     }
 
     [StructLayout(LayoutKind.Sequential)]
@@ -43,6 +46,38 @@ namespace ClassicUO
         public IntPtr /*delegate*<int, bool, bool>*/ RequestMoveFn;
         public IntPtr /*delegate*<ref int, ref int, ref int, bool>*/ GetPlayerPositionFn;
         public IntPtr ReflectionCmdFn;
+        public IntPtr /*delegate*<int, int, int, int, bool, bool>*/ WalkToFn;
+        public IntPtr /*delegate*<void>*/ StopWalkFn;
+        public IntPtr /*delegate*<uint, int, int, byte, int, void>*/ OpenStatusBarFn;
+        public IntPtr /*delegate*<uint, void>*/ CloseStatusBarFn;
+        public IntPtr /*delegate*<uint, ushort, ushort, void>*/ SetOverlayFn;
+        public IntPtr /*delegate*<int, ushort, int, int, IntPtr, void>*/ AddBuffFn;
+        public IntPtr /*delegate*<int, void>*/ RemoveBuffFn;
+        public IntPtr /*delegate*<void>*/ ClearBuffsFn;
+        public IntPtr /*delegate*<int, int, int, int, int, void>*/ DefineTimerGroupFn;
+        public IntPtr /*delegate*<int, int, int, ushort, int, int, int, int, int, IntPtr, byte, int, uint, ushort, ushort, sbyte, short, short, int, void>*/ AddTimerFn;
+        public IntPtr /*delegate*<int, void>*/ RemoveTimerFn;
+        public IntPtr /*delegate*<int, void>*/ RemoveTimerGroupFn;
+        public IntPtr /*delegate*<void>*/ ClearTimersFn;
+        public IntPtr /*delegate*<uint, ushort, int, int, int, int, void>*/ SetPluginPartyMemberFn;
+        public IntPtr /*delegate*<uint, void>*/ RemovePluginPartyMemberFn;
+        public IntPtr /*delegate*<void>*/ ClearPluginPartyFn;
+        public IntPtr /*delegate*<int,int,int,int,int,int,int,byte, byte>*/ CheckLosFn;
+        public IntPtr /*delegate*<int,int,int,int*,int,int,byte,byte*, void>*/ CheckLosBatchFn;
+        // Highlight fields (below) and ClientVersion are appended after every
+        // pre-existing field to preserve the ABI for external v1 plugin binaries
+        // (e.g. cuoapi.dll) compiled against the pre-highlight layout — never insert
+        // new fields in the middle of this struct, only ever append.
+        public IntPtr /*delegate*<IntPtr, int, int, uint, int, int, ushort, int, int, int, void>*/ AddAreaFn;
+        public IntPtr /*delegate*<IntPtr, void>*/ RemoveAreaFn;
+        public IntPtr /*delegate*<void>*/ ClearAreasFn;
+        public IntPtr /*delegate*<IntPtr, int>*/ GetAreaTimerFn;
+        public IntPtr /*delegate*<uint, ushort, byte, void>*/ AddCharacterFn;
+        public IntPtr /*delegate*<uint, byte, void>*/ RemoveCharacterFn;
+        public IntPtr /*delegate*<byte, void>*/ ClearCharactersFn;
+        // Packed client version (major<<24|minor<<16|build<<8|revision). Appended last
+        // to preserve ABI; populated in Initialize() after UO.Load has parsed it.
+        public int ClientVersion;
     }
 
     internal unsafe sealed class UnmanagedAssistantHost : IPluginHost
@@ -93,6 +128,16 @@ namespace ClassicUO
         private readonly dOnUpdatePlayerPosition _updatePlayerPos;
 
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        delegate void dOnWalkProgress(int state);
+        [MarshalAs(UnmanagedType.FunctionPtr)]
+        private readonly dOnWalkProgress _walkProgress;
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        delegate void dOnPluginTimerEvent(int id, int reason);
+        [MarshalAs(UnmanagedType.FunctionPtr)]
+        private readonly dOnPluginTimerEvent _buffEvent, _timerEvent;
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         delegate void dOnPluginFocusWindow();
         [MarshalAs(UnmanagedType.FunctionPtr)]
         private readonly dOnPluginFocusWindow _focusGained, _focusLost;
@@ -119,12 +164,18 @@ namespace ClassicUO
             _hotkey = Marshal.GetDelegateForFunctionPointer<dOnHotkey>(setup->HotkeyFn);
             _mouse = Marshal.GetDelegateForFunctionPointer<dOnMouse>(setup->MouseFn);
             _updatePlayerPos = Marshal.GetDelegateForFunctionPointer<dOnUpdatePlayerPosition>(setup->UpdatePlayerPosFn);
+            _walkProgress = Marshal.GetDelegateForFunctionPointer<dOnWalkProgress>(setup->WalkProgressFn);
             _focusGained = Marshal.GetDelegateForFunctionPointer<dOnPluginFocusWindow>(setup->FocusGainedFn);
             _focusLost = Marshal.GetDelegateForFunctionPointer<dOnPluginFocusWindow>(setup->FocusLostFn);
             _sdlEvent = Marshal.GetDelegateForFunctionPointer<dOnPluginSdlEvent>(setup->SdlEventFn);
             _connected = Marshal.GetDelegateForFunctionPointer<dOnPluginConnection>(setup->ConnectedFn);
             _disconnected = Marshal.GetDelegateForFunctionPointer<dOnPluginConnection>(setup->DisconnectedFn);
             _cmdList = Marshal.GetDelegateForFunctionPointer<dOnPluginCommandList>(setup->CmdListFn);
+
+            if (setup->BuffEventFn != IntPtr.Zero)
+                _buffEvent = Marshal.GetDelegateForFunctionPointer<dOnPluginTimerEvent>(setup->BuffEventFn);
+            if (setup->TimerEventFn != IntPtr.Zero)
+                _timerEvent = Marshal.GetDelegateForFunctionPointer<dOnPluginTimerEvent>(setup->TimerEventFn);
         }
 
         public Dictionary<IntPtr, GraphicsResource> GfxResources { get; } = new Dictionary<nint, GraphicsResource>();
@@ -200,6 +251,26 @@ namespace ClassicUO
         private readonly dRequestMove _requestMove = Plugin.RequestMove;
 
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        delegate bool dWalkTo(int x, int y, int z, int distance, bool run);
+        [MarshalAs(UnmanagedType.FunctionPtr)]
+        private readonly dWalkTo _walkTo = Plugin.WalkTo;
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        delegate byte dCheckLos(int fx, int fy, int fz, int tx, int ty, int tz, int map, byte includeDynamic);
+        [MarshalAs(UnmanagedType.FunctionPtr)]
+        private readonly dCheckLos _checkLos = Plugin.CheckLos;
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        unsafe delegate void dCheckLosBatch(int fx, int fy, int fz, int* toXYZ, int count, int map, byte includeDynamic, byte* results);
+        [MarshalAs(UnmanagedType.FunctionPtr)]
+        private readonly dCheckLosBatch _checkLosBatch = Plugin.CheckLosBatch;
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        delegate void dStopWalk();
+        [MarshalAs(UnmanagedType.FunctionPtr)]
+        private readonly dStopWalk _stopWalk = Plugin.StopWalk;
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         delegate bool dPacketRecvSend(IntPtr data, ref int length);
         [MarshalAs(UnmanagedType.FunctionPtr)]
         private readonly dPacketRecvSend _sendToClient = Plugin.OnPluginRecv_new;
@@ -215,6 +286,101 @@ namespace ClassicUO
         delegate IntPtr dOnPluginReflectionCommand(IntPtr cmdPtr);
         [MarshalAs(UnmanagedType.FunctionPtr)]
         private readonly dOnPluginReflectionCommand _reflectionCmd = reflectionCmd;
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        delegate void dOpenStatusBar(uint serial, int x, int y, byte moveIfExists, int groupId);
+        [MarshalAs(UnmanagedType.FunctionPtr)]
+        private readonly dOpenStatusBar _openStatusBar = Game.Managers.PluginStatusBars.OpenStatusBar;
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        delegate void dCloseStatusBar(uint serial);
+        [MarshalAs(UnmanagedType.FunctionPtr)]
+        private readonly dCloseStatusBar _closeStatusBar = Game.Managers.PluginStatusBars.CloseStatusBar;
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        delegate void dSetOverlay(uint serial, ushort hue, ushort backgroundHue);
+        [MarshalAs(UnmanagedType.FunctionPtr)]
+        private readonly dSetOverlay _setOverlay = Game.Managers.PluginStatusBars.SetOverlay;
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        delegate void dAddBuff(int id, ushort graphic, int durationMs, int kind, IntPtr textUtf8);
+        [MarshalAs(UnmanagedType.FunctionPtr)]
+        private readonly dAddBuff _addBuff = Game.Managers.PluginTimersManager.AddBuff;
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        delegate void dRemoveById(int id);
+        [MarshalAs(UnmanagedType.FunctionPtr)]
+        private readonly dRemoveById _removeBuff = Game.Managers.PluginTimersManager.RemoveBuff;
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        delegate void dNoArg();
+        [MarshalAs(UnmanagedType.FunctionPtr)]
+        private readonly dNoArg _clearBuffs = Game.Managers.PluginTimersManager.ClearBuffs;
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        delegate void dDefineTimerGroup(int groupId, int x, int y, int direction, int gap);
+        [MarshalAs(UnmanagedType.FunctionPtr)]
+        private readonly dDefineTimerGroup _defineTimerGroup = Game.Managers.PluginTimersManager.DefineTimerGroup;
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        delegate void dAddTimer(int id, int shape, int durationMs, ushort hue, int groupId, int x, int y, int width, int height, IntPtr labelUtf8, byte showTime, int anchorKind, uint anchorSerial, ushort ax, ushort ay, sbyte az, short offX, short offY, int graceMs);
+        [MarshalAs(UnmanagedType.FunctionPtr)]
+        private readonly dAddTimer _addTimer = Game.Managers.PluginTimersManager.AddTimer;
+
+        [MarshalAs(UnmanagedType.FunctionPtr)]
+        private readonly dRemoveById _removeTimer = Game.Managers.PluginTimersManager.RemoveTimer;
+
+        [MarshalAs(UnmanagedType.FunctionPtr)]
+        private readonly dRemoveById _removeTimerGroup = Game.Managers.PluginTimersManager.RemoveTimerGroup;
+
+        [MarshalAs(UnmanagedType.FunctionPtr)]
+        private readonly dNoArg _clearTimers = Game.Managers.PluginTimersManager.ClearTimers;
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        delegate void dAddArea(IntPtr idUtf8, int durationMs, int snapKind, uint anchorSerial, int x, int y, ushort hue, int rangeX, int rangeY, int objectTypes);
+        [MarshalAs(UnmanagedType.FunctionPtr)]
+        private readonly dAddArea _addArea = Game.Managers.PluginHighlights.AddArea;
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        delegate void dRemoveArea(IntPtr idUtf8);
+        [MarshalAs(UnmanagedType.FunctionPtr)]
+        private readonly dRemoveArea _removeArea = Game.Managers.PluginHighlights.RemoveArea;
+
+        [MarshalAs(UnmanagedType.FunctionPtr)]
+        private readonly dNoArg _clearAreas = Game.Managers.PluginHighlights.ClearAreas;
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        delegate int dGetAreaTimer(IntPtr idUtf8);
+        [MarshalAs(UnmanagedType.FunctionPtr)]
+        private readonly dGetAreaTimer _getAreaTimer = Game.Managers.PluginHighlights.GetAreaTimer;
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        delegate void dAddCharacter(uint serial, ushort hue, byte priorityHighlight);
+        [MarshalAs(UnmanagedType.FunctionPtr)]
+        private readonly dAddCharacter _addCharacter = Game.Managers.PluginHighlights.AddCharacter;
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        delegate void dRemoveCharacter(uint serial, byte priorityHighlight);
+        [MarshalAs(UnmanagedType.FunctionPtr)]
+        private readonly dRemoveCharacter _removeCharacter = Game.Managers.PluginHighlights.RemoveCharacter;
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        delegate void dClearCharacters(byte priorityHighlight);
+        [MarshalAs(UnmanagedType.FunctionPtr)]
+        private readonly dClearCharacters _clearCharacters = Game.Managers.PluginHighlights.ClearCharacters;
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        delegate void dSetPluginPartyMember(uint serial, ushort hue, int x, int y, int hp, int map);
+        [MarshalAs(UnmanagedType.FunctionPtr)]
+        private readonly dSetPluginPartyMember _setPluginPartyMember = Game.Managers.PluginPartyBridge.SetPluginPartyMember;
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        delegate void dRemovePluginPartyMember(uint serial);
+        [MarshalAs(UnmanagedType.FunctionPtr)]
+        private readonly dRemovePluginPartyMember _removePluginPartyMember = Game.Managers.PluginPartyBridge.RemovePluginPartyMember;
+
+        [MarshalAs(UnmanagedType.FunctionPtr)]
+        private readonly dNoArg _clearPluginParty = Game.Managers.PluginPartyBridge.ClearPluginParty;
 
 
         static short getPacketLength(int id)
@@ -260,7 +426,7 @@ namespace ClassicUO
                     break;
                 case 4:
                     var args = Unsafe.AsRef<(int, int, int, int, int)>(cmd.ToPointer());
-                    bool started = Client.Game.UO?.World?.Player?.Pathfinder?.WalkTo(args.Item2, args.Item3, args.Item4, args.Item5) ?? false;
+                    bool started = Client.Game.UO?.World?.Player?.Pathfinder?.WalkTo(args.Item2, args.Item3, args.Item4, args.Item5, false) ?? false;
                     return (IntPtr)Unsafe.AsPointer(ref started);
             }
 
@@ -282,6 +448,35 @@ namespace ClassicUO
             cuoHost.RequestMoveFn = Marshal.GetFunctionPointerForDelegate(_requestMove);
             cuoHost.GetPlayerPositionFn = Marshal.GetFunctionPointerForDelegate(_getPlayerPosition);
             cuoHost.ReflectionCmdFn = Marshal.GetFunctionPointerForDelegate(_reflectionCmd);
+            cuoHost.WalkToFn = Marshal.GetFunctionPointerForDelegate(_walkTo);
+            cuoHost.CheckLosFn = Marshal.GetFunctionPointerForDelegate(_checkLos);
+            cuoHost.CheckLosBatchFn = Marshal.GetFunctionPointerForDelegate(_checkLosBatch);
+            cuoHost.StopWalkFn = Marshal.GetFunctionPointerForDelegate(_stopWalk);
+            cuoHost.OpenStatusBarFn = Marshal.GetFunctionPointerForDelegate(_openStatusBar);
+            cuoHost.CloseStatusBarFn = Marshal.GetFunctionPointerForDelegate(_closeStatusBar);
+            cuoHost.SetOverlayFn = Marshal.GetFunctionPointerForDelegate(_setOverlay);
+            cuoHost.AddBuffFn = Marshal.GetFunctionPointerForDelegate(_addBuff);
+            cuoHost.RemoveBuffFn = Marshal.GetFunctionPointerForDelegate(_removeBuff);
+            cuoHost.ClearBuffsFn = Marshal.GetFunctionPointerForDelegate(_clearBuffs);
+            cuoHost.DefineTimerGroupFn = Marshal.GetFunctionPointerForDelegate(_defineTimerGroup);
+            cuoHost.AddTimerFn = Marshal.GetFunctionPointerForDelegate(_addTimer);
+            cuoHost.RemoveTimerFn = Marshal.GetFunctionPointerForDelegate(_removeTimer);
+            cuoHost.RemoveTimerGroupFn = Marshal.GetFunctionPointerForDelegate(_removeTimerGroup);
+            cuoHost.ClearTimersFn = Marshal.GetFunctionPointerForDelegate(_clearTimers);
+            cuoHost.AddAreaFn = Marshal.GetFunctionPointerForDelegate(_addArea);
+            cuoHost.RemoveAreaFn = Marshal.GetFunctionPointerForDelegate(_removeArea);
+            cuoHost.ClearAreasFn = Marshal.GetFunctionPointerForDelegate(_clearAreas);
+            cuoHost.GetAreaTimerFn = Marshal.GetFunctionPointerForDelegate(_getAreaTimer);
+            cuoHost.AddCharacterFn = Marshal.GetFunctionPointerForDelegate(_addCharacter);
+            cuoHost.RemoveCharacterFn = Marshal.GetFunctionPointerForDelegate(_removeCharacter);
+            cuoHost.ClearCharactersFn = Marshal.GetFunctionPointerForDelegate(_clearCharacters);
+            cuoHost.SetPluginPartyMemberFn = Marshal.GetFunctionPointerForDelegate(_setPluginPartyMember);
+            cuoHost.RemovePluginPartyMemberFn = Marshal.GetFunctionPointerForDelegate(_removePluginPartyMember);
+            cuoHost.ClearPluginPartyFn = Marshal.GetFunctionPointerForDelegate(_clearPluginParty);
+            // UO.Load (GameController.Load) runs before PluginHost.Initialize, so the
+            // client version is parsed by now. The host uses it to pick pre/post-KR
+            // packet framing (e.g. MoveItem drop); 0 would break drops on modern servers.
+            cuoHost.ClientVersion = (int)Client.Game.UO.Version;
 
             _initialize((IntPtr)mem);
         }
@@ -343,6 +538,21 @@ namespace ClassicUO
         {
             _updatePlayerPos?.Invoke(x, y, z);
         }
+
+        public void WalkProgress(int state)
+        {
+            _walkProgress?.Invoke(state);
+        }
+
+        public void BuffEvent(int id, int reason)
+        {
+            _buffEvent?.Invoke(id, reason);
+        }
+
+        public void TimerEvent(int id, int reason)
+        {
+            _timerEvent?.Invoke(id, reason);
+        }
     }
 
     interface IPluginHost
@@ -362,7 +572,10 @@ namespace ClassicUO
         public void GetCommandList(out IntPtr listPtr, out int listCount);
         public unsafe int SdlEvent(SDL3.SDL.SDL_Event* ev);
         public void UpdatePlayerPosition(int x, int y, int z);
+        public void WalkProgress(int state);
         public bool PacketIn(ArraySegment<byte> buffer);
         public bool PacketOut(Span<byte> buffer);
+        public void BuffEvent(int id, int reason);
+        public void TimerEvent(int id, int reason);
     }
 }

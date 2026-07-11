@@ -572,7 +572,34 @@ namespace ClassicUO.Resources {
                 return ResourceManager.GetString("CellSize", resourceCulture);
             }
         }
-        
+
+        /// <summary>
+        ///   Looks up a localized string similar to Use fixed grid (locks resize).
+        /// </summary>
+        public static string CounterUseFixedGrid {
+            get {
+                return ResourceManager.GetString("CounterUseFixedGrid", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Rows:.
+        /// </summary>
+        public static string CounterRows {
+            get {
+                return ResourceManager.GetString("CounterRows", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Columns:.
+        /// </summary>
+        public static string CounterColumns {
+            get {
+                return ResourceManager.GetString("CounterColumns", resourceCulture);
+            }
+        }
+
         /// <summary>
         ///   Looks up a localized string similar to Changing language needs restart to take effect.
         /// </summary>
@@ -1268,6 +1295,24 @@ namespace ClassicUO.Resources {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to Use Up/Down arrows for chat history.
+        /// </summary>
+        public static string ChatHistoryUseArrows {
+            get {
+                return ResourceManager.GetString("ChatHistoryUseArrows", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Chat history length.
+        /// </summary>
+        public static string ChatHistoryLength {
+            get {
+                return ResourceManager.GetString("ChatHistoryLength", resourceCulture);
+            }
+        }
+
+        /// <summary>
         ///   Looks up a localized string similar to Disable Ctrl + Q/W (messageHistory).
         /// </summary>
         public static string DisableMessageHistory {
@@ -1834,7 +1879,52 @@ namespace ClassicUO.Resources {
                 return ResourceManager.GetString("GridLoot_None", resourceCulture);
             }
         }
-        
+
+        /// <summary>
+        ///   Looks up a localized string similar to Container view:.
+        /// </summary>
+        public static string ContainerViewMode {
+            get {
+                return ResourceManager.GetString("ContainerViewMode", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Standard.
+        /// </summary>
+        public static string ContainerViewMode_Standard {
+            get {
+                return ResourceManager.GetString("ContainerViewMode_Standard", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Grid.
+        /// </summary>
+        public static string ContainerViewMode_Grid {
+            get {
+                return ResourceManager.GetString("ContainerViewMode_Grid", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Toggle.
+        /// </summary>
+        public static string ContainerViewMode_Toggle {
+            get {
+                return ResourceManager.GetString("ContainerViewMode_Toggle", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Default toggled containers to grid.
+        /// </summary>
+        public static string ContainerToggleDefaultGrid {
+            get {
+                return ResourceManager.GetString("ContainerToggleDefaultGrid", resourceCulture);
+            }
+        }
+
         /// <summary>
         ///   Looks up a localized string similar to [Guild]: .
         /// </summary>
@@ -3332,6 +3422,15 @@ namespace ClassicUO.Resources {
                 return ResourceManager.GetString("RelativeDragAndDropContainers", resourceCulture);
             }
         }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Allow dropping items outside container bounds.
+        /// </summary>
+        public static string AllowItemsOutsideContainerBounds {
+            get {
+                return ResourceManager.GetString("AllowItemsOutsideContainerBounds", resourceCulture);
+            }
+        }
         
         /// <summary>
         ///   Looks up a localized string similar to Releasing Ctrl Restores Scale.
@@ -3672,6 +3771,15 @@ namespace ClassicUO.Resources {
         public static string ShowBuffDuration {
             get {
                 return ResourceManager.GetString("ShowBuffDuration", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Show buff ID in tooltip.
+        /// </summary>
+        public static string ShowBuffId {
+            get {
+                return ResourceManager.GetString("ShowBuffId", resourceCulture);
             }
         }
         
@@ -4462,7 +4570,16 @@ namespace ClassicUO.Resources {
                 return ResourceManager.GetString("UseBlackBackgr", resourceCulture);
             }
         }
-        
+
+        /// <summary>
+        ///   Looks up a localized string similar to Show stat values on bars.
+        /// </summary>
+        public static string ShowStatValuesOnBars {
+            get {
+                return ResourceManager.GetString("ShowStatValuesOnBars", resourceCulture);
+            }
+        }
+
         /// <summary>
         ///   Looks up a localized string similar to Use colored lights.
         /// </summary>

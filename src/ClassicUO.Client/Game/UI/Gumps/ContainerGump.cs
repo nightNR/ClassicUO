@@ -24,8 +24,14 @@ namespace ClassicUO.Game.UI.Gumps
         private readonly bool _hideIfEmpty;
         private HitBox _hitBox;
         private bool _isMinimized;
+        private GridContainerView _gridView;
+        private int _gridPage;
 
         internal const int CORPSES_GUMP = 0x0009;
+
+        // Top strip reserved in grid Toggle mode so the corner toggle button does not
+        // overlap the first row of grid cells.
+        private const int TOGGLE_HEADER_HEIGHT = 24;
 
         public ContainerGump(World world) : base(world, 0, 0) { }
 
@@ -118,6 +124,13 @@ namespace ClassicUO.Game.UI.Gumps
             get => _isMinimized;
             set
             {
+                if (_gumpPicContainer == null)
+                {
+                    // Grid mode: no iconized artwork, minimize is disabled.
+                    _isMinimized = false;
+                    return;
+                }
+
                 //if (_isMinimized != value)
                 {
                     _isMinimized = value;
@@ -145,6 +158,23 @@ namespace ClassicUO.Game.UI.Gumps
         public bool IsBackgammonBoard =>
             Graphic == 0x092E;
 
+        private static bool ResolveGridView(uint serial)
+        {
+            var profile = ProfileManager.CurrentProfile;
+
+            if (profile == null)
+            {
+                return false;
+            }
+
+            return ContainerViewModeResolver.Resolve(
+                profile.ContainerViewMode,
+                profile.ContainerToggleDefaultGrid,
+                profile.ContainerGridStates,
+                serial
+            );
+        }
+
         private void BuildGump()
         {
             CanMove = true;
@@ -160,9 +190,25 @@ namespace ClassicUO.Game.UI.Gumps
                 return;
             }
 
-            float scale = GetScale();
-
             _data = World.ContainerManager.Get(Graphic);
+
+            _gridView = null;
+
+            if (ResolveGridView(LocalSerial))
+            {
+                BuildGridBranch();
+            }
+            else
+            {
+                BuildStandardBranch(item);
+            }
+
+            AddToggleButtonIfNeeded();
+        }
+
+        private void BuildStandardBranch(Item item)
+        {
+            float scale = GetScale();
             ushort g = _data.Graphic;
 
             _gumpPicContainer?.Dispose();
@@ -196,6 +242,89 @@ namespace ClassicUO.Game.UI.Gumps
 
             Width = _gumpPicContainer.Width = (int)(_gumpPicContainer.Width * scale);
             Height = _gumpPicContainer.Height = (int)(_gumpPicContainer.Height * scale);
+        }
+
+        private void BuildGridBranch()
+        {
+            // Grid mode has no minimizer hitbox, no container art, and no corpse eye.
+            _gumpPicContainer = null;
+            _hitBox = null;
+            _eyeGumpPic = null;
+
+            // In Toggle mode reserve a top strip so the corner toggle button sits above
+            // the grid instead of over the top-right cell.
+            int headerHeight =
+                ProfileManager.CurrentProfile != null
+                && ProfileManager.CurrentProfile.ContainerViewMode == 2
+                    ? TOGGLE_HEADER_HEIGHT
+                    : 0;
+
+            _gridView = new GridContainerView(this) { X = 0, Y = headerHeight };
+            Add(_gridView);
+            _gridView.Rebuild();
+            _gridView.SetPage(_gridPage);
+
+            Width = _gridView.Width;
+            Height = _gridView.Height + headerHeight;
+        }
+
+        private void AddToggleButtonIfNeeded()
+        {
+            if (ProfileManager.CurrentProfile == null
+                || ProfileManager.CurrentProfile.ContainerViewMode != 2)
+            {
+                return;
+            }
+
+            NiceButton btn = new NiceButton(
+                Width - 22,
+                2,
+                20,
+                20,
+                ButtonAction.Activate,
+                _gridView != null ? "S" : "G"
+            )
+            {
+                IsSelectable = false
+            };
+
+            btn.MouseUp += ToggleButtonOnMouseUp;
+
+            Add(btn);
+        }
+
+        private void ToggleButtonOnMouseUp(object sender, MouseEventArgs e)
+        {
+            if (e.Button != MouseButtonType.Left)
+            {
+                return;
+            }
+
+            var profile = ProfileManager.CurrentProfile;
+
+            if (profile == null)
+            {
+                return;
+            }
+
+            profile.ContainerGridStates[LocalSerial] = ContainerViewModeResolver.ComputeToggleValue(
+                profile.ContainerToggleDefaultGrid,
+                profile.ContainerGridStates,
+                LocalSerial
+            );
+
+            RequestUpdateContents();
+        }
+
+        // Container gumps are client-side and carry no server-gump buttons. The grid
+        // paginator (Prev/Next) and the view-mode toggle are NiceButtons using
+        // ButtonAction.Activate, whose click routes here through Gump.OnButtonClick —
+        // which treats any button on a LocalSerial gump as a server gump reply and
+        // Dispose()s the window. Those buttons do their real work in their own MouseUp
+        // handlers, so swallow the routed click here to keep the container open.
+        // Right-click close is unaffected (it disposes via Control.CloseWithRightClick).
+        public override void OnButtonClick(int buttonID)
+        {
         }
 
         private void HitBoxOnMouseUp(object sender, MouseEventArgs e)
@@ -370,6 +499,10 @@ namespace ClassicUO.Game.UI.Gumps
 
                         float scale = GetScale();
 
+                        bool clampToBounds =
+                            ProfileManager.CurrentProfile == null
+                            || !ProfileManager.CurrentProfile.AllowItemsOutsideContainerBounds;
+
                         containerBounds.X = (int)(containerBounds.X * scale);
                         containerBounds.Y = (int)(containerBounds.Y * scale);
                         containerBounds.Width = (int)(containerBounds.Width * scale);
@@ -408,25 +541,31 @@ namespace ClassicUO.Game.UI.Gumps
                             x -= textureW >> 1;
                             y -= textureH >> 1;
 
-                            if (x + textureW > containerBounds.Width)
+                            if (clampToBounds)
                             {
-                                x = containerBounds.Width - textureW;
-                            }
+                                if (x + textureW > containerBounds.Width)
+                                {
+                                    x = containerBounds.Width - textureW;
+                                }
 
-                            if (y + textureH > containerBounds.Height)
-                            {
-                                y = containerBounds.Height - textureH;
+                                if (y + textureH > containerBounds.Height)
+                                {
+                                    y = containerBounds.Height - textureH;
+                                }
                             }
                         }
 
-                        if (x < containerBounds.X)
+                        if (clampToBounds)
                         {
-                            x = containerBounds.X;
-                        }
+                            if (x < containerBounds.X)
+                            {
+                                x = containerBounds.X;
+                            }
 
-                        if (y < containerBounds.Y)
-                        {
-                            y = containerBounds.Y;
+                            if (y < containerBounds.Y)
+                            {
+                                y = containerBounds.Y;
+                            }
                         }
 
                         x = (int)(x / scale);
@@ -488,7 +627,7 @@ namespace ClassicUO.Game.UI.Gumps
                 SelectedObject.SelectedContainer = item;
             }
 
-            if (Graphic == CORPSES_GUMP && _corpseEyeTicks < Time.Ticks)
+            if (Graphic == CORPSES_GUMP && _eyeGumpPic != null && _corpseEyeTicks < Time.Ticks)
             {
                 _eyeCorspeOffset = _eyeCorspeOffset == 0 ? 1 : 0;
                 _corpseEyeTicks = (long)Time.Ticks + 750;
@@ -501,10 +640,27 @@ namespace ClassicUO.Game.UI.Gumps
 
         protected override void UpdateContents()
         {
+            if (_gridView != null)
+            {
+                _gridPage = _gridView.CurrentPage;
+            }
+
             Clear();
             BuildGump();
-            IsMinimized = IsMinimized;
-            ItemsOnAdded();
+
+            Entity container = World.Get(LocalSerial);
+
+            if (container != null && !container.IsEmpty && _hideIfEmpty && !IsVisible)
+            {
+                IsVisible = true;
+            }
+
+            if (_gridView == null)
+            {
+                IsMinimized = IsMinimized;
+                ItemsOnAdded();
+            }
+            // Grid branch: BuildGump already created and populated _gridView.
         }
 
         public override void Save(XmlTextWriter writer)
@@ -539,11 +695,6 @@ namespace ClassicUO.Game.UI.Gumps
             }
 
             bool is_corpse = container.Graphic == 0x2006;
-
-            if (!container.IsEmpty && _hideIfEmpty && !IsVisible)
-            {
-                IsVisible = true;
-            }
 
             for (LinkedObject i = container.Items; i != null; i = i.Next)
             {
@@ -612,6 +763,14 @@ namespace ClassicUO.Game.UI.Gumps
 
         public void CheckItemControlPosition(Item item)
         {
+            if (
+                ProfileManager.CurrentProfile != null
+                && ProfileManager.CurrentProfile.AllowItemsOutsideContainerBounds
+            )
+            {
+                return;
+            }
+
             Rectangle dataBounds = _data.Bounds;
 
             int boundX = dataBounds.X;
@@ -662,7 +821,7 @@ namespace ClassicUO.Game.UI.Gumps
             base.AddToRenderLists(renderLists, x, y, ref layerDepthRef);
             float layerDepth = layerDepthRef;
 
-            if (CUOEnviroment.Debug && !IsMinimized)
+            if (CUOEnviroment.Debug && !IsMinimized && _gridView == null)
             {
                 Rectangle bounds = _data.Bounds;
                 float scale = GetScale();
