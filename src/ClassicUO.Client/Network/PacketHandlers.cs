@@ -10,6 +10,7 @@ using ClassicUO.Game.Scenes;
 using ClassicUO.Game.UI.Controls;
 using ClassicUO.Game.UI.Gumps;
 using ClassicUO.IO;
+using ClassicUO.PluginApi;
 using ClassicUO.Renderer;
 using ClassicUO.Resources;
 using ClassicUO.Utility;
@@ -358,11 +359,12 @@ namespace ClassicUO.Network
 
         private static void TargetCursor(World world, ref StackDataReader p)
         {
-            world.TargetManager.SetTargeting(
-                (CursorTarget)p.ReadUInt8(),
-                p.ReadUInt32BE(),
-                (TargetType)p.ReadUInt8()
-            );
+            var cursorTarget = (CursorTarget)p.ReadUInt8();
+            uint cursorId = p.ReadUInt32BE();
+            var targetType = (TargetType)p.ReadUInt8();
+            HighlightObjectTypes acceptedTypes = ReadPluginHoverAcceptedTypes(cursorTarget, ref p);
+
+            world.TargetManager.SetTargeting(cursorTarget, cursorId, targetType, acceptedTypes);
 
             if (world.Party.PartyHealTimer < Time.Ticks && world.Party.PartyHealTarget != 0)
             {
@@ -370,6 +372,13 @@ namespace ClassicUO.Network
                 world.Party.PartyHealTimer = 0;
                 world.Party.PartyHealTarget = 0;
             }
+        }
+
+        internal static HighlightObjectTypes ReadPluginHoverAcceptedTypes(CursorTarget cursorTarget, ref StackDataReader p)
+        {
+            return cursorTarget == CursorTarget.PluginHoverTarget
+                ? (HighlightObjectTypes)p.ReadUInt8()
+                : HighlightObjectTypes.All;
         }
 
         private static void SecureTrading(World world, ref StackDataReader p)
