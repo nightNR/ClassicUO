@@ -409,6 +409,8 @@ namespace ClassicUO.Configuration
             {
                 xml.WriteStartDocument(true);
                 xml.WriteStartElement("gumps");
+                xml.WriteAttributeString("save_w", Client.Game.ClientBounds.Width.ToString());
+                xml.WriteAttributeString("save_h", Client.Game.ClientBounds.Height.ToString());
 
                 UIManager.AnchorManager.Save(xml);
 
