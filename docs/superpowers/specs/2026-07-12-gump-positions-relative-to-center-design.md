@@ -117,6 +117,12 @@ gump.Y = y;
 - The existing `SetInScreen()` (resets to 0,0 only when fully off-screen) is left
   untouched; this feature does its own stronger clamp inline so unrelated call
   sites keep their current behavior.
+- **`NameOverHeadHandler` gump is not re-anchored.** In `ReadGumps` that type
+  is handled specially (its position is stored into
+  `NameOverHeadHandlerGump.LastPosition` and the loop `continue`s with
+  `gump == null`), so it never reaches the center-anchor block and restores at
+  its raw absolute position even when the feature is on. Acceptable for the
+  experimental opt-in; revisit if it graduates.
 
 ## Testing
 

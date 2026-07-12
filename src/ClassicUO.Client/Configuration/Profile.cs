@@ -549,6 +549,8 @@ namespace ClassicUO.Configuration
 
                 if (root != null)
                 {
+                    // Non-short-circuit '&' between the TryParse calls is deliberate:
+                    // both 'out' vars must be definitely assigned before the '>0' checks.
                     bool haveSaveSize =
                         int.TryParse(root.GetAttribute("save_w"), out int saveW) &
                         int.TryParse(root.GetAttribute("save_h"), out int saveH) &&
