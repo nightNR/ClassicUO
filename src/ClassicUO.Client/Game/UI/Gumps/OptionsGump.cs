@@ -36,7 +36,7 @@ namespace ClassicUO.Game.UI.Gumps
         private InputField _autoOpenCorpseRange;
 
         //experimental
-        private Checkbox _autoOpenDoors, _autoOpenCorpse, _skipEmptyCorpse, _disableTabBtn, _disableCtrlQWBtn, _disableDefaultHotkeys, _disableArrowBtn, _disableAutoMove, _overrideContainerLocation, _smoothDoors, _showTargetRangeIndicator, _customBars, _customBarsBBG, _statValuesOnBars, _saveHealthbars;
+        private Checkbox _autoOpenDoors, _autoOpenCorpse, _skipEmptyCorpse, _disableTabBtn, _disableCtrlQWBtn, _disableDefaultHotkeys, _disableArrowBtn, _disableAutoMove, _overrideContainerLocation, _smoothDoors, _showTargetRangeIndicator, _customBars, _customBarsBBG, _statValuesOnBars, _saveHealthbars, _saveGumpsRelativeToCenter;
         private Checkbox _nameOverheadAlwaysOn, _nameOverheadShowHpBar;
         private HSliderBar _cellSize;
         private Checkbox _containerScaleItems, _containerDoubleClickToLoot, _relativeDragAnDropItems, _useLargeContianersGumps, _highlightContainersWhenMouseIsOver, _allowItemsOutsideContainerBounds;
@@ -47,6 +47,7 @@ namespace ClassicUO.Game.UI.Gumps
         private Combobox _cotType;
         private DataBox _databox;
         private HSliderBar _delay_before_display_tooltip, _tooltip_zoom, _tooltip_background_opacity;
+        private HSliderBar _statusbar_color_opacity;
         private Combobox _dragSelectModifierKey;
         private Combobox _backpackStyle;
         private Checkbox _hueContainerGumps;
@@ -597,6 +598,18 @@ namespace ClassicUO.Game.UI.Gumps
                     null,
                     ResGumps.SmoothDoors,
                     _currentProfile.SmoothDoors,
+                    startX,
+                    startY
+                )
+            );
+
+            section.Add
+            (
+                _saveGumpsRelativeToCenter = AddCheckBox
+                (
+                    null,
+                    "Save gump positions relative to window center",
+                    _currentProfile.SaveGumpsRelativeToCenter,
                     startX,
                     startY
                 )
@@ -3460,7 +3473,25 @@ namespace ClassicUO.Game.UI.Gumps
             };
             rightArea.Add(enabledBox);
 
-            DataBox databox = new DataBox(0, 70, 0, 0) { WantUpdateSize = true };
+            Label opacityLabel = AddLabel(rightArea, "Color opacity", 5, 38);
+
+            _statusbar_color_opacity = AddHSlider
+            (
+                rightArea,
+                0,
+                100,
+                _currentProfile != null ? _currentProfile.StatusbarColorOpacity : 80,
+                opacityLabel.X + opacityLabel.Width + 8,
+                38,
+                150
+            );
+            _statusbar_color_opacity.ValueChanged += (s, e) =>
+            {
+                if (_currentProfile != null)
+                    _currentProfile.StatusbarColorOpacity = _statusbar_color_opacity.Value;
+            };
+
+            DataBox databox = new DataBox(0, 95, 0, 0) { WantUpdateSize = true };
 
             void AddRow(StatusbarColorRule rule)
             {
@@ -3475,7 +3506,7 @@ namespace ClassicUO.Game.UI.Gumps
                 databox.Add(row);
             }
 
-            NiceButton addTarget = new NiceButton(5, 35, 130, 25, ButtonAction.Activate, "Add (target)") { ButtonParameter = 999 };
+            NiceButton addTarget = new NiceButton(5, 65, 130, 25, ButtonAction.Activate, "Add (target)") { ButtonParameter = 999 };
             addTarget.MouseUp += (sender, e) =>
             {
                 _statusbarColorTargetPending = true;
@@ -3503,7 +3534,7 @@ namespace ClassicUO.Game.UI.Gumps
                 );
             };
 
-            NiceButton addManual = new NiceButton(140, 35, 130, 25, ButtonAction.Activate, "Add (manual)") { ButtonParameter = 999 };
+            NiceButton addManual = new NiceButton(140, 65, 130, 25, ButtonAction.Activate, "Add (manual)") { ButtonParameter = 999 };
             addManual.MouseUp += (sender, e) =>
             {
                 var rule = new StatusbarColorRule { Graphic = 0, Hues = new List<ushort>(), Color = 0 };
@@ -4636,6 +4667,7 @@ namespace ClassicUO.Game.UI.Gumps
             _currentProfile.DisableAutoMove = _disableAutoMove.IsChecked;
             _currentProfile.AutoOpenDoors = _autoOpenDoors.IsChecked;
             _currentProfile.SmoothDoors = _smoothDoors.IsChecked;
+            _currentProfile.SaveGumpsRelativeToCenter = _saveGumpsRelativeToCenter.IsChecked;
             _currentProfile.AutoOpenCorpses = _autoOpenCorpse.IsChecked;
             _currentProfile.AutoOpenCorpseRange = int.Parse(_autoOpenCorpseRange.Text);
             _currentProfile.CorpseOpenOptions = _autoOpenCorpseOptions.SelectedIndex;

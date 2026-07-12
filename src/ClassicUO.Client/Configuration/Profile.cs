@@ -186,6 +186,7 @@ namespace ClassicUO.Configuration
 
         // Experimental
         public bool CastSpellsByOneClick { get; set; }
+        public bool SaveGumpsRelativeToCenter { get; set; }
         public bool BuffBarTime { get; set; }
         public bool BuffBarShowId { get; set; } = true;
         public bool FastSpellsAssign { get; set; }
@@ -226,6 +227,7 @@ namespace ClassicUO.Configuration
         public bool PartyInviteGump { get; set; }
         public bool CustomBarsToggled { get; set; }
         public bool StatusbarColorsEnabled { get; set; } = true;
+        public int StatusbarColorOpacity { get; set; } = 80;
         public bool CBBlackBGToggled { get; set; }
         public bool ShowStatValuesOnBars { get; set; }
 
@@ -407,6 +409,8 @@ namespace ClassicUO.Configuration
             {
                 xml.WriteStartDocument(true);
                 xml.WriteStartElement("gumps");
+                xml.WriteAttributeString("save_w", Client.Game.ClientBounds.Width.ToString());
+                xml.WriteAttributeString("save_h", Client.Game.ClientBounds.Height.ToString());
 
                 UIManager.AnchorManager.Save(xml);
 
@@ -545,6 +549,13 @@ namespace ClassicUO.Configuration
 
                 if (root != null)
                 {
+                    // Non-short-circuit '&' between the TryParse calls is deliberate:
+                    // both 'out' vars must be definitely assigned before the '>0' checks.
+                    bool haveSaveSize =
+                        int.TryParse(root.GetAttribute("save_w"), out int saveW) &
+                        int.TryParse(root.GetAttribute("save_h"), out int saveH) &&
+                        saveW > 0 && saveH > 0;
+
                     foreach (XmlElement xml in root.ChildNodes /*.GetElementsByTagName("gump")*/)
                     {
                         if (xml.Name != "gump")
@@ -691,6 +702,20 @@ namespace ClassicUO.Configuration
 
                             gump.LocalSerial = serial;
                             gump.Restore(xml);
+
+                            if (ProfileManager.CurrentProfile != null &&
+                                ProfileManager.CurrentProfile.SaveGumpsRelativeToCenter &&
+                                haveSaveSize)
+                            {
+                                Rectangle cb = Client.Game.ClientBounds;
+
+                                (x, y) = GumpPositionHelper.CenterAnchor(
+                                    x, y,
+                                    saveW, saveH,
+                                    cb.Width, cb.Height,
+                                    gump.Width, gump.Height);
+                            }
+
                             gump.X = x;
                             gump.Y = y;
 

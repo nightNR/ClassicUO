@@ -297,6 +297,28 @@ namespace ClassicUO.Game.UI.Gumps
 
             return false;
         }
+
+        protected StatusbarColorFill _statusColorFill;
+
+        protected void UpdateStatusColorFill(Mobile mobile)
+        {
+            if (_statusColorFill == null)
+                return;
+
+            if (mobile != null && mobile != World.Player &&
+                World.StatusbarColorManager.TryGetColor(mobile.Graphic, mobile.Hue, out ushort fillHue))
+            {
+                _statusColorFill.Width = Width;
+                _statusColorFill.Height = Height;
+                _statusColorFill.ColorHue = fillHue;
+                _statusColorFill.FillAlpha = (ProfileManager.CurrentProfile != null ? ProfileManager.CurrentProfile.StatusbarColorOpacity : 80) / 100f;
+                _statusColorFill.IsVisible = true;
+            }
+            else
+            {
+                _statusColorFill.IsVisible = false;
+            }
+        }
     }
 
     internal class HealthBarGumpCustom : BaseHealthBarGump
@@ -489,6 +511,8 @@ namespace ClassicUO.Game.UI.Gumps
 
                     _bars[0].IsVisible = false;
                 }
+
+                UpdateStatusColorFill(null);
             }
 
             if (entity != null && !entity.IsDestroyed)
@@ -634,6 +658,8 @@ namespace ClassicUO.Game.UI.Gumps
                         _background.Hue = 912;
                     }
                 }
+
+                UpdateStatusColorFill(mobile);
 
 
                 if (mobile != null)
@@ -833,6 +859,7 @@ namespace ClassicUO.Game.UI.Gumps
                 Width = HPB_WIDTH;
 
                 Add(_background = new AlphaBlendControl(0.7f) { Width = Width, Height = Height, AcceptMouseInput = true, CanMove = true });
+                Add(_statusColorFill = new StatusbarColorFill { Width = Width, Height = Height, IsVisible = false });
 
 
                 if (LocalSerial == World.Player)
@@ -1030,6 +1057,7 @@ namespace ClassicUO.Game.UI.Gumps
                     Width = HPB_WIDTH;
 
                     Add(_background = new AlphaBlendControl(0.7f) { Width = Width, Height = Height, AcceptMouseInput = true, CanMove = true });
+                    Add(_statusColorFill = new StatusbarColorFill { Width = Width, Height = Height, IsVisible = false });
 
                     Add
                     (
@@ -1206,6 +1234,7 @@ namespace ClassicUO.Game.UI.Gumps
                     Width = HPB_WIDTH;
 
                     Add(_background = new AlphaBlendControl(0.7f) { Width = Width, Height = Height, AcceptMouseInput = true, CanMove = true });
+                    Add(_statusColorFill = new StatusbarColorFill { Width = Width, Height = Height, IsVisible = false });
 
                     Add
                     (
@@ -1550,6 +1579,8 @@ namespace ClassicUO.Game.UI.Gumps
                 Width = 115;
                 Height = 55;
 
+                Add(_statusColorFill = new StatusbarColorFill { Width = Width, Height = Height, IsVisible = false });
+
                 if (LocalSerial == World.Player)
                 {
                     Add
@@ -1654,6 +1685,8 @@ namespace ClassicUO.Game.UI.Gumps
                     Width = _background.Width;
                     Height = _background.Height;
 
+                    Add(_statusColorFill = new StatusbarColorFill { Width = Width, Height = Height, IsVisible = false });
+
                     // add backgrounds
                     Add(_hpLineRed = new GumpPic(34, 12, LINE_RED, 0));
                     Add(new GumpPic(34, 25, LINE_RED, 0));
@@ -1722,6 +1755,7 @@ namespace ClassicUO.Game.UI.Gumps
                     }
 
                     Add(_background = new GumpPic(0, 0, 0x0804, barColor) { ContainsByBounds = true });
+                    Add(_statusColorFill = new StatusbarColorFill { Width = Width, Height = Height, IsVisible = false });
                     Add(_hpLineRed = new GumpPic(34, 38, LINE_RED, hitsColor));
 
                     Add
@@ -1872,6 +1906,8 @@ namespace ClassicUO.Game.UI.Gumps
 
                     _bars[0].IsVisible = false;
                 }
+
+                UpdateStatusColorFill(null);
             }
 
             if (entity != null && !entity.IsDestroyed)
@@ -1987,6 +2023,8 @@ namespace ClassicUO.Game.UI.Gumps
                 {
                     _background.Hue = barColor;
                 }
+
+                UpdateStatusColorFill(mobile);
 
                 if (mobile != null && mobile.IsPoisoned && !_poisoned)
                 {

@@ -7,6 +7,7 @@ using ClassicUO.Game.UI.Gumps;
 using ClassicUO.Input;
 using ClassicUO.Assets;
 using ClassicUO.Network;
+using ClassicUO.PluginApi;
 using ClassicUO.Resources;
 using ClassicUO.Utility;
 using System;
@@ -24,7 +25,8 @@ namespace ClassicUO.Game.Managers
         SetGrabBag,
         HueCommandTarget,
         IgnorePlayerTarget,
-        CallbackTarget
+        CallbackTarget,
+        PluginHoverTarget
     }
 
     internal class CursorType
@@ -112,6 +114,8 @@ namespace ClassicUO.Game.Managers
 
         public uint LastAttack, SelectedTarget, NewTargetSystemSerial;
 
+        public HighlightObjectTypes PluginHoverAcceptedTypes { get; private set; } = HighlightObjectTypes.All;
+
         public readonly LastTargetInfo LastTargetInfo = new LastTargetInfo();
 
 
@@ -145,6 +149,7 @@ namespace ClassicUO.Game.Managers
             _targetCursorId = 0;
             MultiTargetInfo = null;
             TargetingType = 0;
+            PluginHoverAcceptedTypes = HighlightObjectTypes.All;
         }
 
         public void SetTargeting(Action<GameObject> callback, uint cursorID, TargetType cursorType)
@@ -154,7 +159,7 @@ namespace ClassicUO.Game.Managers
             _targetCallback = callback;
         }
 
-        public void SetTargeting(CursorTarget targeting, uint cursorID, TargetType cursorType)
+        public void SetTargeting(CursorTarget targeting, uint cursorID, TargetType cursorType, HighlightObjectTypes acceptedTypes = HighlightObjectTypes.All)
         {
             if (targeting == CursorTarget.Invalid)
             {
@@ -165,6 +170,7 @@ namespace ClassicUO.Game.Managers
             IsTargeting = cursorType < TargetType.Cancel;
             TargetingState = targeting;
             TargetingType = cursorType;
+            PluginHoverAcceptedTypes = acceptedTypes;
 
             if (IsTargeting)
             {
@@ -401,6 +407,66 @@ namespace ClassicUO.Game.Managers
                         ClearTargetingWithoutTargetCancelPacket();
                         return;
                 }
+            }
+        }
+
+        internal static bool MatchesAcceptedTypes(BaseGameObject obj, HighlightObjectTypes accepted)
+        {
+            HighlightObjectTypes category = obj switch
+            {
+                Mobile => HighlightObjectTypes.Mobile,
+                Item item when item.IsCorpse => HighlightObjectTypes.Corpse,
+                Item => HighlightObjectTypes.Item,
+                Land => HighlightObjectTypes.Land,
+                Multi => HighlightObjectTypes.Multi,
+                Static => HighlightObjectTypes.Static,
+                GameObject => HighlightObjectTypes.Static,
+                _ => HighlightObjectTypes.None
+            };
+
+            return category != HighlightObjectTypes.None && (accepted & category) != 0;
+        }
+
+        internal bool TryResolveObject(BaseGameObject obj)
+        {
+            if (obj is TextObject textObject)
+            {
+                obj = textObject.Owner;
+            }
+
+            switch (obj)
+            {
+                case Entity ent:
+                    Target(ent.Serial);
+                    return true;
+
+                case Land land:
+                    Target(0, land.X, land.Y, land.Z, land.TileData.IsWet);
+                    return true;
+
+                case GameObject o:
+                    Target(o.Graphic, o.X, o.Y, o.Z);
+                    return true;
+
+                default:
+                    return false;
+            }
+        }
+
+        internal void CheckPluginHoverTarget(BaseGameObject hovered)
+        {
+            if (!IsTargeting || TargetingState != CursorTarget.PluginHoverTarget)
+            {
+                return;
+            }
+
+            if (hovered != null && MatchesAcceptedTypes(hovered, PluginHoverAcceptedTypes))
+            {
+                TryResolveObject(hovered);
+            }
+            else
+            {
+                CancelTarget();
             }
         }
 

@@ -13,8 +13,13 @@ public enum StackDirection { Down, Up, Right, Left }
 /// <summary>Placement intent. Reserved; a <c>GroupId == 0</c> already implies Lone.</summary>
 public enum PlacementMode { Lone, Stacking }
 
-/// <summary>What an anchored timer follows. None = fixed screen position / group.</summary>
-public enum AnchorKind { None = 0, Serial = 1, Absolute = 2, Self = 3 }
+/// <summary>
+/// What an anchored timer follows. None = fixed position relative to the
+/// application window's top-left. Viewport = fixed position relative to the
+/// game viewport's top-left (the world-rendering area, excluding docked UI
+/// chrome) - same X/Y and group semantics as None, just a different origin.
+/// </summary>
+public enum AnchorKind { None = 0, Serial = 1, Absolute = 2, Self = 3, Viewport = 4 }
 
 /// <summary>Why a screen timer was removed.</summary>
 public enum TimerRemoveReason { Expired, RemovedByPlugin, RemovedByUser, AnchorLost }
@@ -33,7 +38,7 @@ public sealed class TimerConfig
     public int Height { get; init; }          // 0 = default per shape
     public string? Label { get; init; }
     public bool ShowTime { get; init; }
-    public AnchorKind Anchor { get; init; }         // None => fixed X/Y or group
+    public AnchorKind Anchor { get; init; }         // None/Viewport => fixed X/Y or group
     public uint AnchorSerial { get; init; }         // Serial kind: mobile/item
     public ushort AnchorX { get; init; }            // Absolute kind: tile
     public ushort AnchorY { get; init; }

@@ -7,7 +7,7 @@ namespace ClassicUO.Game.Managers
 {
     internal enum TimerShape { Circle, Bar, Numeric }
     internal enum StackDirection { Down, Up, Right, Left }
-    internal enum AnchorKind { None = 0, Serial = 1, Absolute = 2, Self = 3 }
+    internal enum AnchorKind { None = 0, Serial = 1, Absolute = 2, Self = 3, Viewport = 4 }
 
     internal struct ScreenTimerEntry
     {
@@ -63,7 +63,7 @@ namespace ClassicUO.Game.Managers
     internal static class ScreenTimers
     {
         private const int DefaultBarW = 120, DefaultBarH = 14;
-        private const int DefaultCircle = 32;
+        private const int DefaultCircle = 53;
         private const int DefaultNumericW = 40, DefaultNumericH = 20;
         public const int DefaultGraceMs = 5000;
 
