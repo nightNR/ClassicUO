@@ -263,6 +263,7 @@ namespace ClassicUO.Game.Managers
                     case CursorTarget.Object:
                     case CursorTarget.HueCommandTarget:
                     case CursorTarget.SetTargetClientSide:
+                    case CursorTarget.PluginHoverTarget:
 
                         if (entity != _world.Player)
                         {
