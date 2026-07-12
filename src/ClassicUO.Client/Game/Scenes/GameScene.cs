@@ -821,7 +821,26 @@ namespace ClassicUO.Game.Scenes
                 SelectedObject.Object = null;
             }
 
-            _world.TargetManager.CheckPluginHoverTarget(SelectedObject.Object);
+            BaseGameObject pluginHoverObject = SelectedObject.Object;
+
+            // Plugin hover target must also resolve mobile status/health bars: those are UI gumps,
+            // not world objects, so SelectedObject.Object is null over them and the hover would read
+            // as "nothing" and cancel. Map the health bar under the cursor to its mobile instead.
+            if (pluginHoverObject == null
+                && _world.TargetManager.IsTargeting
+                && _world.TargetManager.TargetingState == CursorTarget.PluginHoverTarget)
+            {
+                var overControl = UIManager.MouseOverControl;
+                BaseHealthBarGump healthBar = overControl as BaseHealthBarGump
+                    ?? overControl?.RootParent as BaseHealthBarGump;
+
+                if (healthBar != null && SerialHelper.IsValid(healthBar.LocalSerial))
+                {
+                    pluginHoverObject = _world.Get(healthBar.LocalSerial);
+                }
+            }
+
+            _world.TargetManager.CheckPluginHoverTarget(pluginHoverObject);
 
             if (
                 _world.TargetManager.IsTargeting
