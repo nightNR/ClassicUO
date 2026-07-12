@@ -549,6 +549,11 @@ namespace ClassicUO.Configuration
 
                 if (root != null)
                 {
+                    bool haveSaveSize =
+                        int.TryParse(root.GetAttribute("save_w"), out int saveW) &
+                        int.TryParse(root.GetAttribute("save_h"), out int saveH) &&
+                        saveW > 0 && saveH > 0;
+
                     foreach (XmlElement xml in root.ChildNodes /*.GetElementsByTagName("gump")*/)
                     {
                         if (xml.Name != "gump")
@@ -695,6 +700,20 @@ namespace ClassicUO.Configuration
 
                             gump.LocalSerial = serial;
                             gump.Restore(xml);
+
+                            if (ProfileManager.CurrentProfile != null &&
+                                ProfileManager.CurrentProfile.SaveGumpsRelativeToCenter &&
+                                haveSaveSize)
+                            {
+                                Rectangle cb = Client.Game.ClientBounds;
+
+                                (x, y) = GumpPositionHelper.CenterAnchor(
+                                    x, y,
+                                    saveW, saveH,
+                                    cb.Width, cb.Height,
+                                    gump.Width, gump.Height);
+                            }
+
                             gump.X = x;
                             gump.Y = y;
 
