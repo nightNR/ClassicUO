@@ -245,6 +245,12 @@ namespace ClassicUO.Configuration
         public int CounterBarRows { get; set; } = 3;
         public int CounterBarColumns { get; set; } = 10;
 
+        // Grid layout for plugin-opened, grouped status bars: bars stack down a
+        // column up to MaxRows, then wrap into a new column to the right; opens
+        // past MaxRows*MaxColumns capacity are dropped.
+        public int PluginStatusBarMaxRows { get; set; } = 10;
+        public int PluginStatusBarMaxColumns { get; set; } = 1;
+
         public bool ShowSkillsChangedMessage { get; set; } = true;
         public int ShowSkillsChangedDeltaValue { get; set; } = 1;
         public bool ShowStatsChangedMessage { get; set; } = true;

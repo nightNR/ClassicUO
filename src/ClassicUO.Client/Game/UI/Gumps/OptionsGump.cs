@@ -126,6 +126,7 @@ namespace ClassicUO.Game.UI.Gumps
         private NiceButton _randomizeColorsButton;
         private Checkbox _restorezoomCheckbox, _zoomCheckbox;
         private InputField _rows, _columns, _highlightAmount, _abbreviatedAmount;
+        private InputField _pluginStatusBarMaxRows, _pluginStatusBarMaxColumns;
 
         // speech
         private Checkbox _scaleSpeechDelay, _saveJournalCheckBox;
@@ -1170,6 +1171,47 @@ namespace ClassicUO.Game.UI.Gumps
                     0
                 )
             );
+
+            // Grid layout for plugin-opened, grouped status bars: bars stack down
+            // a column up to MaxRows, then wrap into a new column; opens past
+            // MaxRows*MaxColumns are dropped.
+            section3.Add(AddLabel(null, "Plugin status bar max rows", 0, 0));
+
+            _pluginStatusBarMaxRows = AddInputField
+            (
+                null,
+                0,
+                0,
+                50,
+                TEXTBOX_HEIGHT,
+                null,
+                50,
+                false,
+                true,
+                3
+            );
+
+            _pluginStatusBarMaxRows.SetText(_currentProfile.PluginStatusBarMaxRows.ToString());
+            section3.AddRight(_pluginStatusBarMaxRows);
+
+            section3.Add(AddLabel(null, "Plugin status bar max columns", 0, 0));
+
+            _pluginStatusBarMaxColumns = AddInputField
+            (
+                null,
+                0,
+                0,
+                50,
+                TEXTBOX_HEIGHT,
+                null,
+                50,
+                false,
+                true,
+                3
+            );
+
+            _pluginStatusBarMaxColumns.SetText(_currentProfile.PluginStatusBarMaxColumns.ToString());
+            section3.AddRight(_pluginStatusBarMaxColumns);
 
 
             SettingsSection section4 = AddSettingsSection(box, "Miscellaneous");
@@ -4233,6 +4275,21 @@ namespace ClassicUO.Game.UI.Gumps
             _currentProfile.HoldShiftForContext = _holdShiftForContext.IsChecked;
             _currentProfile.HoldAltToMoveGumps = _holdAltToMoveGumps.IsChecked;
             _currentProfile.HoldShiftToSplitStack = _holdShiftToSplitStack.IsChecked;
+
+            if (!int.TryParse(_pluginStatusBarMaxRows.Text, out int pluginBarRows) || pluginBarRows < 1)
+            {
+                pluginBarRows = 10;
+                _pluginStatusBarMaxRows.SetText("10");
+            }
+
+            if (!int.TryParse(_pluginStatusBarMaxColumns.Text, out int pluginBarCols) || pluginBarCols < 1)
+            {
+                pluginBarCols = 1;
+                _pluginStatusBarMaxColumns.SetText("1");
+            }
+
+            _currentProfile.PluginStatusBarMaxRows = pluginBarRows;
+            _currentProfile.PluginStatusBarMaxColumns = pluginBarCols;
             _currentProfile.CloseHealthBarType = _healtbarType.SelectedIndex;
             _currentProfile.HideScreenshotStoredInMessage = _hideScreenshotStoredInMessage.IsChecked;
 
