@@ -2,6 +2,7 @@
 
 using System.Collections.Generic;
 using System.Linq;
+using ClassicUO.Configuration;
 using ClassicUO.Game.UI.Gumps;
 
 namespace ClassicUO.Game.Managers
@@ -65,6 +66,12 @@ namespace ClassicUO.Game.Managers
         private static readonly Dictionary<int, AnchorManager.AnchorGroup> _groups =
             new Dictionary<int, AnchorManager.AnchorGroup>();
 
+        // Insertion-ordered live members per group, used to compute the next
+        // grid cell (column-major) and its anchor neighbor. Disposed bars are
+        // pruned lazily on read.
+        private static readonly Dictionary<int, List<BaseHealthBarGump>> _members =
+            new Dictionary<int, List<BaseHealthBarGump>>();
+
         public static void Track(int groupId, AnchorManager.AnchorGroup group)
         {
             if (groupId == 0 || group == null)
@@ -80,6 +87,39 @@ namespace ClassicUO.Game.Managers
             return _groups.TryGetValue(groupId, out AnchorManager.AnchorGroup group) ? group : null;
         }
 
+        /// <summary>
+        /// Returns the group's live members in insertion order, pruning any that
+        /// have been disposed (closed by the user, out of range, death, etc.).
+        /// The returned list is the tracked instance; callers may index it.
+        /// </summary>
+        public static List<BaseHealthBarGump> GetLiveMembers(int groupId)
+        {
+            if (!_members.TryGetValue(groupId, out List<BaseHealthBarGump> list))
+            {
+                return new List<BaseHealthBarGump>();
+            }
+
+            list.RemoveAll(b => b == null || b.IsDisposed);
+
+            return list;
+        }
+
+        public static void AddMember(int groupId, BaseHealthBarGump bar)
+        {
+            if (groupId == 0 || bar == null)
+            {
+                return;
+            }
+
+            if (!_members.TryGetValue(groupId, out List<BaseHealthBarGump> list))
+            {
+                list = new List<BaseHealthBarGump>();
+                _members[groupId] = list;
+            }
+
+            list.Add(bar);
+        }
+
         public static void PruneEmpty()
         {
             List<int> dead = _groups
@@ -90,11 +130,16 @@ namespace ClassicUO.Game.Managers
             foreach (int id in dead)
             {
                 _groups.Remove(id);
+                _members.Remove(id);
             }
         }
 
         /// <summary>Test-only: drops all tracked groups.</summary>
-        public static void Reset() => _groups.Clear();
+        public static void Reset()
+        {
+            _groups.Clear();
+            _members.Clear();
+        }
     }
 
     /// <summary>
@@ -126,6 +171,11 @@ namespace ClassicUO.Game.Managers
             PluginStatusBarGroups.PruneEmpty();
         }
 
+        // Defaults mirror Profile.PluginStatusBarMaxRows/Columns; used when no
+        // profile is loaded (e.g. unit tests).
+        internal const int DefaultMaxRows = 10;
+        internal const int DefaultMaxColumns = 1;
+
         public static void OpenStatusBar(uint serial, int x, int y, byte moveIfExists, int groupId)
         {
             World world = Client.Game?.UO?.World;
@@ -148,6 +198,17 @@ namespace ClassicUO.Game.Managers
                 return;
             }
 
+            // Grouped bars are laid out in a bounded grid; once the group has
+            // filled MaxRows*MaxColumns cells, further opens are dropped.
+            if (groupId != 0 &&
+                IsCapacityReached(
+                    PluginStatusBarGroups.GetLiveMembers(groupId).Count,
+                    ResolveMaxRows(),
+                    ResolveMaxColumns()))
+            {
+                return;
+            }
+
             // Plugin-opened bars are always the custom bar so priority-overlay tint works.
             HealthBarGumpCustom bar = new HealthBarGumpCustom(world, serial)
             {
@@ -163,51 +224,85 @@ namespace ClassicUO.Game.Managers
             }
         }
 
-        // Seeds a new AnchorGroup for the first bar of a groupId; for later bars
-        // it positions the new bar to the right of an existing member and reuses
-        // AnchorManager.DropControl to slot it into the matrix.
+        // Lays the group out column-major: the first bar seeds the group at the
+        // plugin-supplied position; each subsequent bar stacks below the one
+        // above it until a column holds MaxRows bars, then a new column starts to
+        // the right. AnchorManager.DropControl slots the bar into the matrix so
+        // the whole grid drags as one unit.
         private static void AddToGroup(int groupId, BaseHealthBarGump bar)
         {
+            int maxRows = ResolveMaxRows();
+            List<BaseHealthBarGump> members = PluginStatusBarGroups.GetLiveMembers(groupId);
+            int index = members.Count; // cell this new bar will occupy
+
             AnchorManager.AnchorGroup group = PluginStatusBarGroups.GetGroup(groupId);
 
-            if (group == null || group.IsEmpty)
+            if (index == 0 || group == null || group.IsEmpty)
             {
                 group = new AnchorManager.AnchorGroup(bar);
                 UIManager.AnchorManager[bar] = group;
                 PluginStatusBarGroups.Track(groupId, group);
+                PluginStatusBarGroups.AddMember(groupId, bar);
 
                 return;
             }
 
-            BaseHealthBarGump host = FindHost(group);
+            (int _, int row) = GridCell(index, maxRows);
 
-            if (host == null)
+            BaseHealthBarGump neighbor;
+
+            if (row > 0)
             {
-                group = new AnchorManager.AnchorGroup(bar);
-                UIManager.AnchorManager[bar] = group;
-                PluginStatusBarGroups.Track(groupId, group);
-
-                return;
+                // Stack below the previous bar in this column (GetAnchorDirection → south).
+                neighbor = members[index - 1];
+                bar.X = neighbor.X;
+                bar.Y = neighbor.Y + neighbor.GroupMatrixHeight;
+            }
+            else
+            {
+                // Start a new column right of the top bar of the previous column (→ east).
+                neighbor = members[index - maxRows];
+                bar.X = neighbor.X + neighbor.GroupMatrixWidth;
+                bar.Y = neighbor.Y;
             }
 
-            // Place to the right of the host so GetAnchorDirection slots it east.
-            bar.X = host.X + host.GroupMatrixWidth;
-            bar.Y = host.Y;
-
-            UIManager.AnchorManager.DropControl(bar, host);
+            UIManager.AnchorManager.DropControl(bar, neighbor);
+            PluginStatusBarGroups.AddMember(groupId, bar);
         }
 
-        private static BaseHealthBarGump FindHost(AnchorManager.AnchorGroup group)
+        // --- Pure layout helpers (unit-tested) ---
+
+        /// <summary>Column-major cell for the given 0-based insertion index.</summary>
+        internal static (int column, int row) GridCell(int index, int maxRows)
         {
-            foreach (Gump gump in UIManager.Gumps)
+            if (maxRows < 1)
             {
-                if (gump is BaseHealthBarGump bar && !bar.IsDisposed && UIManager.AnchorManager[bar] == group)
-                {
-                    return bar;
-                }
+                maxRows = 1;
             }
 
-            return null;
+            return (index / maxRows, index % maxRows);
+        }
+
+        /// <summary>True once a group already holds every cell of its grid.</summary>
+        internal static bool IsCapacityReached(int liveCount, int maxRows, int maxColumns)
+        {
+            return liveCount >= maxRows * maxColumns;
+        }
+
+        /// <summary>Clamps a grid dimension to a sane minimum of 1.</summary>
+        internal static int NormalizeDimension(int value)
+        {
+            return value < 1 ? 1 : value;
+        }
+
+        internal static int ResolveMaxRows()
+        {
+            return NormalizeDimension(ProfileManager.CurrentProfile?.PluginStatusBarMaxRows ?? DefaultMaxRows);
+        }
+
+        internal static int ResolveMaxColumns()
+        {
+            return NormalizeDimension(ProfileManager.CurrentProfile?.PluginStatusBarMaxColumns ?? DefaultMaxColumns);
         }
     }
 }
