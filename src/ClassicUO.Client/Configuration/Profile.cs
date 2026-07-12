@@ -186,6 +186,7 @@ namespace ClassicUO.Configuration
 
         // Experimental
         public bool CastSpellsByOneClick { get; set; }
+        public bool SaveGumpsRelativeToCenter { get; set; }
         public bool BuffBarTime { get; set; }
         public bool BuffBarShowId { get; set; } = true;
         public bool FastSpellsAssign { get; set; }
