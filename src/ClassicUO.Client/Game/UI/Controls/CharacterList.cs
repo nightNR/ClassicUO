@@ -24,13 +24,18 @@ namespace ClassicUO.Game.UI.Controls
         {
             public readonly string Name;
             public readonly int Slot;
-            public Item(string name, int slot) { Name = name; Slot = slot; }
+            public readonly bool IsNew;   // gets extra separation above it
+            public Item(string name, int slot, bool isNew = false) { Name = name; Slot = slot; IsNew = isNew; }
         }
+
+        private const int ExtraGapBeforeNew = 30;
 
         private readonly List<Item> _items;
         private readonly ILoginFont _font;
         private readonly float _fontSize;
         private readonly int _rowH, _rowGap;
+        private readonly int[] _offsets;   // content-relative top of each row
+        private readonly int _contentH;
         private int _scroll;
         private bool _pressed;
         private int _pressedRow = -1;
@@ -50,18 +55,30 @@ namespace ClassicUO.Game.UI.Controls
             _rowGap = rowGap;
             AcceptMouseInput = true;
             SelectedRow = items.Count > 0 ? 0 : -1;
+
+            // Precompute each row's content-relative top, with extra separation
+            // above any "New" row.
+            _offsets = new int[items.Count];
+            int yoff = 0;
+            for (int i = 0; i < items.Count; i++)
+            {
+                if (i > 0) yoff += _rowGap;
+                if (items[i].IsNew) yoff += ExtraGapBeforeNew;
+                _offsets[i] = yoff;
+                yoff += _rowH;
+            }
+            _contentH = items.Count > 0 ? yoff : 0;
         }
 
         public int SelectedSlot => (SelectedRow >= 0 && SelectedRow < _items.Count) ? _items[SelectedRow].Slot : -1;
 
-        private int Step => _rowH + _rowGap;
-        private int ContentH => _items.Count > 0 ? _items.Count * Step - _rowGap : 0;
-        private int MaxScroll => Math.Max(0, ContentH - Height);
+        private int MaxScroll => Math.Max(0, _contentH - Height);
 
         protected override void OnMouseWheel(MouseEventType delta)
         {
-            if (delta == MouseEventType.WheelScrollUp) _scroll -= Step;
-            else if (delta == MouseEventType.WheelScrollDown) _scroll += Step;
+            int step = _rowH + _rowGap;
+            if (delta == MouseEventType.WheelScrollUp) _scroll -= step;
+            else if (delta == MouseEventType.WheelScrollDown) _scroll += step;
             else return;
 
             _scroll = Math.Clamp(_scroll, 0, MaxScroll);
@@ -69,8 +86,12 @@ namespace ClassicUO.Game.UI.Controls
 
         private int RowAtLocal(int localY)
         {
-            int r = (localY + _scroll) / Step;
-            return (r >= 0 && r < _items.Count) ? r : -1;
+            int t = localY + _scroll;
+            for (int i = 0; i < _items.Count; i++)
+            {
+                if (t >= _offsets[i] && t < _offsets[i] + _rowH) return i;
+            }
+            return -1;
         }
 
         protected override void OnMouseDown(int x, int y, MouseButtonType button)
@@ -125,10 +146,11 @@ namespace ClassicUO.Game.UI.Controls
             bool mouseIn = mlx >= 0 && mlx < Width && mly >= 0 && mly < Height;
             int hoverRow = mouseIn ? RowAtLocal(mly) : -1;
 
-            int scroll = _scroll, rowH = _rowH, step = Step, w = Width, h = Height, sel = SelectedRow;
+            int scroll = _scroll, rowH = _rowH, w = Width, h = Height, sel = SelectedRow;
             bool pressed = _pressed;
             int pressedRow = _pressedRow;
             var items = _items;
+            var offsets = _offsets;
             ILoginFont font = _font;
             float fs = _fontSize;
 
@@ -139,7 +161,7 @@ namespace ClassicUO.Game.UI.Controls
 
                 for (int i = 0; i < items.Count; i++)
                 {
-                    int ry = y - scroll + i * step;
+                    int ry = y - scroll + offsets[i];
                     if (ry + rowH < y || ry > y + h) continue;
 
                     Texture2D bg = (pressed && i == pressedRow) ? dis

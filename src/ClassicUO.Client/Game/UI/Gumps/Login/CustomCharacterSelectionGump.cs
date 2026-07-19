@@ -23,8 +23,21 @@ namespace ClassicUO.Game.UI.Gumps.Login
 
         private const int ListW = 400, RowH = 60, RowGap = 12;
         private const int BtnW = 185, BtnH = 48;
+        private const int NewSlot = -1;   // sentinel slot for the "New Character" row
 
         private readonly CharacterList _list;
+
+        private static void Proceed(LoginScene scene, int slot)
+        {
+            if (slot == NewSlot)
+            {
+                scene.StartCharCreation();
+            }
+            else if (slot >= 0)
+            {
+                scene.SelectCharacter((uint)slot);
+            }
+        }
 
         public CustomCharacterSelectionGump(World world, LoginScene scene) : base(world, 0, 0)
         {
@@ -45,7 +58,8 @@ namespace ClassicUO.Game.UI.Gumps.Login
             var titleSize = cinzel.Measure(title, 26f, 3f);
             Add(new TtfLabel(title, cinzel, 26f, labelColor, 1f, PanelCX - (int)(titleSize.X / 2), PanelY + 46, 3f));
 
-            // Build items from non-empty character slots.
+            // Build items from non-empty character slots, then a "New Character" row
+            // (slot -1) as the last item, which starts character creation.
             var items = new List<CharacterList.Item>();
             string[] chars = scene.Characters ?? System.Array.Empty<string>();
             for (int i = 0; i < chars.Length; i++)
@@ -55,6 +69,7 @@ namespace ClassicUO.Game.UI.Gumps.Login
                     items.Add(new CharacterList.Item(chars[i], i));
                 }
             }
+            items.Add(new CharacterList.Item("New Character", NewSlot, isNew: true));
 
             // Scrollable list viewport, sized to fit above the bottom buttons.
             int listX = PanelCX - ListW / 2;
@@ -62,7 +77,7 @@ namespace ClassicUO.Game.UI.Gumps.Login
             int listH = PanelH - 110 - 34 - BtnH - 30;
             _list = new CharacterList(items, cormorant, 18f, listX, listY, ListW, listH, RowH, RowGap)
             {
-                Activated = slot => scene.SelectCharacter((uint)slot)
+                Activated = slot => Proceed(scene, slot)
             };
             Add(_list);
 
@@ -78,14 +93,7 @@ namespace ClassicUO.Game.UI.Gumps.Login
 
             Add(new ImageButton(ButtonStyle.Priority, "Select", cinzel, 20f, selX, btnY, BtnW, BtnH)
             {
-                Clicked = () =>
-                {
-                    int slot = _list.SelectedSlot;
-                    if (slot >= 0)
-                    {
-                        scene.SelectCharacter((uint)slot);
-                    }
-                }
+                Clicked = () => Proceed(scene, _list.SelectedSlot)
             });
         }
     }
