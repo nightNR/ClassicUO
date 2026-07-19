@@ -29,6 +29,10 @@
     Optional. If given, copies the freshly built cuo.dll (and cuo.pdb) into this
     directory after the build - e.g. the Phoenix bundle's plugin folder.
 
+.PARAMETER ClassicLogin
+    Build the original UO login screen instead of the custom gothic
+    login/realm/character scene. The custom scene is built in by default.
+
 .NOTES
     Prerequisites for NativeAOT on Windows: the Visual Studio C++ build tools
     (Desktop C++ workload - provides link.exe and the MSVC libs). Without them the
@@ -45,7 +49,9 @@ param(
     [string]$Rid = "win-x64",
     [string]$Configuration = "Release",
     [string]$DeployTo,
-    [switch]$CustomLoginScene
+    # The custom gothic login/realm/character scene is built in by default.
+    # Pass -ClassicLogin to build the original UO login instead.
+    [switch]$ClassicLogin
 )
 
 $ErrorActionPreference = "Stop"
@@ -67,19 +73,18 @@ Write-Host "    output  : $outputDir"
 $cuoDll = Join-Path $outputDir "cuo.dll"
 $before = if (Test-Path $cuoDll) { (Get-Item $cuoDll).LastWriteTime } else { $null }
 
+$customLogin = -not $ClassicLogin
+Write-Host ("    login   : {0} (CustomLoginScene={1})" -f $(if ($customLogin) { "custom gothic scene" } else { "classic UO" }), $customLogin.ToString().ToLower())
+
 $publishArgs = @(
     $clientProject
     "-c", $Configuration
     "-r", $Rid
     "-p:BootstrapHostMode=true"
     "-p:StripSymbols=true"
+    "-p:CustomLoginScene=$($customLogin.ToString().ToLower())"
     "-o", $outputDir
 )
-
-if ($CustomLoginScene) {
-    Write-Host "    login   : custom (CustomLoginScene=true)"
-    $publishArgs += "-p:CustomLoginScene=true"
-}
 
 & dotnet publish @publishArgs
 
