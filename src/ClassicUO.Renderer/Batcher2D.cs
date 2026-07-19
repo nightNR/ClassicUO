@@ -626,6 +626,117 @@ namespace ClassicUO.Renderer
             AddSprite(texture, sourceX, sourceY, sourceW, sourceH, position.X, position.Y, destW, destH, color, 0.0f, 0.0f, 0.0f, 1.0f, depth, 0);
         }
 
+        /// <summary>
+        /// Draws a textured quad tinted with a free RGB color (not routed through the UO hue
+        /// palette). Used for FontStashSharp glyph atlases, which are white+coverage and need
+        /// the requested text color applied directly. Unlike the plain <see cref="Draw"/>
+        /// overloads, the vertex Normal channel is repurposed to carry the tint RGB (0..1) and
+        /// is NOT set to the default (0,0,1) normal.
+        /// </summary>
+        public void DrawTextGlyph
+        (
+            Texture2D texture,
+            Vector2 position,
+            Rectangle sourceRect,
+            Vector3 tintRgb,
+            float opacity,
+            float depth
+        )
+        {
+            CalculateUVs(sourceRect, texture.Width, texture.Height,
+                out float sourceX, out float sourceY, out float sourceW, out float sourceH);
+
+            float destW = sourceRect.Width;
+            float destH = sourceRect.Height;
+
+            EnsureSize();
+
+            ref PositionNormalTextureColor4 vertex = ref _vertexInfo[_numSprites];
+
+            vertex.Position0.X = position.X;
+            vertex.Position0.Y = position.Y;
+
+            vertex.Position1.X = position.X + destW;
+            vertex.Position1.Y = position.Y;
+
+            vertex.Position2.X = position.X;
+            vertex.Position2.Y = position.Y + destH;
+
+            vertex.Position3.X = position.X + destW;
+            vertex.Position3.Y = position.Y + destH;
+
+            vertex.Position0.Z = depth;
+            vertex.Position1.Z = depth;
+            vertex.Position2.Z = depth;
+            vertex.Position3.Z = depth;
+
+            vertex.TextureCoordinate0.X = sourceX;
+            vertex.TextureCoordinate0.Y = sourceY;
+            vertex.TextureCoordinate1.X = sourceX + sourceW;
+            vertex.TextureCoordinate1.Y = sourceY;
+            vertex.TextureCoordinate2.X = sourceX;
+            vertex.TextureCoordinate2.Y = sourceY + sourceH;
+            vertex.TextureCoordinate3.X = sourceX + sourceW;
+            vertex.TextureCoordinate3.Y = sourceY + sourceH;
+
+            vertex.TextureCoordinate0.Z = 0;
+            vertex.TextureCoordinate1.Z = 0;
+            vertex.TextureCoordinate2.Z = 0;
+            vertex.TextureCoordinate3.Z = 0;
+
+            vertex.Normal0 = tintRgb;
+            vertex.Normal1 = tintRgb;
+            vertex.Normal2 = tintRgb;
+            vertex.Normal3 = tintRgb;
+
+            Vector3 hue = new Vector3(0, ShaderHueTranslator.SHADER_TEXT_RGB, opacity);
+            vertex.Hue0 = hue;
+            vertex.Hue1 = hue;
+            vertex.Hue2 = hue;
+            vertex.Hue3 = hue;
+
+            _textureInfo[_numSprites] = texture;
+            ++_numSprites;
+        }
+
+        // Draws a texture into a dest rectangle tinted by tintRgb (0..1) at an
+        // arbitrary opacity, via the free-RGB TEXT_RGB shader mode. tintRgb = 0
+        // gives a black silhouette shaped by the texture alpha — used for soft
+        // drop shadows at a controllable (low) opacity, unlike the fixed-0.4
+        // SHADOW mode.
+        public void DrawTinted(Texture2D texture, Rectangle destRect, Rectangle sourceRect, Vector3 tintRgb, float opacity, float depth)
+        {
+            CalculateUVs(sourceRect, texture.Width, texture.Height,
+                out float sourceX, out float sourceY, out float sourceW, out float sourceH);
+
+            EnsureSize();
+
+            ref PositionNormalTextureColor4 vertex = ref _vertexInfo[_numSprites];
+
+            float x0 = destRect.X, y0 = destRect.Y;
+            float x1 = destRect.X + destRect.Width, y1 = destRect.Y + destRect.Height;
+
+            vertex.Position0.X = x0; vertex.Position0.Y = y0;
+            vertex.Position1.X = x1; vertex.Position1.Y = y0;
+            vertex.Position2.X = x0; vertex.Position2.Y = y1;
+            vertex.Position3.X = x1; vertex.Position3.Y = y1;
+            vertex.Position0.Z = vertex.Position1.Z = vertex.Position2.Z = vertex.Position3.Z = depth;
+
+            vertex.TextureCoordinate0.X = sourceX; vertex.TextureCoordinate0.Y = sourceY;
+            vertex.TextureCoordinate1.X = sourceX + sourceW; vertex.TextureCoordinate1.Y = sourceY;
+            vertex.TextureCoordinate2.X = sourceX; vertex.TextureCoordinate2.Y = sourceY + sourceH;
+            vertex.TextureCoordinate3.X = sourceX + sourceW; vertex.TextureCoordinate3.Y = sourceY + sourceH;
+            vertex.TextureCoordinate0.Z = vertex.TextureCoordinate1.Z = vertex.TextureCoordinate2.Z = vertex.TextureCoordinate3.Z = 0;
+
+            vertex.Normal0 = vertex.Normal1 = vertex.Normal2 = vertex.Normal3 = tintRgb;
+
+            Vector3 hue = new Vector3(0, ShaderHueTranslator.SHADER_TEXT_RGB, opacity);
+            vertex.Hue0 = vertex.Hue1 = vertex.Hue2 = vertex.Hue3 = hue;
+
+            _textureInfo[_numSprites] = texture;
+            ++_numSprites;
+        }
+
         public void Draw
         (
             Texture2D texture,

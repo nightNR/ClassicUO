@@ -44,7 +44,8 @@
 param(
     [string]$Rid = "win-x64",
     [string]$Configuration = "Release",
-    [string]$DeployTo
+    [string]$DeployTo,
+    [switch]$CustomLoginScene
 )
 
 $ErrorActionPreference = "Stop"
@@ -66,11 +67,21 @@ Write-Host "    output  : $outputDir"
 $cuoDll = Join-Path $outputDir "cuo.dll"
 $before = if (Test-Path $cuoDll) { (Get-Item $cuoDll).LastWriteTime } else { $null }
 
-& dotnet publish $clientProject `
-    -c $Configuration `
-    -r $Rid `
-    -p:BootstrapHostMode=true `
-    -o $outputDir
+$publishArgs = @(
+    $clientProject
+    "-c", $Configuration
+    "-r", $Rid
+    "-p:BootstrapHostMode=true"
+    "-p:StripSymbols=true"
+    "-o", $outputDir
+)
+
+if ($CustomLoginScene) {
+    Write-Host "    login   : custom (CustomLoginScene=true)"
+    $publishArgs += "-p:CustomLoginScene=true"
+}
+
+& dotnet publish @publishArgs
 
 if ($LASTEXITCODE -ne 0) {
     throw "dotnet publish failed with exit code $LASTEXITCODE."

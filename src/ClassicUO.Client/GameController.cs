@@ -33,6 +33,7 @@ namespace ClassicUO
         private readonly float[] _intervalFixedUpdate = new float[2];
         private double _totalElapsed, _currentFpsTime;
         private uint _totalFrames;
+        private int _autoShotTick = Environment.GetEnvironmentVariable("CUO_AUTOSHOT") != null ? 0 : -1;
         private UltimaBatcher2D _uoSpriteBatch;
         private RenderTargets _renderTargets = new();
         private readonly RenderLists _renderLists = new();
@@ -529,6 +530,16 @@ namespace ClassicUO
             Profiler.EnterContext(Profiler.ProfilerContext.OUT_OF_CONTEXT);
 
             Plugin.ProcessDrawCmdList(GraphicsDevice);
+
+            if (_autoShotTick >= 0)
+            {
+                _autoShotTick++;
+                if (_autoShotTick == 200)
+                {
+                    _autoShotTick = -1;
+                    TakeScreenshot();
+                }
+            }
 
             base.Draw(gameTime);
         }

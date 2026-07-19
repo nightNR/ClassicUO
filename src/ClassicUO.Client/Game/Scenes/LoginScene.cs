@@ -7,6 +7,9 @@ using ClassicUO.Game.Managers;
 using ClassicUO.Game.UI.Gumps;
 using ClassicUO.Game.UI.Gumps.CharCreation;
 using ClassicUO.Game.UI.Gumps.Login;
+#if CUSTOM_LOGIN_SCENE
+using ClassicUO.Game.UI.Login;
+#endif
 using ClassicUO.IO;
 using ClassicUO.Network;
 using ClassicUO.Resources;
@@ -45,12 +48,15 @@ namespace ClassicUO.Game.Scenes
         private long _reconnectTime;
         private int _reconnectTryCounter = 1;
         private bool _autoLogin;
+        private bool _forceFullLogin;
+        private bool _keepPopupOnMain;
         private readonly World _world;
 
         public LoginScene(World world) => _world = world;
 
 
         public bool Reconnect { get; set; }
+        internal bool ForceFullLogin { get => _forceFullLogin; set => _forceFullLogin = value; }
         public LoginSteps CurrentLoginStep { get; set; } = LoginSteps.Main;
         public ServerListEntry[] Servers { get; private set; }
         public CityInfo[] Cities { get; set; }
@@ -71,8 +77,12 @@ namespace ClassicUO.Game.Scenes
 
             _autoLogin = Settings.GlobalSettings.AutoLogin;
 
+#if CUSTOM_LOGIN_SCENE
+            UIManager.Add(_currentGump = new CustomLoginGump(_world, this));
+#else
             UIManager.Add(new LoginBackground(_world));
             UIManager.Add(_currentGump = new LoginGump(_world, this));
+#endif
 
             Client.Game.Audio.PlayMusic(Client.Game.Audio.LoginMusicIndex, false, true);
 
@@ -91,8 +101,13 @@ namespace ClassicUO.Game.Scenes
                 Client.Game.RestoreWindow();
             }
 
+#if CUSTOM_LOGIN_SCENE
+            int width = Client.Game.ScaleWithDpi(1280);
+            int height = Client.Game.ScaleWithDpi(720);
+#else
             int width = Client.Game.ScaleWithDpi(640);
             int height = Client.Game.ScaleWithDpi(480);
+#endif
             SDL.SDL_SetWindowMinimumSize(Client.Game.Window.Handle, width, height);
             Client.Game.SetWindowSize(width, height);
         }
@@ -111,6 +126,10 @@ namespace ClassicUO.Game.Scenes
             UIManager.GetGump<LoginBackground>()?.Dispose();
 
             _currentGump?.Dispose();
+
+#if CUSTOM_LOGIN_SCENE
+            LoginAssets.Reset();
+#endif
 
             // UnRegistering Packet Events
             NetClient.Socket.Connected -= OnNetClientConnected;
@@ -192,9 +211,18 @@ namespace ClassicUO.Game.Scenes
             switch (CurrentLoginStep)
             {
                 case LoginSteps.Main:
-                    PopupMessage = null;
+                    if (!_keepPopupOnMain)
+                    {
+                        PopupMessage = null;
+                    }
 
-                    return new LoginGump(_world,this);
+                    _keepPopupOnMain = false;
+
+#if CUSTOM_LOGIN_SCENE
+                    return new CustomLoginGump(_world, this);
+#else
+                    return new LoginGump(_world, this);
+#endif
 
                 case LoginSteps.Connecting:
                 case LoginSteps.VerifyingAccount:
@@ -642,11 +670,27 @@ namespace ClassicUO.Game.Scenes
 
         public void HandleErrorCode(ref StackDataReader p)
         {
+            byte packetID = p[0];
             byte code = p.ReadUInt8();
 
-            PopupMessage = ServerErrorMessages.GetError(p[0], code, LoginDelay);
-            CurrentLoginStep = LoginSteps.PopUpMessage;
+            PopupMessage = ServerErrorMessages.GetError(packetID, code, LoginDelay);
             LoginDelay = default;
+
+#if CUSTOM_LOGIN_SCENE
+            if (LoginReconnectPolicy.IsFatalAuthRejection(packetID, code))
+            {
+                _forceFullLogin = true;
+                Reconnect = false;
+                _keepPopupOnMain = true;
+                CurrentLoginStep = LoginSteps.Main;
+            }
+            else
+            {
+                CurrentLoginStep = LoginSteps.PopUpMessage;
+            }
+#else
+            CurrentLoginStep = LoginSteps.PopUpMessage;
+#endif
         }
 
         public void HandleLoginDelayPacket(ref StackDataReader p)

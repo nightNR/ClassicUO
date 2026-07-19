@@ -10,4 +10,30 @@
     <ProjectReference Include="..\..\external\FNA\FNA.Core.csproj" />
   </ItemGroup>
 
+  <!--
+    "FontStashSharp.FNA" does not exist on NuGet. "FNA.NET.FontStashSharp"
+    depends on the NuGet FNA.NET package rather than the vendored external/FNA
+    project this repo references (would collide/duplicate FNA types), so it
+    was rejected too. "FontStashSharp.Base" alone (the platform-agnostic
+    interfaces-only core) has no FontSystem/DynamicSpriteFont at all - those
+    live in the platform bundles (MonoGame/XNA/Stride/Kni), none of which
+    target our vendored FNA either.
+
+    Using "FontStashSharp" 1.3.10 instead: this is the original
+    platform-agnostic bundle (FontSystem + IFontStashRenderer +
+    ITexture2DManager taking `object` textures, exactly the shape this task's
+    brief was written against) - it has zero MonoGame/XNA/graphics
+    dependencies (netstandard2.0, transitively just FontStashSharp.Base +
+    the StbTrueTypeSharp rasterizer + Cyotek.Drawing.BitmapFont +
+    StbImageSharp + System.Numerics.Vectors), so it doesn't collide with the
+    vendored FNA. It is deprecated in favor of a rename to
+    "FontStashSharp.PlatformAgnostic", but 1.3.10 is unaffected by that and
+    fully functional. The FNA renderer/texture glue (converting between
+    System.Numerics.Vector2/System.Drawing types used by this package and
+    FNA/XNA types) is implemented in FontStashLoginFont.cs.
+  -->
+  <ItemGroup>
+    <PackageReference Include="FontStashSharp" Version="1.3.10" />
+  </ItemGroup>
+
 </Project>
