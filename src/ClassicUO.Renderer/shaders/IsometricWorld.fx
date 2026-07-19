@@ -9,6 +9,7 @@
 #define SHADOW 8
 #define LIGHTS 9
 #define EFFECT_HUED 10
+#define TEXT_RGB 11
 #define GUMP 20
 
 const static float3 LIGHT_DIRECTION = float3(0.0f, 1.0f, 1.0f);
@@ -169,6 +170,10 @@ float4 PixelShader_Hue(PS_INPUT IN) : COLOR0
 	else if (mode == EFFECT_HUED)
 	{
 		color.rgb = get_rgb(color.g, hue);
+	}
+	else if (mode == TEXT_RGB)
+	{
+		color.rgb *= IN.Normal;
 	}
 
 	if (useTrans && CircleOfTransparencyRadius > 0)

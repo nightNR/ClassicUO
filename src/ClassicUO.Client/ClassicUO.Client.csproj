@@ -55,6 +55,24 @@
     <DefineConstants>$(DefineConstants)TRACE</DefineConstants>
   </PropertyGroup>
 
+  <!--
+    CustomLoginScene compiles the custom 1280x720 login scene instead of the
+    default UO login. ON by default; build the original UO login with
+    -p:CustomLoginScene=false.
+  -->
+  <PropertyGroup Condition="'$(CustomLoginScene)' == ''">
+    <CustomLoginScene>true</CustomLoginScene>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(CustomLoginScene)' == 'true'">
+    <DefineConstants>$(DefineConstants);CUSTOM_LOGIN_SCENE</DefineConstants>
+    <!-- Raise FileEmbed's default 1 MiB per-file cap; the login background PNG is ~2.5 MB. -->
+    <FileEmbed_MaxEmbedSize>8388608</FileEmbed_MaxEmbedSize>
+  </PropertyGroup>
+  <ItemGroup Condition="'$(CustomLoginScene)' == 'true'">
+    <!-- Required for FileEmbed_MaxEmbedSize above to reach the source generator. -->
+    <CompilerVisibleProperty Include="FileEmbed_MaxEmbedSize" />
+  </ItemGroup>
+
 
   <ItemGroup>
     <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleToAttribute">
