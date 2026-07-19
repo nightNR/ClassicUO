@@ -12,7 +12,7 @@ namespace ClassicUO.Game.UI.Login
     {
         private static GraphicsDevice Device => Client.Game.GraphicsDevice;
 
-        private static Texture2D _background, _btnNeutral, _btnHover, _btnDown,
+        private static Texture2D _background, _charSelectBg, _btnNeutral, _btnHover, _btnDown,
             _btnPrioNeutral, _btnPrioHover, _btnPrioDown,
             _inputNeutral, _inputFocus, _inputDisabled,
             _cornerTL, _cornerTR, _cornerBL, _cornerBR,
@@ -80,6 +80,7 @@ namespace ClassicUO.Game.UI.Login
         }
 
         public static Texture2D Background => Load(ref _background, Loader.GetLoginBackground());
+        public static Texture2D CharSelectBackground => Load(ref _charSelectBg, Loader.GetCharSelectBackground());
         public static Texture2D ButtonNeutral => Load(ref _btnNeutral, Loader.GetButtonNeutral());
         public static Texture2D ButtonHover => Load(ref _btnHover, Loader.GetButtonHover());
         public static Texture2D ButtonDown => Load(ref _btnDown, Loader.GetButtonDown());
@@ -112,6 +113,7 @@ namespace ClassicUO.Game.UI.Login
             _cormorant = null;
 
             _background?.Dispose();
+            _charSelectBg?.Dispose();
             _btnNeutral?.Dispose();
             _btnHover?.Dispose();
             _btnDown?.Dispose();
@@ -131,7 +133,7 @@ namespace ClassicUO.Game.UI.Login
             _topOrn?.Dispose();
             _bottomOrn?.Dispose();
 
-            _background = _btnNeutral = _btnHover = _btnDown =
+            _background = _charSelectBg = _btnNeutral = _btnHover = _btnDown =
                 _btnPrioNeutral = _btnPrioHover = _btnPrioDown =
                 _inputNeutral = _inputFocus = _inputDisabled =
                 _cornerTL = _cornerTR = _cornerBL = _cornerBR =

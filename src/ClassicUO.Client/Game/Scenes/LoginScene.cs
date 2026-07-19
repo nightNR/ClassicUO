@@ -234,12 +234,21 @@ namespace ClassicUO.Game.Scenes
 
                     return GetLoadingScreen();
 
-                case LoginSteps.CharacterSelection: return new CharacterSelectionGump(_world);
+                case LoginSteps.CharacterSelection:
+#if CUSTOM_LOGIN_SCENE
+                    return new CustomCharacterSelectionGump(_world, this);
+#else
+                    return new CharacterSelectionGump(_world);
+#endif
 
                 case LoginSteps.ServerSelection:
                     _pingTime = Time.Ticks + 60000; // reset ping timer
 
+#if CUSTOM_LOGIN_SCENE
+                    return new CustomServerSelectionGump(_world, this);
+#else
                     return new ServerSelectionGump(_world);
+#endif
 
                 case LoginSteps.CharacterCreation:
                     _pingTime = Time.Ticks + 60000; // reset ping timer
@@ -250,7 +259,7 @@ namespace ClassicUO.Game.Scenes
             return null;
         }
 
-        private LoadingGump GetLoadingScreen()
+        private Gump GetLoadingScreen()
         {
             string labelText = "No Text";
             LoginButtons showButtons = LoginButtons.None;
@@ -296,7 +305,11 @@ namespace ClassicUO.Game.Scenes
                 }
             }
 
+#if CUSTOM_LOGIN_SCENE
+            return new CustomLoadingGump(_world, labelText, showButtons, OnLoadingGumpButtonClick);
+#else
             return new LoadingGump(_world, labelText, showButtons, OnLoadingGumpButtonClick);
+#endif
         }
 
         private void OnLoadingGumpButtonClick(int buttonId)
@@ -564,7 +577,11 @@ namespace ClassicUO.Game.Scenes
 
                     PopupMessage = string.Format(ResGeneral.ReconnectPleaseWait01, _reconnectTryCounter, StringHelper.AddSpaceBeforeCapital(e.ToString()));
 
+#if CUSTOM_LOGIN_SCENE
+                    UIManager.GetGump<CustomLoadingGump>()?.SetMessage(PopupMessage);
+#else
                     UIManager.GetGump<LoadingGump>()?.SetText(PopupMessage);
+#endif
                 }
                 else
                 {

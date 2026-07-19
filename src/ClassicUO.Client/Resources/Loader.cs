@@ -18,6 +18,9 @@ namespace ClassicUO.Resources
         [FileEmbed.FileEmbed("..\\..\\Assets\\background-image.png")]
         public static partial ReadOnlySpan<byte> GetLoginBackground();
 
+        [FileEmbed.FileEmbed("..\\..\\Assets\\background-character-select.png")]
+        public static partial ReadOnlySpan<byte> GetCharSelectBackground();
+
         // Buttons: dark/secondary style
         [FileEmbed.FileEmbed("..\\..\\Assets\\gothic-login-ui\\19-secondary-neutral.png")]
         public static partial ReadOnlySpan<byte> GetButtonNeutral();
