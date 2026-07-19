@@ -103,6 +103,17 @@ namespace ClassicUO.Game.UI.Gumps.Login
 
             account.EnterPressed += _ => scene.Connect(account.Text, password.Text);
             password.EnterPressed += _ => scene.Connect(account.Text, password.Text);
+
+            // Focus a field so Enter submits without clicking first (matches the
+            // classic login: password when the account is prefilled, else account).
+            if (!string.IsNullOrEmpty(account.Text))
+            {
+                password.SetKeyboardFocus();
+            }
+            else
+            {
+                account.SetKeyboardFocus();
+            }
         }
 
         private void BuildReconnectState(LoginScene scene, ILoginFont cormorant, ILoginFont cinzel,

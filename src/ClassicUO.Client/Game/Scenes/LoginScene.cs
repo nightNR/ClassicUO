@@ -606,6 +606,15 @@ namespace ClassicUO.Game.Scenes
 
             CurrentLoginStep = LoginSteps.ServerSelection;
 
+#if CUSTOM_LOGIN_SCENE
+            // A single realm needs no choice — skip the selection screen.
+            if (Servers.Length == 1)
+            {
+                SelectServer((byte)Servers[0].Index);
+                return;
+            }
+#endif
+
             if (CanAutologin)
             {
                 if (Servers.Length != 0)

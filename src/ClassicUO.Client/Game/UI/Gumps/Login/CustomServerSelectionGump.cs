@@ -27,11 +27,14 @@ namespace ClassicUO.Game.UI.Gumps.Login
 
         private readonly List<RealmButton> _rows = new List<RealmButton>();
         private int _selectedIndex;
+        private readonly LoginScene _scene;
+        private ServerListEntry[] _servers;
 
         public CustomServerSelectionGump(World world, LoginScene scene) : base(world, 0, 0)
         {
+            _scene = scene;
             CanCloseWithRightClick = false;
-            AcceptKeyboardInput = false;
+            AcceptKeyboardInput = true;
 
             var cormorant = LoginAssets.Cormorant;
             var cinzel = LoginAssets.Cinzel;
@@ -49,9 +52,9 @@ namespace ClassicUO.Game.UI.Gumps.Login
             Add(new TtfLabel(title, cinzel, 26f, labelColor, 1f, PanelCX - (int)(titleSize.X / 2), PanelY + 46, 3f));
 
             var servers = scene.Servers ?? System.Array.Empty<ServerListEntry>();
-            int defaultIdx = scene.GetServerIndexFromSettings();
-            if (defaultIdx < 0 || defaultIdx >= servers.Length) defaultIdx = 0;
-            _selectedIndex = servers.Length > 0 ? defaultIdx : -1;
+            _servers = servers;
+            // Default focus on the first realm.
+            _selectedIndex = servers.Length > 0 ? 0 : -1;
 
             int rowX = PanelCX - RowW / 2;
             int rowY = PanelY + 110;
@@ -91,15 +94,19 @@ namespace ClassicUO.Game.UI.Gumps.Login
 
             Add(new ImageButton(ButtonStyle.Priority, "Select", cinzel, 20f, selX, btnY, BtnW, BtnH)
             {
-                Clicked = () =>
-                {
-                    if (_selectedIndex >= 0 && _selectedIndex < servers.Length)
-                    {
-                        scene.SelectServer((byte)servers[_selectedIndex].Index);
-                    }
-                }
+                Clicked = Confirm
             });
         }
+
+        private void Confirm()
+        {
+            if (_selectedIndex >= 0 && _selectedIndex < _servers.Length)
+            {
+                _scene.SelectServer((byte)_servers[_selectedIndex].Index);
+            }
+        }
+
+        public override void OnKeyboardReturn(int textID, string text) => Confirm();
     }
 }
 #endif

@@ -26,6 +26,7 @@ namespace ClassicUO.Game.UI.Gumps.Login
         private const int NewSlot = -1;   // sentinel slot for the "New Character" row
 
         private readonly CharacterList _list;
+        private readonly LoginScene _scene;
 
         private static void Proceed(LoginScene scene, int slot)
         {
@@ -41,8 +42,9 @@ namespace ClassicUO.Game.UI.Gumps.Login
 
         public CustomCharacterSelectionGump(World world, LoginScene scene) : base(world, 0, 0)
         {
+            _scene = scene;
             CanCloseWithRightClick = false;
-            AcceptKeyboardInput = false;
+            AcceptKeyboardInput = true;
 
             var cormorant = LoginAssets.Cormorant;
             var cinzel = LoginAssets.Cinzel;
@@ -96,6 +98,8 @@ namespace ClassicUO.Game.UI.Gumps.Login
                 Clicked = () => Proceed(scene, _list.SelectedSlot)
             });
         }
+
+        public override void OnKeyboardReturn(int textID, string text) => Proceed(_scene, _list.SelectedSlot);
     }
 }
 #endif
