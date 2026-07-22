@@ -3,6 +3,8 @@
 using System;
 using System.Collections.Generic;
 using ClassicUO.Configuration;
+using ClassicUO.Game.Data;
+using ClassicUO.Game.GameObjects;
 
 namespace ClassicUO.Game.Managers
 {
@@ -105,6 +107,41 @@ namespace ClassicUO.Game.Managers
             }
 
             return conflicts;
+        }
+
+        /// <summary>
+        /// Maps a mobile's notoriety to a coarse allegiance category. Mirrors EXACTLY the
+        /// hostile/friendly split used by GameSceneInputHandler.DoDragSelect's
+        /// DragSelectHostileOnly filter: that filter skips (treats as non-hostile) only
+        /// NotorietyFlag.Ally, Innocent, and Invulnerable, and keeps everything else
+        /// (Unknown, Gray, Criminal, Enemy, Murderer) as hostile. So here the same
+        /// Ally/Innocent/Invulnerable set maps to Allied, and the remaining defined values
+        /// map to Hostile; Neutral is reserved for any undefined/out-of-range value.
+        /// </summary>
+        public static Allegiance ClassifyNotoriety(NotorietyFlag noto)
+        {
+            switch (noto)
+            {
+                case NotorietyFlag.Ally:
+                case NotorietyFlag.Innocent:
+                case NotorietyFlag.Invulnerable:
+                    return Allegiance.Allied;
+
+                case NotorietyFlag.Unknown:
+                case NotorietyFlag.Gray:
+                case NotorietyFlag.Criminal:
+                case NotorietyFlag.Enemy:
+                case NotorietyFlag.Murderer:
+                    return Allegiance.Hostile;
+
+                default:
+                    return Allegiance.Neutral;
+            }
+        }
+
+        public static Allegiance ClassifyMobile(Mobile m)
+        {
+            return m == null ? Allegiance.Neutral : ClassifyNotoriety(m.NotorietyFlag);
         }
     }
 }

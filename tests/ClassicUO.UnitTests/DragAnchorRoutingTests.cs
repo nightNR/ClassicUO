@@ -64,5 +64,24 @@ namespace ClassicUO.UnitTests
             Assert.DoesNotContain(1, conflicts);
             Assert.DoesNotContain(3, conflicts);
         }
+
+        // Real ClassicUO.Game.Data.NotorietyFlag values. Mirrors exactly the set used by
+        // GameSceneInputHandler.DoDragSelect's DragSelectHostileOnly filter, which skips
+        // (treats as non-hostile) NotorietyFlag.Ally / Innocent / Invulnerable and keeps
+        // everything else (Unknown/Gray/Criminal/Enemy/Murderer) as hostile.
+        [Theory]
+        [InlineData(/*Unknown*/     0, 2)] // Hostile - not in the friendly skip-set
+        [InlineData(/*Innocent*/    1, 1)] // Allied - in the friendly skip-set
+        [InlineData(/*Ally*/        2, 1)] // Allied - in the friendly skip-set
+        [InlineData(/*Gray*/        3, 2)] // Hostile
+        [InlineData(/*Criminal*/    4, 2)] // Hostile
+        [InlineData(/*Enemy*/       5, 2)] // Hostile
+        [InlineData(/*Murderer*/    6, 2)] // Hostile
+        [InlineData(/*Invulnerable*/7, 1)] // Allied - in the friendly skip-set
+        [InlineData(/*out-of-range*/99, 0)] // Neutral - defensive default
+        public void ClassifyNotoriety_MapsToAllegiance(int noto, int expected)
+        {
+            Assert.Equal(expected, (int)DragAnchorRouting.ClassifyNotoriety((ClassicUO.Game.Data.NotorietyFlag)noto));
+        }
     }
 }
