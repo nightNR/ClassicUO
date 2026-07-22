@@ -1078,76 +1078,6 @@ namespace ClassicUO.Game.UI.Gumps
                 )
             );
 
-            section3.Add
-            (
-                _customBars = AddCheckBox
-                (
-                    null,
-                    ResGumps.UseCustomHPBars,
-                    _currentProfile.CustomBarsToggled,
-                    0,
-                    0
-                )
-            );
-
-            section3.AddRight
-            (
-                _customBarsBBG = AddCheckBox
-                (
-                    null,
-                    ResGumps.UseBlackBackgr,
-                    _currentProfile.CBBlackBGToggled,
-                    0,
-                    0
-                )
-            );
-
-            section3.Add
-            (
-                _statValuesOnBars = AddCheckBox
-                (
-                    null,
-                    ResGumps.ShowStatValuesOnBars,
-                    _currentProfile.ShowStatValuesOnBars,
-                    0,
-                    0
-                )
-            );
-
-            section3.Add
-            (
-                _saveHealthbars = AddCheckBox
-                (
-                    null,
-                    ResGumps.SaveHPBarsOnLogout,
-                    _currentProfile.SaveHealthbars,
-                    0,
-                    0
-                )
-            );
-
-            section3.PushIndent();
-            section3.Add(AddLabel(null, ResGumps.CloseHPGumpWhen, 0, 0));
-
-            mode = _currentProfile.CloseHealthBarType;
-
-            if (mode < 0 || mode > 2)
-            {
-                mode = 0;
-            }
-
-            _healtbarType = AddCombobox
-            (
-                null,
-                new[] { ResGumps.HPType_None, ResGumps.HPType_MobileOOR, ResGumps.HPType_MobileDead },
-                mode,
-                0,
-                0,
-                150
-            );
-
-            section3.AddRight(_healtbarType);
-            section3.PopIndent();
             section3.Add(AddLabel(null, ResGumps.GridLoot, startX, startY));
 
             section3.AddRight
@@ -1187,47 +1117,6 @@ namespace ClassicUO.Game.UI.Gumps
                     0
                 )
             );
-
-            // Grid layout for plugin-opened, grouped status bars: bars stack down
-            // a column up to MaxRows, then wrap into a new column; opens past
-            // MaxRows*MaxColumns are dropped.
-            section3.Add(AddLabel(null, "Plugin status bar max rows (fallback)", 0, 0));
-
-            _pluginStatusBarMaxRows = AddInputField
-            (
-                null,
-                0,
-                0,
-                50,
-                TEXTBOX_HEIGHT,
-                null,
-                50,
-                false,
-                true,
-                3
-            );
-
-            _pluginStatusBarMaxRows.SetText(_currentProfile.PluginStatusBarMaxRows.ToString());
-            section3.AddRight(_pluginStatusBarMaxRows);
-
-            section3.Add(AddLabel(null, "Plugin status bar max columns (fallback)", 0, 0));
-
-            _pluginStatusBarMaxColumns = AddInputField
-            (
-                null,
-                0,
-                0,
-                50,
-                TEXTBOX_HEIGHT,
-                null,
-                50,
-                false,
-                true,
-                3
-            );
-
-            _pluginStatusBarMaxColumns.SetText(_currentProfile.PluginStatusBarMaxColumns.ToString());
-            section3.AddRight(_pluginStatusBarMaxColumns);
 
             // Permanent anchor groups: each group gets its own on-screen widget
             // and its own rows/columns/fill capacity, overriding the fallback
@@ -3644,7 +3533,128 @@ namespace ClassicUO.Game.UI.Gumps
 
             ScrollArea rightArea = new ScrollArea(190, 20, WIDTH - 210, 420, true);
 
-            // (controls added in Tasks 2-4)
+            int startX = 5;
+            int startY = 5;
+
+            DataBox box = new DataBox(startX, startY, rightArea.Width - 15, 1);
+            box.WantUpdateSize = true;
+            rightArea.Add(box);
+
+            SettingsSection section = AddSettingsSection(box, "Status Bars");
+
+            section.Add
+            (
+                _customBars = AddCheckBox
+                (
+                    null,
+                    ResGumps.UseCustomHPBars,
+                    _currentProfile.CustomBarsToggled,
+                    0,
+                    0
+                )
+            );
+
+            section.AddRight
+            (
+                _customBarsBBG = AddCheckBox
+                (
+                    null,
+                    ResGumps.UseBlackBackgr,
+                    _currentProfile.CBBlackBGToggled,
+                    0,
+                    0
+                )
+            );
+
+            section.Add
+            (
+                _statValuesOnBars = AddCheckBox
+                (
+                    null,
+                    ResGumps.ShowStatValuesOnBars,
+                    _currentProfile.ShowStatValuesOnBars,
+                    0,
+                    0
+                )
+            );
+
+            section.Add
+            (
+                _saveHealthbars = AddCheckBox
+                (
+                    null,
+                    ResGumps.SaveHPBarsOnLogout,
+                    _currentProfile.SaveHealthbars,
+                    0,
+                    0
+                )
+            );
+
+            section.PushIndent();
+            section.Add(AddLabel(null, ResGumps.CloseHPGumpWhen, 0, 0));
+
+            int mode = _currentProfile.CloseHealthBarType;
+
+            if (mode < 0 || mode > 2)
+            {
+                mode = 0;
+            }
+
+            _healtbarType = AddCombobox
+            (
+                null,
+                new[] { ResGumps.HPType_None, ResGumps.HPType_MobileOOR, ResGumps.HPType_MobileDead },
+                mode,
+                0,
+                0,
+                150
+            );
+
+            section.AddRight(_healtbarType);
+            section.PopIndent();
+
+            // Grid layout for plugin-opened, grouped status bars: bars stack down
+            // a column up to MaxRows, then wrap into a new column; opens past
+            // MaxRows*MaxColumns are dropped.
+            section.Add(AddLabel(null, "Plugin status bar max rows (fallback)", 0, 0));
+
+            _pluginStatusBarMaxRows = AddInputField
+            (
+                null,
+                0,
+                0,
+                50,
+                TEXTBOX_HEIGHT,
+                null,
+                50,
+                false,
+                true,
+                3
+            );
+
+            _pluginStatusBarMaxRows.SetText(_currentProfile.PluginStatusBarMaxRows.ToString());
+            section.AddRight(_pluginStatusBarMaxRows);
+
+            section.Add(AddLabel(null, "Plugin status bar max columns (fallback)", 0, 0));
+
+            _pluginStatusBarMaxColumns = AddInputField
+            (
+                null,
+                0,
+                0,
+                50,
+                TEXTBOX_HEIGHT,
+                null,
+                50,
+                false,
+                true,
+                3
+            );
+
+            _pluginStatusBarMaxColumns.SetText(_currentProfile.PluginStatusBarMaxColumns.ToString());
+            section.AddRight(_pluginStatusBarMaxColumns);
+
+            // (anchor groups editor + anchor-behavior toggles added in Tasks 3-4)
 
             Add(rightArea, PAGE);
         }
