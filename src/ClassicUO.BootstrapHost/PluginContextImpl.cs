@@ -256,6 +256,16 @@ internal sealed class StatusBarsImpl : IStatusBars
         else
             _bridge.PostToGameThread(() => ((delegate* unmanaged[Cdecl]<uint, ushort, ushort, void>)fn)(serial, hue, backgroundHue));
     }
+
+    public unsafe void SetStatusBarPriority(uint serial, int priority)
+    {
+        var fn = _bridge.ClientBindings.SetStatusBarPriorityFn;
+        if (fn == 0) return;
+        if (_bridge.IsGameThread)
+            ((delegate* unmanaged[Cdecl]<uint, int, void>)fn)(serial, priority);
+        else
+            _bridge.PostToGameThread(() => ((delegate* unmanaged[Cdecl]<uint, int, void>)fn)(serial, priority));
+    }
 }
 
 internal sealed class BuffsImpl : IPluginBuffs

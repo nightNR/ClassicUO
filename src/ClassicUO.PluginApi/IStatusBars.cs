@@ -34,4 +34,13 @@ public interface IStatusBars
     /// game thread. Badge support is deferred (see spec).
     /// </summary>
     void SetOverlay(uint serial, ushort hue, ushort backgroundHue = 0);
+
+    /// <summary>
+    /// Sets the ordering priority for the status bar of <paramref name="serial"/>.
+    /// Within its anchor group, bars are ordered by priority descending, then by
+    /// the order they were opened; default is 0, and passing 0 resets. Priority
+    /// only affects layout while the serial's bar belongs to a group. Auto-marshals
+    /// to the game thread.
+    /// </summary>
+    void SetStatusBarPriority(uint serial, int priority);
 }

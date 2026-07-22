@@ -75,6 +75,7 @@ namespace ClassicUO
         public IntPtr /*delegate*<uint, ushort, byte, void>*/ AddCharacterFn;
         public IntPtr /*delegate*<uint, byte, void>*/ RemoveCharacterFn;
         public IntPtr /*delegate*<byte, void>*/ ClearCharactersFn;
+        public IntPtr /*delegate*<uint, int, void>*/ SetStatusBarPriorityFn;
         // Packed client version (major<<24|minor<<16|build<<8|revision). Appended last
         // to preserve ABI; populated in Initialize() after UO.Load has parsed it.
         public int ClientVersion;
@@ -303,6 +304,11 @@ namespace ClassicUO
         private readonly dSetOverlay _setOverlay = Game.Managers.PluginStatusBars.SetOverlay;
 
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        delegate void dSetStatusBarPriority(uint serial, int priority);
+        [MarshalAs(UnmanagedType.FunctionPtr)]
+        private readonly dSetStatusBarPriority _setStatusBarPriority = Game.Managers.PluginStatusBars.SetStatusBarPriority;
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         delegate void dAddBuff(int id, ushort graphic, int durationMs, int kind, IntPtr textUtf8);
         [MarshalAs(UnmanagedType.FunctionPtr)]
         private readonly dAddBuff _addBuff = Game.Managers.PluginTimersManager.AddBuff;
@@ -455,6 +461,7 @@ namespace ClassicUO
             cuoHost.OpenStatusBarFn = Marshal.GetFunctionPointerForDelegate(_openStatusBar);
             cuoHost.CloseStatusBarFn = Marshal.GetFunctionPointerForDelegate(_closeStatusBar);
             cuoHost.SetOverlayFn = Marshal.GetFunctionPointerForDelegate(_setOverlay);
+            cuoHost.SetStatusBarPriorityFn = Marshal.GetFunctionPointerForDelegate(_setStatusBarPriority);
             cuoHost.AddBuffFn = Marshal.GetFunctionPointerForDelegate(_addBuff);
             cuoHost.RemoveBuffFn = Marshal.GetFunctionPointerForDelegate(_removeBuff);
             cuoHost.ClearBuffsFn = Marshal.GetFunctionPointerForDelegate(_clearBuffs);
