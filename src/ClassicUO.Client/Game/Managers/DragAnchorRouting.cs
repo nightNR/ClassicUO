@@ -1,4 +1,3 @@
-// src/ClassicUO.Client/Game/Managers/DragAnchorRouting.cs
 // SPDX-License-Identifier: BSD-2-Clause
 
 using System;
