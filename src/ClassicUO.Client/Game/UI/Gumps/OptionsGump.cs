@@ -4338,7 +4338,7 @@ namespace ClassicUO.Game.UI.Gumps
 
             foreach (Control child in _anchorGroupsBox.Children)
             {
-                if (child is AnchorGroupRow row)
+                if (child is AnchorGroupRow row && !row.IsDisposed)
                 {
                     row.Commit();
 

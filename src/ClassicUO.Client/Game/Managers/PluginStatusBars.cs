@@ -354,6 +354,11 @@ namespace ClassicUO.Game.Managers
 
         internal static PluginAnchorGroupDef GetDef(int groupId)
         {
+            if (groupId == 0)
+            {
+                return null;
+            }
+
             var groups = ProfileManager.CurrentProfile?.PluginAnchorGroups;
 
             if (groups == null)
