@@ -61,7 +61,11 @@ namespace ClassicUO.UnitTests
             int clientVersionOffset = (int)Marshal.OffsetOf<ClientBindings>("ClientVersion");
 
             Assert.Equal(checkLosBatchOffset + ptrSize, (int)Marshal.OffsetOf<ClientBindings>("AddAreaFn"));
-            Assert.Equal(checkLosBatchOffset + 8 * ptrSize, clientVersionOffset); // 7 highlight fields between them
+
+            // SetStatusBarPriorityFn was appended after the 7 highlight fields and
+            // before ClientVersion (still last), per the append-only ABI rule.
+            Assert.Equal(checkLosBatchOffset + 8 * ptrSize, (int)Marshal.OffsetOf<ClientBindings>("SetStatusBarPriorityFn"));
+            Assert.Equal(checkLosBatchOffset + 9 * ptrSize, clientVersionOffset); // 7 highlight fields + SetStatusBarPriorityFn between them
         }
     }
 }
