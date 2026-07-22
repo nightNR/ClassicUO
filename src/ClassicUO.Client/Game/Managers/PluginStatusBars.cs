@@ -294,12 +294,18 @@ namespace ClassicUO.Game.Managers
                 seedY = def.Y + PluginAnchorGroupGump.WidgetHeight;
             }
 
-            // Plugin-opened bars are always the custom bar so priority-overlay tint works.
-            HealthBarGumpCustom bar = new HealthBarGumpCustom(world, serial)
-            {
-                X = seedX,
-                Y = seedY
-            };
+            // Bar style (custom vs classic) honors the profile's CustomBarsToggled
+            // setting, mirroring every other spawn site (DoDragSelect, party, etc.).
+            GameObjects.Entity entity = world.Get(serial);
+
+            // Known entity -> factory picks custom/classic per profile. Unknown serial
+            // (not yet loaded) -> keep the original serial-ctor behavior so a bar still
+            // opens (e.g. out-of-range mobile), never silently dropped.
+            BaseHealthBarGump bar = entity != null
+                ? HealthBarFactory.Create(world, entity)
+                : new HealthBarGumpCustom(world, serial);
+            bar.X = seedX;
+            bar.Y = seedY;
 
             UIManager.Add(bar);
 
@@ -320,6 +326,30 @@ namespace ClassicUO.Game.Managers
         {
             PluginStatusBarGroups.AddMember(groupId, bar);
             ReflowGroup(groupId);
+        }
+
+        // Client-side counterpart to AddToGroup for a bar the user drags onto
+        // an existing anchor group's bars (AnchorableGump.Attache), rather than
+        // one opened via a plugin's OpenStatusBar call. Same capacity guard;
+        // keeps ReflowGroup private by routing through this public entry point.
+        public static bool JoinGroup(int groupId, BaseHealthBarGump bar)
+        {
+            if (groupId == 0 || bar == null)
+            {
+                return false;
+            }
+
+            if (IsCapacityReached(
+                    PluginStatusBarGroups.GetLiveMembers(groupId).Count,
+                    ResolveMaxRows(groupId),
+                    ResolveMaxColumns(groupId)))
+            {
+                return false;
+            }
+
+            AddToGroup(groupId, bar);
+
+            return true;
         }
 
         // Positions an already-ordered member list into the group's grid,

@@ -18,5 +18,11 @@ namespace ClassicUO.Configuration
         public int X { get; set; }
         public int Y { get; set; }
         public bool Locked { get; set; }
+        public bool DragCtrl { get; set; }
+        public bool DragShift { get; set; }
+        public bool DragAlt { get; set; }
+        public bool DragAllied { get; set; }
+        public bool DragHostile { get; set; }
+        public bool DragNeutral { get; set; }
     }
 }

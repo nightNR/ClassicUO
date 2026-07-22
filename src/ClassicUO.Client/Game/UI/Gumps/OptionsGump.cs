@@ -12,6 +12,7 @@ using ClassicUO.Network;
 using ClassicUO.Renderer;
 using ClassicUO.Resources;
 using ClassicUO.Utility;
+using ClassicUO.Utility.Logging;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using System;
@@ -258,6 +259,19 @@ namespace ClassicUO.Game.UI.Gumps
                     140,
                     25,
                     ButtonAction.SwitchPage,
+                    "Status Bars"
+                ) { ButtonParameter = 15 }
+            );
+
+            Add
+            (
+                new NiceButton
+                (
+                    10,
+                    10 + 30 * i++,
+                    140,
+                    25,
+                    ButtonAction.SwitchPage,
                     ResGumps.Macros
                 ) { ButtonParameter = 4 }
             );
@@ -459,6 +473,7 @@ namespace ClassicUO.Game.UI.Gumps
             BuildExperimental();
             BuildAliases();
             BuildStatusbarColors();
+            BuildStatusBars();
 
             ChangePage(1);
         }
@@ -978,35 +993,11 @@ namespace ClassicUO.Game.UI.Gumps
 
             section3.Add
             (
-                _holdDownKeyAlt = AddCheckBox
-                (
-                    null,
-                    ResGumps.AltCloseGumps,
-                    _currentProfile.HoldDownKeyAltToCloseAnchored,
-                    0,
-                    0
-                )
-            );
-
-            section3.Add
-            (
                 _holdAltToMoveGumps = AddCheckBox
                 (
                     null,
                     ResGumps.AltMoveGumps,
                     _currentProfile.HoldAltToMoveGumps,
-                    0,
-                    0
-                )
-            );
-
-            section3.Add
-            (
-                _closeAllAnchoredGumpsWithRClick = AddCheckBox
-                (
-                    null,
-                    ResGumps.ClickCloseAllGumps,
-                    _currentProfile.CloseAllAnchoredGumpsInGroupWithRightClick,
                     0,
                     0
                 )
@@ -1064,76 +1055,6 @@ namespace ClassicUO.Game.UI.Gumps
                 )
             );
 
-            section3.Add
-            (
-                _customBars = AddCheckBox
-                (
-                    null,
-                    ResGumps.UseCustomHPBars,
-                    _currentProfile.CustomBarsToggled,
-                    0,
-                    0
-                )
-            );
-
-            section3.AddRight
-            (
-                _customBarsBBG = AddCheckBox
-                (
-                    null,
-                    ResGumps.UseBlackBackgr,
-                    _currentProfile.CBBlackBGToggled,
-                    0,
-                    0
-                )
-            );
-
-            section3.Add
-            (
-                _statValuesOnBars = AddCheckBox
-                (
-                    null,
-                    ResGumps.ShowStatValuesOnBars,
-                    _currentProfile.ShowStatValuesOnBars,
-                    0,
-                    0
-                )
-            );
-
-            section3.Add
-            (
-                _saveHealthbars = AddCheckBox
-                (
-                    null,
-                    ResGumps.SaveHPBarsOnLogout,
-                    _currentProfile.SaveHealthbars,
-                    0,
-                    0
-                )
-            );
-
-            section3.PushIndent();
-            section3.Add(AddLabel(null, ResGumps.CloseHPGumpWhen, 0, 0));
-
-            mode = _currentProfile.CloseHealthBarType;
-
-            if (mode < 0 || mode > 2)
-            {
-                mode = 0;
-            }
-
-            _healtbarType = AddCombobox
-            (
-                null,
-                new[] { ResGumps.HPType_None, ResGumps.HPType_MobileOOR, ResGumps.HPType_MobileDead },
-                mode,
-                0,
-                0,
-                150
-            );
-
-            section3.AddRight(_healtbarType);
-            section3.PopIndent();
             section3.Add(AddLabel(null, ResGumps.GridLoot, startX, startY));
 
             section3.AddRight
@@ -1173,78 +1094,6 @@ namespace ClassicUO.Game.UI.Gumps
                     0
                 )
             );
-
-            // Grid layout for plugin-opened, grouped status bars: bars stack down
-            // a column up to MaxRows, then wrap into a new column; opens past
-            // MaxRows*MaxColumns are dropped.
-            section3.Add(AddLabel(null, "Plugin status bar max rows (fallback)", 0, 0));
-
-            _pluginStatusBarMaxRows = AddInputField
-            (
-                null,
-                0,
-                0,
-                50,
-                TEXTBOX_HEIGHT,
-                null,
-                50,
-                false,
-                true,
-                3
-            );
-
-            _pluginStatusBarMaxRows.SetText(_currentProfile.PluginStatusBarMaxRows.ToString());
-            section3.AddRight(_pluginStatusBarMaxRows);
-
-            section3.Add(AddLabel(null, "Plugin status bar max columns (fallback)", 0, 0));
-
-            _pluginStatusBarMaxColumns = AddInputField
-            (
-                null,
-                0,
-                0,
-                50,
-                TEXTBOX_HEIGHT,
-                null,
-                50,
-                false,
-                true,
-                3
-            );
-
-            _pluginStatusBarMaxColumns.SetText(_currentProfile.PluginStatusBarMaxColumns.ToString());
-            section3.AddRight(_pluginStatusBarMaxColumns);
-
-            // Permanent anchor groups: each group gets its own on-screen widget
-            // and its own rows/columns/fill capacity, overriding the fallback
-            // above for that group id.
-            section3.Add(AddLabel(null, "Anchor groups", 0, 0));
-
-            NiceButton addAnchorGroupButton = new NiceButton(0, 0, 130, 25, ButtonAction.Activate, "Add group") { ButtonParameter = 999 };
-            addAnchorGroupButton.MouseUp += (s, e) =>
-            {
-                if (e.Button != MouseButtonType.Left)
-                {
-                    return;
-                }
-
-                PluginAnchorGroupDef newDef = new PluginAnchorGroupDef();
-                _currentProfile.PluginAnchorGroups.Add(newDef);
-
-                _anchorGroupsBox.Add(new AnchorGroupRow(this, newDef) { Y = _anchorGroupsBox.Children.Count * 26 });
-                _anchorGroupsBox.WantUpdateSize = true;
-            };
-            section3.Add(addAnchorGroupButton);
-
-            _anchorGroupsBox = new DataBox(0, 0, 0, 0) { WantUpdateSize = true };
-
-            foreach (PluginAnchorGroupDef def in _currentProfile.PluginAnchorGroups)
-            {
-                _anchorGroupsBox.Add(new AnchorGroupRow(this, def) { Y = _anchorGroupsBox.Children.Count * 26 });
-            }
-
-            section3.Add(_anchorGroupsBox);
-
 
             SettingsSection section4 = AddSettingsSection(box, "Miscellaneous");
             section4.Y = section3.Bounds.Bottom + 40;
@@ -1386,7 +1235,7 @@ namespace ClassicUO.Game.UI.Gumps
             );
 
             section4.PushIndent();
-            section4.Add(AddLabel(null, ResGumps.DragKey, startX, startY));
+            section4.Add(AddLabel(null, "Drag-select modifier (default / unanchored)", startX, startY));
 
             section4.AddRight
             (
@@ -1430,14 +1279,6 @@ namespace ClassicUO.Game.UI.Gumps
 
             section4.Add(new Label(ResGumps.DragSelectStartingPosY, true, HUE_FONT));
             section4.Add(_dragSelectStartY = new HSliderBar(startX, startY, 200, 0, Client.Game.Scene.Camera.Bounds.Height, _currentProfile.DragSelectStartY, HSliderBarStyle.MetalWidgetRecessedBar, true, 0, HUE_FONT));
-            section4.Add
-            (
-                _dragSelectAsAnchor = AddCheckBox
-                (
-                    null, ResGumps.DragSelectAnchoredHB, _currentProfile.DragSelectAsAnchor, startX,
-                    startY
-                )
-            );
 
             section4.PopIndent();
 
@@ -3624,6 +3465,220 @@ namespace ClassicUO.Game.UI.Gumps
             Add(rightArea, PAGE);
         }
 
+        private void BuildStatusBars()
+        {
+            const int PAGE = 15;
+
+            ScrollArea rightArea = new ScrollArea(190, 20, WIDTH - 210, 420, true);
+
+            int startX = 5;
+            int startY = 5;
+
+            DataBox box = new DataBox(startX, startY, rightArea.Width - 15, 1);
+            box.WantUpdateSize = true;
+            rightArea.Add(box);
+
+            SettingsSection section = AddSettingsSection(box, "Status Bars");
+
+            section.Add
+            (
+                _holdDownKeyAlt = AddCheckBox
+                (
+                    null,
+                    ResGumps.AltCloseGumps,
+                    _currentProfile.HoldDownKeyAltToCloseAnchored,
+                    0,
+                    0
+                )
+            );
+
+            section.Add
+            (
+                _closeAllAnchoredGumpsWithRClick = AddCheckBox
+                (
+                    null,
+                    ResGumps.ClickCloseAllGumps,
+                    _currentProfile.CloseAllAnchoredGumpsInGroupWithRightClick,
+                    0,
+                    0
+                )
+            );
+
+            section.Add
+            (
+                _customBars = AddCheckBox
+                (
+                    null,
+                    ResGumps.UseCustomHPBars,
+                    _currentProfile.CustomBarsToggled,
+                    0,
+                    0
+                )
+            );
+
+            section.AddRight
+            (
+                _customBarsBBG = AddCheckBox
+                (
+                    null,
+                    ResGumps.UseBlackBackgr,
+                    _currentProfile.CBBlackBGToggled,
+                    0,
+                    0
+                )
+            );
+
+            section.Add
+            (
+                _statValuesOnBars = AddCheckBox
+                (
+                    null,
+                    ResGumps.ShowStatValuesOnBars,
+                    _currentProfile.ShowStatValuesOnBars,
+                    0,
+                    0
+                )
+            );
+
+            section.Add
+            (
+                _saveHealthbars = AddCheckBox
+                (
+                    null,
+                    ResGumps.SaveHPBarsOnLogout,
+                    _currentProfile.SaveHealthbars,
+                    0,
+                    0
+                )
+            );
+
+            section.PushIndent();
+            section.Add(AddLabel(null, ResGumps.CloseHPGumpWhen, 0, 0));
+
+            int mode = _currentProfile.CloseHealthBarType;
+
+            if (mode < 0 || mode > 2)
+            {
+                mode = 0;
+            }
+
+            _healtbarType = AddCombobox
+            (
+                null,
+                new[] { ResGumps.HPType_None, ResGumps.HPType_MobileOOR, ResGumps.HPType_MobileDead },
+                mode,
+                0,
+                0,
+                150
+            );
+
+            section.AddRight(_healtbarType);
+            section.PopIndent();
+
+            section.Add
+            (
+                _dragSelectAsAnchor = AddCheckBox
+                (
+                    null, ResGumps.DragSelectAnchoredHB, _currentProfile.DragSelectAsAnchor, 0,
+                    0
+                )
+            );
+
+            // Grid layout for plugin-opened, grouped status bars: bars stack down
+            // a column up to MaxRows, then wrap into a new column; opens past
+            // MaxRows*MaxColumns are dropped.
+            section.Add(AddLabel(null, "Plugin status bar max rows (fallback)", 0, 0));
+
+            _pluginStatusBarMaxRows = AddInputField
+            (
+                null,
+                0,
+                0,
+                50,
+                TEXTBOX_HEIGHT,
+                null,
+                50,
+                false,
+                true,
+                3
+            );
+
+            _pluginStatusBarMaxRows.SetText(_currentProfile.PluginStatusBarMaxRows.ToString());
+            section.AddRight(_pluginStatusBarMaxRows);
+
+            section.Add(AddLabel(null, "Plugin status bar max columns (fallback)", 0, 0));
+
+            _pluginStatusBarMaxColumns = AddInputField
+            (
+                null,
+                0,
+                0,
+                50,
+                TEXTBOX_HEIGHT,
+                null,
+                50,
+                false,
+                true,
+                3
+            );
+
+            _pluginStatusBarMaxColumns.SetText(_currentProfile.PluginStatusBarMaxColumns.ToString());
+            section.AddRight(_pluginStatusBarMaxColumns);
+
+            // Permanent anchor groups: each group gets its own on-screen widget
+            // and its own rows/columns/fill capacity, overriding the fallback
+            // above for that group id.
+            //
+            // The DataBox below is a DIRECT child of rightArea (the page
+            // ScrollArea), NOT nested inside a SettingsSection: sections freeze
+            // their height at build time, so a growable list living inside one
+            // would overlap/clip as rows are added. Every "Add group" click
+            // also calls ReArrangeChildren() to restack the rows and update the
+            // box's size/scroll extents immediately.
+            // box.Bounds.Bottom is lazy (DataBox only recomputes Height via
+            // WantUpdateSize during Update()), so it's still ~6 here. Use
+            // section.Bounds.Bottom instead - SettingsSection.Add updates
+            // Height synchronously - offset by box.Y to convert from box-local
+            // space into rightArea-space (box is a direct child of rightArea).
+            int anchorY = box.Y + section.Bounds.Bottom + 15;
+
+            rightArea.Add(AddLabel(null, "Anchor groups", startX, anchorY));
+
+            NiceButton addAnchorGroupButton = new NiceButton(startX, anchorY + 20, 130, 25, ButtonAction.Activate, "Add group") { ButtonParameter = 999 };
+            addAnchorGroupButton.MouseUp += (s, e) =>
+            {
+                if (e.Button != MouseButtonType.Left)
+                {
+                    return;
+                }
+
+                PluginAnchorGroupDef newDef = new PluginAnchorGroupDef();
+                _currentProfile.PluginAnchorGroups.Add(newDef);
+
+                _anchorGroupsBox.Add(new AnchorGroupRow(this, newDef) { Y = _anchorGroupsBox.Children.Count * AnchorGroupRow.RowHeight });
+                _anchorGroupsBox.ReArrangeChildren();
+            };
+            rightArea.Add(addAnchorGroupButton);
+
+            // Legend for the second sub-line of each AnchorGroupRow: a drag
+            // routes into that row's group only when the held modifier set
+            // matches exactly AND the dragged mobile's allegiance matches one
+            // of the checked target categories.
+            rightArea.Add(AddLabel(null, "Drag-select routing: Mods (exact match) | Target allegiance (any checked)", startX, anchorY + 48));
+
+            _anchorGroupsBox = new DataBox(startX, anchorY + 66, 0, 0) { WantUpdateSize = true };
+
+            foreach (PluginAnchorGroupDef def in _currentProfile.PluginAnchorGroups)
+            {
+                _anchorGroupsBox.Add(new AnchorGroupRow(this, def) { Y = _anchorGroupsBox.Children.Count * AnchorGroupRow.RowHeight });
+            }
+
+            _anchorGroupsBox.ReArrangeChildren();
+            rightArea.Add(_anchorGroupsBox);
+
+            Add(rightArea, PAGE);
+        }
+
         private void BuildInfoBar()
         {
             const int PAGE = 10;
@@ -4367,6 +4422,29 @@ namespace ClassicUO.Game.UI.Gumps
                     }
 
                     anchorGroups.Add(def);
+                }
+            }
+
+            // Two groups bound to the same exact modifier set with an
+            // overlapping target category would make drag-select routing
+            // ambiguous (DragAnchorRouting.ResolveDragAnchor returns the
+            // first match). Disable the later of any such pair's drag
+            // binding here (mirrors the silent-drop dup-id handling above)
+            // so the saved profile always routes deterministically.
+            List<int> conflictingIds = DragAnchorRouting.ConflictingGroupIds(anchorGroups);
+
+            if (conflictingIds.Count > 0)
+            {
+                foreach (PluginAnchorGroupDef def in anchorGroups)
+                {
+                    if (conflictingIds.Contains(def.Id))
+                    {
+                        Log.Warn($"Anchor group {def.Id} ('{def.Label}') has a drag-select binding that conflicts with an earlier group (same modifiers, overlapping target allegiance) - disabling its drag binding.");
+
+                        def.DragCtrl = false;
+                        def.DragShift = false;
+                        def.DragAlt = false;
+                    }
                 }
             }
 
