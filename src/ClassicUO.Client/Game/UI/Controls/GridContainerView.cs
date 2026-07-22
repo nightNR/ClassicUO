@@ -2,6 +2,7 @@
 
 using System.Linq;
 using ClassicUO.Assets;
+using ClassicUO.Configuration;
 using ClassicUO.Game.Data;
 using ClassicUO.Game.GameObjects;
 using ClassicUO.Game.Scenes;
@@ -37,7 +38,12 @@ namespace ClassicUO.Game.UI.Controls
             Width = GridContainerLayout.GridWidth();
             Height = GridContainerLayout.GridHeight() + GridContainerLayout.RESERVED_BOTTOM;
 
-            _background = new AlphaBlendControl { Width = Width, Height = Height };
+            _background = new AlphaBlendControl
+            {
+                Width = Width,
+                Height = Height,
+                BaseColor = PanelColor()
+            };
             Add(_background);
 
             _buttonPrev = new NiceButton(
@@ -82,6 +88,12 @@ namespace ClassicUO.Game.UI.Controls
 
             Add(_pageLabel);
         }
+
+        // Backdrop/cell fill color for the grid container. Pale gray when the light-background
+        // option is on, otherwise the historical black. Shared with GridContainerItem so the whole
+        // panel stays consistent.
+        internal static Color PanelColor()
+            => ProfileManager.CurrentProfile?.GridContainerLightBackground == true ? Color.LightGray : Color.Black;
 
         public World World => _host.World;
 

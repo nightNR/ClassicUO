@@ -234,6 +234,9 @@
   <data name="ContainerToggleDefaultGrid" xml:space="preserve">
     <value>Default toggled containers to grid</value>
   </data>
+  <data name="GridContainerLightBackground" xml:space="preserve">
+    <value>Light grid container background</value>
+  </data>
   <data name="HideRoofTiles" xml:space="preserve">
     <value>Hide roof tiles</value>
   </data>

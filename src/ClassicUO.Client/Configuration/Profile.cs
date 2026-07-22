@@ -278,6 +278,10 @@ namespace ClassicUO.Configuration
 
         public int GridLootType { get; set; } // 0 = none, 1 = only grid, 2 = both
 
+        // Draw the grid-container panel (backdrop + cells) in a pale/light color instead of the
+        // default dark. Off = dark (unchanged for existing users).
+        public bool GridContainerLightBackground { get; set; }
+
         public bool ReduceFPSWhenInactive { get; set; } = true;
 
         public bool OverrideAllFonts { get; set; }

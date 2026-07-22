@@ -52,6 +52,7 @@ namespace ClassicUO.Game.UI.Gumps
         private Combobox _backpackStyle;
         private Checkbox _hueContainerGumps;
         private Checkbox _containerToggleDefaultGrid;
+        private Checkbox _gridContainerLightBg;
 
 
         //counters
@@ -3932,7 +3933,18 @@ namespace ClassicUO.Game.UI.Gumps
                 _containerToggleDefaultGrid.IsEnabled = index == 2;
             };
 
-            startY += _containerToggleDefaultGrid.Height + 2 + 10;
+            startY += _containerToggleDefaultGrid.Height + 2;
+
+            _gridContainerLightBg = AddCheckBox
+            (
+                rightArea,
+                ResGumps.GridContainerLightBackground,
+                _currentProfile.GridContainerLightBackground,
+                startX,
+                startY
+            );
+
+            startY += _gridContainerLightBg.Height + 2 + 10;
 
             NiceButton button = new NiceButton
             (
@@ -4863,6 +4875,18 @@ namespace ClassicUO.Game.UI.Gumps
                 _currentProfile.ContainerViewMode = _containerViewMode.SelectedIndex;
                 _currentProfile.ContainerToggleDefaultGrid = _containerToggleDefaultGrid.IsChecked;
 
+                foreach (ContainerGump containerGump in UIManager.Gumps.OfType<ContainerGump>())
+                {
+                    containerGump.RequestUpdateContents();
+                }
+            }
+
+            if (_currentProfile.GridContainerLightBackground != _gridContainerLightBg.IsChecked)
+            {
+                _currentProfile.GridContainerLightBackground = _gridContainerLightBg.IsChecked;
+
+                // Rebuild open grid containers so the new panel color applies live (BuildGump
+                // recreates the GridContainerView, which re-reads PanelColor()).
                 foreach (ContainerGump containerGump in UIManager.Gumps.OfType<ContainerGump>())
                 {
                     containerGump.RequestUpdateContents();

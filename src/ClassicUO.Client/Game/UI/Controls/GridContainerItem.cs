@@ -42,7 +42,12 @@ namespace ClassicUO.Game.UI.Controls
             Width = size;
             Height = size;
 
-            AlphaBlendControl background = new AlphaBlendControl { Width = size, Height = size };
+            AlphaBlendControl background = new AlphaBlendControl
+            {
+                Width = size,
+                Height = size,
+                BaseColor = GridContainerView.PanelColor()
+            };
             Add(background);
 
             // The cell itself is the mouse-input control (like ItemGump). Do NOT add a

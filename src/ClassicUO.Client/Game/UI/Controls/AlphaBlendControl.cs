@@ -16,6 +16,11 @@ namespace ClassicUO.Game.UI.Controls
 
         public ushort Hue { get; set; }
 
+        // Solid color the alpha-blended fill is drawn from. Defaults to black (the historical
+        // behaviour). Set to a light color for a pale panel — hueing the black texture can't
+        // lighten it, so the base color itself must change.
+        public Color BaseColor { get; set; } = Color.Black;
+
         public override bool AddToRenderLists(RenderLists renderLists, int x, int y, ref float layerDepthRef)
         {
             float layerDepth = layerDepthRef;
@@ -27,7 +32,7 @@ namespace ClassicUO.Game.UI.Controls
                 {
                     batcher.Draw
                     (
-                        SolidColorTextureCache.GetTexture(Color.Black),
+                        SolidColorTextureCache.GetTexture(BaseColor),
                         new Rectangle
                         (
                             x,

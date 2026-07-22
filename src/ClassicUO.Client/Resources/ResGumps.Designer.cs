@@ -1926,6 +1926,15 @@ namespace ClassicUO.Resources {
         }
 
         /// <summary>
+        ///   Looks up a localized string similar to Light grid container background.
+        /// </summary>
+        public static string GridContainerLightBackground {
+            get {
+                return ResourceManager.GetString("GridContainerLightBackground", resourceCulture);
+            }
+        }
+
+        /// <summary>
         ///   Looks up a localized string similar to [Guild]: .
         /// </summary>
         public static string Guild {
