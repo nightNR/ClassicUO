@@ -2277,6 +2277,8 @@ namespace ClassicUO.Network
                         UIManager.Add(gump);
                     }
                 }
+
+                PluginAnchorGroupManager.Rebuild(world);
             }
         }
 

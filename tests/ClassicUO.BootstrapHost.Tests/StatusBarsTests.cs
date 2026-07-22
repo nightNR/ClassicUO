@@ -18,7 +18,8 @@ public sealed unsafe class StatusBarsTests
     private static int _x, _y, _group;
     private static byte _move;
     private static ushort _hue, _bgHue;
-    private static int _openCalls, _closeCalls, _overlayCalls;
+    private static int _priority;
+    private static int _openCalls, _closeCalls, _overlayCalls, _priorityCalls;
 
     [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
     private static void CaptureOpen(uint serial, int x, int y, byte move, int group)
@@ -31,6 +32,9 @@ public sealed unsafe class StatusBarsTests
 
     [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
     private static void CaptureOverlay(uint serial, ushort hue, ushort bgHue) { _serial = serial; _hue = hue; _bgHue = bgHue; _overlayCalls++; }
+
+    [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
+    private static void CapturePriority(uint serial, int priority) { _serial = serial; _priority = priority; _priorityCalls++; }
 
     private static StatusBarsImpl NewImplWithBindings(ClientBindings bindings)
     {
@@ -94,6 +98,23 @@ public sealed unsafe class StatusBarsTests
     }
 
     [Fact]
+    public void SetStatusBarPriority_InvokesBinding_WithSerialAndPriority()
+    {
+        _priorityCalls = 0;
+        var bindings = new ClientBindings
+        {
+            SetStatusBarPriorityFn = (nint)(delegate* unmanaged[Cdecl]<uint, int, void>)&CapturePriority
+        };
+        var impl = NewImplWithBindings(bindings);
+
+        impl.SetStatusBarPriority(0xDEADBEEF, 7);
+
+        _priorityCalls.Should().Be(1);
+        _serial.Should().Be(0xDEADBEEFu);
+        _priority.Should().Be(7);
+    }
+
+    [Fact]
     public void Methods_AreNoOps_WhenBindingMissing()
     {
         var impl = NewImplWithBindings(new ClientBindings());
@@ -101,5 +122,6 @@ public sealed unsafe class StatusBarsTests
         impl.OpenStatusBar(1, 0, 0);
         impl.CloseStatusBar(1);
         impl.SetOverlay(1, 1);
+        impl.SetStatusBarPriority(1, 1);
     }
 }

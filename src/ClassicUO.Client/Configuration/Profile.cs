@@ -24,6 +24,7 @@ namespace ClassicUO.Configuration
     [JsonSerializable(typeof(Profile), GenerationMode = JsonSourceGenerationMode.Metadata)]
     [JsonSerializable(typeof(ClassicUO.Game.UI.Gumps.ChatHistoryEntry), GenerationMode = JsonSourceGenerationMode.Metadata)]
     [JsonSerializable(typeof(ClassicUO.Game.Managers.AliasEntry), GenerationMode = JsonSourceGenerationMode.Metadata)]
+    [JsonSerializable(typeof(ClassicUO.Configuration.PluginAnchorGroupDef), GenerationMode = JsonSourceGenerationMode.Metadata)]
     sealed partial class ProfileJsonContext : JsonSerializerContext
     {
         sealed class SnakeCaseNamingPolicy : JsonNamingPolicy
@@ -250,6 +251,7 @@ namespace ClassicUO.Configuration
         // past MaxRows*MaxColumns capacity are dropped.
         public int PluginStatusBarMaxRows { get; set; } = 10;
         public int PluginStatusBarMaxColumns { get; set; } = 1;
+        public List<PluginAnchorGroupDef> PluginAnchorGroups { get; set; } = new List<PluginAnchorGroupDef>();
 
         public bool ShowSkillsChangedMessage { get; set; } = true;
         public int ShowSkillsChangedDeltaValue { get; set; } = 1;

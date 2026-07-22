@@ -128,6 +128,7 @@ namespace ClassicUO.Game.UI.Gumps
         private Checkbox _restorezoomCheckbox, _zoomCheckbox;
         private InputField _rows, _columns, _highlightAmount, _abbreviatedAmount;
         private InputField _pluginStatusBarMaxRows, _pluginStatusBarMaxColumns;
+        private DataBox _anchorGroupsBox;
 
         // speech
         private Checkbox _scaleSpeechDelay, _saveJournalCheckBox;
@@ -1176,7 +1177,7 @@ namespace ClassicUO.Game.UI.Gumps
             // Grid layout for plugin-opened, grouped status bars: bars stack down
             // a column up to MaxRows, then wrap into a new column; opens past
             // MaxRows*MaxColumns are dropped.
-            section3.Add(AddLabel(null, "Plugin status bar max rows", 0, 0));
+            section3.Add(AddLabel(null, "Plugin status bar max rows (fallback)", 0, 0));
 
             _pluginStatusBarMaxRows = AddInputField
             (
@@ -1195,7 +1196,7 @@ namespace ClassicUO.Game.UI.Gumps
             _pluginStatusBarMaxRows.SetText(_currentProfile.PluginStatusBarMaxRows.ToString());
             section3.AddRight(_pluginStatusBarMaxRows);
 
-            section3.Add(AddLabel(null, "Plugin status bar max columns", 0, 0));
+            section3.Add(AddLabel(null, "Plugin status bar max columns (fallback)", 0, 0));
 
             _pluginStatusBarMaxColumns = AddInputField
             (
@@ -1213,6 +1214,36 @@ namespace ClassicUO.Game.UI.Gumps
 
             _pluginStatusBarMaxColumns.SetText(_currentProfile.PluginStatusBarMaxColumns.ToString());
             section3.AddRight(_pluginStatusBarMaxColumns);
+
+            // Permanent anchor groups: each group gets its own on-screen widget
+            // and its own rows/columns/fill capacity, overriding the fallback
+            // above for that group id.
+            section3.Add(AddLabel(null, "Anchor groups", 0, 0));
+
+            NiceButton addAnchorGroupButton = new NiceButton(0, 0, 130, 25, ButtonAction.Activate, "Add group") { ButtonParameter = 999 };
+            addAnchorGroupButton.MouseUp += (s, e) =>
+            {
+                if (e.Button != MouseButtonType.Left)
+                {
+                    return;
+                }
+
+                PluginAnchorGroupDef newDef = new PluginAnchorGroupDef();
+                _currentProfile.PluginAnchorGroups.Add(newDef);
+
+                _anchorGroupsBox.Add(new AnchorGroupRow(this, newDef) { Y = _anchorGroupsBox.Children.Count * 26 });
+                _anchorGroupsBox.WantUpdateSize = true;
+            };
+            section3.Add(addAnchorGroupButton);
+
+            _anchorGroupsBox = new DataBox(0, 0, 0, 0) { WantUpdateSize = true };
+
+            foreach (PluginAnchorGroupDef def in _currentProfile.PluginAnchorGroups)
+            {
+                _anchorGroupsBox.Add(new AnchorGroupRow(this, def) { Y = _anchorGroupsBox.Children.Count * 26 });
+            }
+
+            section3.Add(_anchorGroupsBox);
 
 
             SettingsSection section4 = AddSettingsSection(box, "Miscellaneous");
@@ -4302,6 +4333,46 @@ namespace ClassicUO.Game.UI.Gumps
 
             _currentProfile.PluginStatusBarMaxRows = pluginBarRows;
             _currentProfile.PluginStatusBarMaxColumns = pluginBarCols;
+
+            List<PluginAnchorGroupDef> anchorGroups = new List<PluginAnchorGroupDef>();
+
+            foreach (Control child in _anchorGroupsBox.Children)
+            {
+                if (child is AnchorGroupRow row && !row.IsDisposed)
+                {
+                    row.Commit();
+
+                    PluginAnchorGroupDef def = row.Def;
+
+                    // drop invalid (Id == 0) and later duplicate ids (keep the first)
+                    if (def.Id == 0)
+                    {
+                        continue;
+                    }
+
+                    bool duplicate = false;
+
+                    foreach (PluginAnchorGroupDef existing in anchorGroups)
+                    {
+                        if (existing.Id == def.Id)
+                        {
+                            duplicate = true;
+                            break;
+                        }
+                    }
+
+                    if (duplicate)
+                    {
+                        continue;
+                    }
+
+                    anchorGroups.Add(def);
+                }
+            }
+
+            _currentProfile.PluginAnchorGroups = anchorGroups;
+            PluginAnchorGroupManager.Rebuild(World);
+
             _currentProfile.CloseHealthBarType = _healtbarType.SelectedIndex;
             _currentProfile.HideScreenshotStoredInMessage = _hideScreenshotStoredInMessage.IsChecked;
 

@@ -385,4 +385,5 @@ internal struct ClientBindings
     public nint AddCharacterFn;        // void(uint serial, ushort hue, byte priorityHighlight)
     public nint RemoveCharacterFn;     // void(uint serial, byte priorityHighlight)
     public nint ClearCharactersFn;     // void(byte priorityHighlight)
+    public nint SetStatusBarPriorityFn; // void(uint serial, int priority)
 }
