@@ -94,6 +94,21 @@ namespace ClassicUO.Game.UI.Gumps
             {
                 Location = UIManager.AnchorManager.GetCandidateDropLocation(this, _anchorCandidate);
                 UIManager.AnchorManager.DropControl(this, _anchorCandidate);
+
+                // Dropping a free bar onto a bar that already belongs to a
+                // tracked anchor group joins it to that group (grid reflow),
+                // capacity permitting. A bar already tracked in a group is
+                // left alone (FindGroupOf(LocalSerial) == 0 guard).
+                if (this is BaseHealthBarGump && _anchorCandidate is BaseHealthBarGump host)
+                {
+                    int gid = PluginStatusBarGroups.FindGroupOf(host.LocalSerial);
+
+                    if (gid != 0 && PluginStatusBarGroups.FindGroupOf(LocalSerial) == 0)
+                    {
+                        PluginStatusBars.JoinGroup(gid, (BaseHealthBarGump)this);
+                    }
+                }
+
                 _anchorCandidate = null;
             }
         }

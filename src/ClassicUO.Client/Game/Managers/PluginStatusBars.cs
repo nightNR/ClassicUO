@@ -328,6 +328,30 @@ namespace ClassicUO.Game.Managers
             ReflowGroup(groupId);
         }
 
+        // Client-side counterpart to AddToGroup for a bar the user drags onto
+        // an existing anchor group's bars (AnchorableGump.Attache), rather than
+        // one opened via a plugin's OpenStatusBar call. Same capacity guard;
+        // keeps ReflowGroup private by routing through this public entry point.
+        public static bool JoinGroup(int groupId, BaseHealthBarGump bar)
+        {
+            if (groupId == 0 || bar == null)
+            {
+                return false;
+            }
+
+            if (IsCapacityReached(
+                    PluginStatusBarGroups.GetLiveMembers(groupId).Count,
+                    ResolveMaxRows(groupId),
+                    ResolveMaxColumns(groupId)))
+            {
+                return false;
+            }
+
+            AddToGroup(groupId, bar);
+
+            return true;
+        }
+
         // Positions an already-ordered member list into the group's grid,
         // anchoring the first member at (originX, originY) and snapping each
         // subsequent member to its neighbor via NeighborFor + fill-order math.
