@@ -65,19 +65,18 @@ namespace ClassicUO.UnitTests
             Assert.DoesNotContain(3, conflicts);
         }
 
-        // Real ClassicUO.Game.Data.NotorietyFlag values. Mirrors exactly the set used by
-        // GameSceneInputHandler.DoDragSelect's DragSelectHostileOnly filter, which skips
-        // (treats as non-hostile) NotorietyFlag.Ally / Innocent / Invulnerable and keeps
-        // everything else (Unknown/Gray/Criminal/Enemy/Murderer) as hostile.
+        // Real ClassicUO.Game.Data.NotorietyFlag values. Three-way split for drag-select
+        // routing: Innocent/Ally = Allied(1); Gray/Criminal/Enemy/Murderer = Hostile(2);
+        // Invulnerable (vendors/healers) and Unknown = Neutral(0).
         [Theory]
-        [InlineData(/*Unknown*/     0, 2)] // Hostile - not in the friendly skip-set
-        [InlineData(/*Innocent*/    1, 1)] // Allied - in the friendly skip-set
-        [InlineData(/*Ally*/        2, 1)] // Allied - in the friendly skip-set
+        [InlineData(/*Unknown*/     0, 0)] // Neutral
+        [InlineData(/*Innocent*/    1, 1)] // Allied
+        [InlineData(/*Ally*/        2, 1)] // Allied
         [InlineData(/*Gray*/        3, 2)] // Hostile
         [InlineData(/*Criminal*/    4, 2)] // Hostile
         [InlineData(/*Enemy*/       5, 2)] // Hostile
         [InlineData(/*Murderer*/    6, 2)] // Hostile
-        [InlineData(/*Invulnerable*/7, 1)] // Allied - in the friendly skip-set
+        [InlineData(/*Invulnerable*/7, 0)] // Neutral - vendors/healers
         [InlineData(/*out-of-range*/99, 0)] // Neutral - defensive default
         public void ClassifyNotoriety_MapsToAllegiance(int noto, int expected)
         {
