@@ -12,6 +12,7 @@ using ClassicUO.Network;
 using ClassicUO.Renderer;
 using ClassicUO.Resources;
 using ClassicUO.Utility;
+using ClassicUO.Utility.Logging;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using System;
@@ -1234,7 +1235,7 @@ namespace ClassicUO.Game.UI.Gumps
             );
 
             section4.PushIndent();
-            section4.Add(AddLabel(null, ResGumps.DragKey, startX, startY));
+            section4.Add(AddLabel(null, "Drag-select modifier (default / unanchored)", startX, startY));
 
             section4.AddRight
             (
@@ -3654,16 +3655,22 @@ namespace ClassicUO.Game.UI.Gumps
                 PluginAnchorGroupDef newDef = new PluginAnchorGroupDef();
                 _currentProfile.PluginAnchorGroups.Add(newDef);
 
-                _anchorGroupsBox.Add(new AnchorGroupRow(this, newDef) { Y = _anchorGroupsBox.Children.Count * 26 });
+                _anchorGroupsBox.Add(new AnchorGroupRow(this, newDef) { Y = _anchorGroupsBox.Children.Count * AnchorGroupRow.RowHeight });
                 _anchorGroupsBox.ReArrangeChildren();
             };
             rightArea.Add(addAnchorGroupButton);
 
-            _anchorGroupsBox = new DataBox(startX, anchorY + 50, 0, 0) { WantUpdateSize = true };
+            // Legend for the second sub-line of each AnchorGroupRow: a drag
+            // routes into that row's group only when the held modifier set
+            // matches exactly AND the dragged mobile's allegiance matches one
+            // of the checked target categories.
+            rightArea.Add(AddLabel(null, "Drag-select routing: Mods (exact match) | Target allegiance (any checked)", startX, anchorY + 48));
+
+            _anchorGroupsBox = new DataBox(startX, anchorY + 66, 0, 0) { WantUpdateSize = true };
 
             foreach (PluginAnchorGroupDef def in _currentProfile.PluginAnchorGroups)
             {
-                _anchorGroupsBox.Add(new AnchorGroupRow(this, def) { Y = _anchorGroupsBox.Children.Count * 26 });
+                _anchorGroupsBox.Add(new AnchorGroupRow(this, def) { Y = _anchorGroupsBox.Children.Count * AnchorGroupRow.RowHeight });
             }
 
             _anchorGroupsBox.ReArrangeChildren();
@@ -4415,6 +4422,29 @@ namespace ClassicUO.Game.UI.Gumps
                     }
 
                     anchorGroups.Add(def);
+                }
+            }
+
+            // Two groups bound to the same exact modifier set with an
+            // overlapping target category would make drag-select routing
+            // ambiguous (DragAnchorRouting.ResolveDragAnchor returns the
+            // first match). Disable the later of any such pair's drag
+            // binding here (mirrors the silent-drop dup-id handling above)
+            // so the saved profile always routes deterministically.
+            List<int> conflictingIds = DragAnchorRouting.ConflictingGroupIds(anchorGroups);
+
+            if (conflictingIds.Count > 0)
+            {
+                foreach (PluginAnchorGroupDef def in anchorGroups)
+                {
+                    if (conflictingIds.Contains(def.Id))
+                    {
+                        Log.Warn($"Anchor group {def.Id} ('{def.Label}') has a drag-select binding that conflicts with an earlier group (same modifiers, overlapping target allegiance) - disabling its drag binding.");
+
+                        def.DragCtrl = false;
+                        def.DragShift = false;
+                        def.DragAlt = false;
+                    }
                 }
             }
 
