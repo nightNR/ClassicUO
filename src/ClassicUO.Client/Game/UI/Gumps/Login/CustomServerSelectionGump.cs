@@ -53,8 +53,10 @@ namespace ClassicUO.Game.UI.Gumps.Login
 
             var servers = scene.Servers ?? System.Array.Empty<ServerListEntry>();
             _servers = servers;
-            // Default focus on the first realm.
-            _selectedIndex = servers.Length > 0 ? 0 : -1;
+            // Default focus on the realm remembered in settings (fall back to first).
+            int defaultIdx = scene.GetServerIndexFromSettings();
+            if (defaultIdx < 0 || defaultIdx >= servers.Length) defaultIdx = 0;
+            _selectedIndex = servers.Length > 0 ? defaultIdx : -1;
 
             int rowX = PanelCX - RowW / 2;
             int rowY = PanelY + 110;
