@@ -294,12 +294,18 @@ namespace ClassicUO.Game.Managers
                 seedY = def.Y + PluginAnchorGroupGump.WidgetHeight;
             }
 
-            // Plugin-opened bars are always the custom bar so priority-overlay tint works.
-            HealthBarGumpCustom bar = new HealthBarGumpCustom(world, serial)
+            // Bar style (custom vs classic) honors the profile's CustomBarsToggled
+            // setting, mirroring every other spawn site (DoDragSelect, party, etc.).
+            GameObjects.Entity entity = world.Get(serial);
+
+            if (entity == null)
             {
-                X = seedX,
-                Y = seedY
-            };
+                return;
+            }
+
+            BaseHealthBarGump bar = HealthBarFactory.Create(world, entity);
+            bar.X = seedX;
+            bar.Y = seedY;
 
             UIManager.Add(bar);
 
