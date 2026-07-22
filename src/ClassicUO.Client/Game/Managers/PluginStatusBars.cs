@@ -304,5 +304,57 @@ namespace ClassicUO.Game.Managers
         {
             return NormalizeDimension(ProfileManager.CurrentProfile?.PluginStatusBarMaxColumns ?? DefaultMaxColumns);
         }
+
+        /// <summary>Cell for a 0-based insertion index under a given fill order.</summary>
+        internal static (int column, int row) GridCell(int index, int rows, int cols, FillOrder fill)
+        {
+            if (rows < 1) rows = 1;
+            if (cols < 1) cols = 1;
+
+            if (fill == FillOrder.RowMajor)
+            {
+                return (index % cols, index / cols);
+            }
+
+            // ColumnMajor (default, matches legacy GridCell(index, maxRows))
+            return (index / rows, index % rows);
+        }
+
+        internal static PluginAnchorGroupDef GetDef(int groupId)
+        {
+            var groups = ProfileManager.CurrentProfile?.PluginAnchorGroups;
+
+            if (groups == null)
+            {
+                return null;
+            }
+
+            for (int i = 0; i < groups.Count; i++)
+            {
+                if (groups[i] != null && groups[i].Id == groupId)
+                {
+                    return groups[i];
+                }
+            }
+
+            return null;
+        }
+
+        internal static int ResolveMaxRows(int groupId)
+        {
+            PluginAnchorGroupDef def = GetDef(groupId);
+            return NormalizeDimension(def?.Rows ?? (ProfileManager.CurrentProfile?.PluginStatusBarMaxRows ?? DefaultMaxRows));
+        }
+
+        internal static int ResolveMaxColumns(int groupId)
+        {
+            PluginAnchorGroupDef def = GetDef(groupId);
+            return NormalizeDimension(def?.Columns ?? (ProfileManager.CurrentProfile?.PluginStatusBarMaxColumns ?? DefaultMaxColumns));
+        }
+
+        internal static FillOrder ResolveFill(int groupId)
+        {
+            return GetDef(groupId)?.Fill ?? FillOrder.ColumnMajor;
+        }
     }
 }
