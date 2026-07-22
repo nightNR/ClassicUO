@@ -203,17 +203,30 @@ namespace ClassicUO.Game.Managers
             if (groupId != 0 &&
                 IsCapacityReached(
                     PluginStatusBarGroups.GetLiveMembers(groupId).Count,
-                    ResolveMaxRows(),
-                    ResolveMaxColumns()))
+                    ResolveMaxRows(groupId),
+                    ResolveMaxColumns(groupId)))
             {
                 return;
+            }
+
+            // A defined group seeds its first bar at the widget's anchor origin,
+            // ignoring the plugin-supplied x/y; undefined groups seed at x/y.
+            PluginAnchorGroupDef def = GetDef(groupId);
+            int seedX = x;
+            int seedY = y;
+
+            if (def != null && PluginStatusBarGroups.GetLiveMembers(groupId).Count == 0)
+            {
+                seedX = def.X;
+                // TODO(Task 4): replace 24 with PluginAnchorGroupGump.WidgetHeight
+                seedY = def.Y + 24;
             }
 
             // Plugin-opened bars are always the custom bar so priority-overlay tint works.
             HealthBarGumpCustom bar = new HealthBarGumpCustom(world, serial)
             {
-                X = x,
-                Y = y
+                X = seedX,
+                Y = seedY
             };
 
             UIManager.Add(bar);
@@ -231,7 +244,10 @@ namespace ClassicUO.Game.Managers
         // the whole grid drags as one unit.
         private static void AddToGroup(int groupId, BaseHealthBarGump bar)
         {
-            int maxRows = ResolveMaxRows();
+            int rows = ResolveMaxRows(groupId);
+            int cols = ResolveMaxColumns(groupId);
+            FillOrder fill = ResolveFill(groupId);
+
             List<BaseHealthBarGump> members = PluginStatusBarGroups.GetLiveMembers(groupId);
             int index = members.Count; // cell this new bar will occupy
 
@@ -247,23 +263,38 @@ namespace ClassicUO.Game.Managers
                 return;
             }
 
-            (int _, int row) = GridCell(index, maxRows);
+            (int neighborIndex, bool startNewLine) = NeighborFor(index, rows, cols, fill);
+            BaseHealthBarGump neighbor = members[neighborIndex];
 
-            BaseHealthBarGump neighbor;
-
-            if (row > 0)
+            if (!startNewLine)
             {
-                // Stack below the previous bar in this column (GetAnchorDirection → south).
-                neighbor = members[index - 1];
-                bar.X = neighbor.X;
-                bar.Y = neighbor.Y + neighbor.GroupMatrixHeight;
+                if (fill == FillOrder.RowMajor)
+                {
+                    // continue the row: place east of the previous bar
+                    bar.X = neighbor.X + neighbor.GroupMatrixWidth;
+                    bar.Y = neighbor.Y;
+                }
+                else
+                {
+                    // continue the column: place south of the previous bar
+                    bar.X = neighbor.X;
+                    bar.Y = neighbor.Y + neighbor.GroupMatrixHeight;
+                }
             }
             else
             {
-                // Start a new column right of the top bar of the previous column (→ east).
-                neighbor = members[index - maxRows];
-                bar.X = neighbor.X + neighbor.GroupMatrixWidth;
-                bar.Y = neighbor.Y;
+                if (fill == FillOrder.RowMajor)
+                {
+                    // new row below the first bar of the previous row
+                    bar.X = neighbor.X;
+                    bar.Y = neighbor.Y + neighbor.GroupMatrixHeight;
+                }
+                else
+                {
+                    // new column right of the top bar of the previous column
+                    bar.X = neighbor.X + neighbor.GroupMatrixWidth;
+                    bar.Y = neighbor.Y;
+                }
             }
 
             UIManager.AnchorManager.DropControl(bar, neighbor);
@@ -355,6 +386,20 @@ namespace ClassicUO.Game.Managers
         internal static FillOrder ResolveFill(int groupId)
         {
             return GetDef(groupId)?.Fill ?? FillOrder.ColumnMajor;
+        }
+
+        /// <summary>
+        /// For insertion index > 0, decides which existing member the new bar
+        /// anchors to and whether it opens a new line (column for ColumnMajor,
+        /// row for RowMajor). ColumnMajor: lines are columns of length `rows`.
+        /// RowMajor: lines are rows of length `cols`.
+        /// </summary>
+        internal static (int neighborIndex, bool startNewLine) NeighborFor(int index, int rows, int cols, FillOrder fill)
+        {
+            int lineLength = fill == FillOrder.RowMajor ? (cols < 1 ? 1 : cols) : (rows < 1 ? 1 : rows);
+            bool startNewLine = index % lineLength == 0;
+            int neighbor = startNewLine ? index - lineLength : index - 1;
+            return (neighbor, startNewLine);
         }
     }
 }

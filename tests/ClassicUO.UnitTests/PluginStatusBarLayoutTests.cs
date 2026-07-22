@@ -38,5 +38,24 @@ namespace ClassicUO.UnitTests
             Assert.False(PluginStatusBars.IsCapacityReached(3, 2, 2));
             Assert.True(PluginStatusBars.IsCapacityReached(4, 2, 2));
         }
+
+        [Theory]
+        // column-major rows=3: index 1,2 continue column (prev = index-1, no new line);
+        // index 3 starts new column (prev = index-3 = 0, new line)
+        [InlineData(1, 3, 2, (int)FillOrder.ColumnMajor, 0, false)]
+        [InlineData(2, 3, 2, (int)FillOrder.ColumnMajor, 1, false)]
+        [InlineData(3, 3, 2, (int)FillOrder.ColumnMajor, 0, true)]
+        // row-major cols=2: index 1 continues row (prev 0); index 2 starts new row (prev = index-2 = 0)
+        [InlineData(1, 3, 2, (int)FillOrder.RowMajor, 0, false)]
+        [InlineData(2, 3, 2, (int)FillOrder.RowMajor, 0, true)]
+        [InlineData(3, 3, 2, (int)FillOrder.RowMajor, 2, false)]
+        // NOTE: fill is passed as int, not FillOrder, for the same CS0051 reason
+        // documented on GridCell_PlacesByFillOrder above.
+        public void NeighborFor_PicksAnchorAndLineBreak(int index, int rows, int cols, int fill, int expNeighbor, bool expNewLine)
+        {
+            var (neighbor, newLine) = PluginStatusBars.NeighborFor(index, rows, cols, (FillOrder)fill);
+            Assert.Equal(expNeighbor, neighbor);
+            Assert.Equal(expNewLine, newLine);
+        }
     }
 }
