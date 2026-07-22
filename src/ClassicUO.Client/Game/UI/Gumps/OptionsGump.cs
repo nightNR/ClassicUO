@@ -3634,7 +3634,12 @@ namespace ClassicUO.Game.UI.Gumps
             // would overlap/clip as rows are added. Every "Add group" click
             // also calls ReArrangeChildren() to restack the rows and update the
             // box's size/scroll extents immediately.
-            int anchorY = box.Bounds.Bottom + 15;
+            // box.Bounds.Bottom is lazy (DataBox only recomputes Height via
+            // WantUpdateSize during Update()), so it's still ~6 here. Use
+            // section.Bounds.Bottom instead - SettingsSection.Add updates
+            // Height synchronously - offset by box.Y to convert from box-local
+            // space into rightArea-space (box is a direct child of rightArea).
+            int anchorY = box.Y + section.Bounds.Bottom + 15;
 
             rightArea.Add(AddLabel(null, "Anchor groups", startX, anchorY));
 
