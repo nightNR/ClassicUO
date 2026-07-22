@@ -218,8 +218,7 @@ namespace ClassicUO.Game.Managers
             if (def != null && PluginStatusBarGroups.GetLiveMembers(groupId).Count == 0)
             {
                 seedX = def.X;
-                // TODO(Task 4): replace 24 with PluginAnchorGroupGump.WidgetHeight
-                seedY = def.Y + 24;
+                seedY = def.Y + PluginAnchorGroupGump.WidgetHeight;
             }
 
             // Plugin-opened bars are always the custom bar so priority-overlay tint works.
@@ -237,11 +236,13 @@ namespace ClassicUO.Game.Managers
             }
         }
 
-        // Lays the group out column-major: the first bar seeds the group at the
-        // plugin-supplied position; each subsequent bar stacks below the one
-        // above it until a column holds MaxRows bars, then a new column starts to
-        // the right. AnchorManager.DropControl slots the bar into the matrix so
-        // the whole grid drags as one unit.
+        // Lays the group out per its resolved dimensions and fill order: the
+        // first bar seeds the group at the widget's anchor origin (or the
+        // plugin-supplied position for undefined groups); each subsequent bar
+        // extends the current line (column for ColumnMajor, row for RowMajor)
+        // until it reaches the group's Rows/Columns, then starts a new line.
+        // AnchorManager.DropControl slots the bar into the matrix so the whole
+        // grid drags as one unit.
         private static void AddToGroup(int groupId, BaseHealthBarGump bar)
         {
             int rows = ResolveMaxRows(groupId);
