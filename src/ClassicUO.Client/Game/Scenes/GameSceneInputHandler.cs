@@ -34,6 +34,7 @@ namespace ClassicUO.Game.Scenes
             _continueRunning;
         private Point _selectionStart,
             _selectionEnd;
+        private DragModifier _dragSelectModifiers;
         private int AnchorOffset => ProfileManager.CurrentProfile.DragSelectAsAnchor ? 0 : 2;
 
         private bool MoveCharacterByMouseInput()
@@ -123,6 +124,54 @@ namespace ClassicUO.Game.Scenes
             return false;
         }
 
+        private static DragModifier CurrentHeldDragModifiers()
+        {
+            DragModifier held = DragModifier.None;
+
+            if (Keyboard.Ctrl)
+            {
+                held |= DragModifier.Ctrl;
+            }
+
+            if (Keyboard.Shift)
+            {
+                held |= DragModifier.Shift;
+            }
+
+            if (Keyboard.Alt)
+            {
+                held |= DragModifier.Alt;
+            }
+
+            return held;
+        }
+
+        // True when the held modifier set exactly matches a bound anchor group's
+        // drag modifiers. Unlike DragSelectModifierActive() (the default/unanchored
+        // trigger), this intentionally has no Ctrl+Shift veto: a group explicitly
+        // bound to Ctrl+Shift must still be able to activate drag-select.
+        private static bool AnchorGroupDragBindingActive(DragModifier held)
+        {
+            var groups = ProfileManager.CurrentProfile?.PluginAnchorGroups;
+
+            if (groups == null)
+            {
+                return false;
+            }
+
+            for (int i = 0; i < groups.Count; i++)
+            {
+                PluginAnchorGroupDef def = groups[i];
+
+                if (def != null && DragAnchorRouting.HasBinding(def) && DragAnchorRouting.ModifiersOf(def) == held)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
         private void DoDragSelect()
         {
             if (_selectionStart.X > Mouse.Position.X)
@@ -203,6 +252,20 @@ namespace ClassicUO.Game.Scenes
                     {
                         if (UIManager.GetGump<BaseHealthBarGump>(mobile) != null)
                         {
+                            continue;
+                        }
+
+                        int anchorGroupId = DragAnchorRouting.ResolveDragAnchor(
+                            _dragSelectModifiers,
+                            DragAnchorRouting.ClassifyMobile(mobile),
+                            ProfileManager.CurrentProfile.PluginAnchorGroups
+                        );
+
+                        if (anchorGroupId != 0)
+                        {
+                            // The group's grid layout owns position for anchored bars;
+                            // skip the default cascade + TryAttacheToExist for this mobile.
+                            PluginStatusBars.OpenStatusBar(mobile.Serial, finalX, finalY, 1, anchorGroupId);
                             continue;
                         }
 
@@ -352,12 +415,16 @@ namespace ClassicUO.Game.Scenes
             {
                 SelectedObject.LastLeftDownObject = SelectedObject.Object;
 
-                if (ProfileManager.CurrentProfile.EnableDragSelect && DragSelectModifierActive())
+                DragModifier heldDragModifiers = CurrentHeldDragModifiers();
+
+                if (ProfileManager.CurrentProfile.EnableDragSelect &&
+                    (DragSelectModifierActive() || AnchorGroupDragBindingActive(heldDragModifiers)))
                 {
                     if (CanDragSelectOnObject(SelectedObject.Object as GameObject))
                     {
                         _selectionStart = Mouse.Position;
                         _isSelectionActive = true;
+                        _dragSelectModifiers = heldDragModifiers;
                     }
                 }
                 else
