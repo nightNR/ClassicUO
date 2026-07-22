@@ -23,7 +23,9 @@ namespace ClassicUO.UnitTests
             var def = new PluginAnchorGroupDef
             {
                 Id = 42, Label = "Enemies", Columns = 3, Rows = 5,
-                Fill = FillOrder.RowMajor, X = 100, Y = 200, Locked = true
+                Fill = FillOrder.RowMajor, X = 100, Y = 200, Locked = true,
+                DragCtrl = true, DragShift = true, DragAlt = true,
+                DragAllied = true, DragHostile = true, DragNeutral = true
             };
 
             string json = JsonSerializer.Serialize(def);
@@ -37,6 +39,12 @@ namespace ClassicUO.UnitTests
             Assert.Equal(def.X, round.X);
             Assert.Equal(def.Y, round.Y);
             Assert.Equal(def.Locked, round.Locked);
+            Assert.Equal(def.DragCtrl, round.DragCtrl);
+            Assert.Equal(def.DragShift, round.DragShift);
+            Assert.Equal(def.DragAlt, round.DragAlt);
+            Assert.Equal(def.DragAllied, round.DragAllied);
+            Assert.Equal(def.DragHostile, round.DragHostile);
+            Assert.Equal(def.DragNeutral, round.DragNeutral);
         }
     }
 }
