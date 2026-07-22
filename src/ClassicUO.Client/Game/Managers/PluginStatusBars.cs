@@ -223,12 +223,13 @@ namespace ClassicUO.Game.Managers
             bar.Dispose();
 
             PluginStatusPriorities.Clear(serial);
-            PluginStatusBarGroups.PruneEmpty();
 
             if (groupId != 0)
             {
                 ReflowGroup(groupId); // surviving bars collapse upward
             }
+
+            PluginStatusBarGroups.PruneEmpty();
         }
 
         public static void SetStatusBarPriority(uint serial, int priority)
