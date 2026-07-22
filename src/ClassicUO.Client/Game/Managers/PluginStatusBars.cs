@@ -56,6 +56,37 @@ namespace ClassicUO.Game.Managers
     }
 
     /// <summary>
+    /// Plugin-driven per-serial ordering priority. Absence == priority 0
+    /// (the default); a value of 0 is stored as removal to keep the map small.
+    /// Policy lives in the plugin; the client only stores and sorts.
+    /// </summary>
+    internal static class PluginStatusPriorities
+    {
+        private static readonly Dictionary<uint, int> _priorities = new Dictionary<uint, int>();
+
+        public static void Set(uint serial, int priority)
+        {
+            if (priority == 0)
+            {
+                _priorities.Remove(serial);
+                return;
+            }
+
+            _priorities[serial] = priority;
+        }
+
+        public static int Get(uint serial)
+        {
+            return _priorities.TryGetValue(serial, out int p) ? p : 0;
+        }
+
+        public static void Clear(uint serial) => _priorities.Remove(serial);
+
+        /// <summary>Test-only: drops every priority so tests start clean.</summary>
+        public static void Reset() => _priorities.Clear();
+    }
+
+    /// <summary>
     /// Maps plugin-supplied group ids to the existing anchor-system
     /// <see cref="AnchorManager.AnchorGroup"/> objects so plugins can snap status
     /// bars into a shared, drag-as-a-unit group. The anchor matrix machinery is
@@ -85,6 +116,27 @@ namespace ClassicUO.Game.Managers
         public static AnchorManager.AnchorGroup GetGroup(int groupId)
         {
             return _groups.TryGetValue(groupId, out AnchorManager.AnchorGroup group) ? group : null;
+        }
+
+        /// <summary>groupId of the live member whose serial matches, else 0.</summary>
+        public static int FindGroupOf(uint serial)
+        {
+            foreach (KeyValuePair<int, List<BaseHealthBarGump>> kv in _members)
+            {
+                List<BaseHealthBarGump> list = kv.Value;
+
+                for (int i = 0; i < list.Count; i++)
+                {
+                    BaseHealthBarGump b = list[i];
+
+                    if (b != null && !b.IsDisposed && b.LocalSerial == serial)
+                    {
+                        return kv.Key;
+                    }
+                }
+            }
+
+            return 0;
         }
 
         /// <summary>
@@ -165,10 +217,31 @@ namespace ClassicUO.Game.Managers
                 return;
             }
 
+            int groupId = PluginStatusBarGroups.FindGroupOf(serial);
+
             UIManager.AnchorManager.DetachControl(bar);
             bar.Dispose();
 
+            PluginStatusPriorities.Clear(serial);
+
+            if (groupId != 0)
+            {
+                ReflowGroup(groupId); // surviving bars collapse upward
+            }
+
             PluginStatusBarGroups.PruneEmpty();
+        }
+
+        public static void SetStatusBarPriority(uint serial, int priority)
+        {
+            PluginStatusPriorities.Set(serial, priority);
+
+            int groupId = PluginStatusBarGroups.FindGroupOf(serial);
+
+            if (groupId != 0)
+            {
+                ReflowGroup(groupId);
+            }
         }
 
         // Defaults mirror Profile.PluginStatusBarMaxRows/Columns; used when no
@@ -245,61 +318,146 @@ namespace ClassicUO.Game.Managers
         // grid drags as one unit.
         private static void AddToGroup(int groupId, BaseHealthBarGump bar)
         {
-            int rows = ResolveMaxRows(groupId);
-            int cols = ResolveMaxColumns(groupId);
-            FillOrder fill = ResolveFill(groupId);
+            PluginStatusBarGroups.AddMember(groupId, bar);
+            ReflowGroup(groupId);
+        }
 
-            List<BaseHealthBarGump> members = PluginStatusBarGroups.GetLiveMembers(groupId);
-            int index = members.Count; // cell this new bar will occupy
-
-            AnchorManager.AnchorGroup group = PluginStatusBarGroups.GetGroup(groupId);
-
-            if (index == 0 || group == null || group.IsEmpty)
+        // Positions an already-ordered member list into the group's grid,
+        // anchoring the first member at (originX, originY) and snapping each
+        // subsequent member to its neighbor via NeighborFor + fill-order math.
+        // Rebuilds the AnchorGroup so the whole grid drags as one unit. Shared
+        // by AddToGroup (via ReflowGroup) and ReflowGroup itself.
+        private static void PlaceInGrid(
+            IReadOnlyList<BaseHealthBarGump> ordered,
+            int rows, int cols, FillOrder fill,
+            int originX, int originY)
+        {
+            if (ordered.Count == 0)
             {
-                group = new AnchorManager.AnchorGroup(bar);
-                UIManager.AnchorManager[bar] = group;
-                PluginStatusBarGroups.Track(groupId, group);
-                PluginStatusBarGroups.AddMember(groupId, bar);
-
                 return;
             }
 
-            (int neighborIndex, bool startNewLine) = NeighborFor(index, rows, cols, fill);
-            BaseHealthBarGump neighbor = members[neighborIndex];
+            BaseHealthBarGump first = ordered[0];
+            first.X = originX;
+            first.Y = originY;
 
-            if (!startNewLine)
+            AnchorManager.AnchorGroup group = new AnchorManager.AnchorGroup(first);
+            UIManager.AnchorManager[first] = group;
+
+            for (int i = 1; i < ordered.Count; i++)
             {
-                if (fill == FillOrder.RowMajor)
+                BaseHealthBarGump bar = ordered[i];
+                (int neighborIndex, bool startNewLine) = NeighborFor(i, rows, cols, fill);
+                BaseHealthBarGump neighbor = ordered[neighborIndex];
+
+                if (!startNewLine)
                 {
-                    // continue the row: place east of the previous bar
-                    bar.X = neighbor.X + neighbor.GroupMatrixWidth;
-                    bar.Y = neighbor.Y;
+                    if (fill == FillOrder.RowMajor)
+                    {
+                        // continue the row: place east of the previous bar
+                        bar.X = neighbor.X + neighbor.GroupMatrixWidth;
+                        bar.Y = neighbor.Y;
+                    }
+                    else
+                    {
+                        // continue the column: place south of the previous bar
+                        bar.X = neighbor.X;
+                        bar.Y = neighbor.Y + neighbor.GroupMatrixHeight;
+                    }
                 }
                 else
                 {
-                    // continue the column: place south of the previous bar
-                    bar.X = neighbor.X;
-                    bar.Y = neighbor.Y + neighbor.GroupMatrixHeight;
+                    if (fill == FillOrder.RowMajor)
+                    {
+                        // new row below the first bar of the previous row
+                        bar.X = neighbor.X;
+                        bar.Y = neighbor.Y + neighbor.GroupMatrixHeight;
+                    }
+                    else
+                    {
+                        // new column right of the top bar of the previous column
+                        bar.X = neighbor.X + neighbor.GroupMatrixWidth;
+                        bar.Y = neighbor.Y;
+                    }
                 }
+
+                UIManager.AnchorManager.DropControl(bar, neighbor);
             }
-            else
+        }
+
+        // The fixed top-left the grid grows from. Defined groups derive it from
+        // the anchor def (stable); undefined groups use the current top-left of
+        // live members (smallest Y, then X), so the group stays where it sits.
+        private static (int x, int y) GroupOrigin(int groupId, List<BaseHealthBarGump> members)
+        {
+            PluginAnchorGroupDef def = GetDef(groupId);
+
+            if (def != null)
             {
-                if (fill == FillOrder.RowMajor)
+                return (def.X, def.Y + PluginAnchorGroupGump.WidgetHeight);
+            }
+
+            if (members.Count == 0)
+            {
+                return (0, 0);
+            }
+
+            BaseHealthBarGump topLeft = members[0];
+
+            for (int i = 1; i < members.Count; i++)
+            {
+                BaseHealthBarGump b = members[i];
+
+                if (b.Y < topLeft.Y || (b.Y == topLeft.Y && b.X < topLeft.X))
                 {
-                    // new row below the first bar of the previous row
-                    bar.X = neighbor.X;
-                    bar.Y = neighbor.Y + neighbor.GroupMatrixHeight;
-                }
-                else
-                {
-                    // new column right of the top bar of the previous column
-                    bar.X = neighbor.X + neighbor.GroupMatrixWidth;
-                    bar.Y = neighbor.Y;
+                    topLeft = b;
                 }
             }
 
-            UIManager.AnchorManager.DropControl(bar, neighbor);
-            PluginStatusBarGroups.AddMember(groupId, bar);
+            return (topLeft.X, topLeft.Y);
+        }
+
+        // Re-lays a group's live members into the grid ordered by priority
+        // (desc, insertion tiebreak). Detaches everything, then rebuilds via
+        // PlaceInGrid so cells reflect the new order and collapse densely.
+        private static void ReflowGroup(int groupId)
+        {
+            List<BaseHealthBarGump> members = PluginStatusBarGroups.GetLiveMembers(groupId);
+
+            if (members.Count == 0)
+            {
+                return;
+            }
+
+            (int originX, int originY) = GroupOrigin(groupId, members);
+
+            // Order indices by priority using the tested pure helper.
+            int[] priorities = new int[members.Count];
+
+            for (int i = 0; i < members.Count; i++)
+            {
+                priorities[i] = PluginStatusPriorities.Get(members[i].LocalSerial);
+            }
+
+            int[] order = OrderByPriority(priorities);
+
+            List<BaseHealthBarGump> ordered = new List<BaseHealthBarGump>(members.Count);
+
+            foreach (int idx in order)
+            {
+                ordered.Add(members[idx]);
+            }
+
+            // Detach all before rebuilding so the matrix (and the AnchorManager's
+            // reverse map) starts clean; PlaceInGrid re-seeds a fresh AnchorGroup.
+            foreach (BaseHealthBarGump bar in members)
+            {
+                UIManager.AnchorManager.DetachControl(bar);
+            }
+
+            PlaceInGrid(ordered, ResolveMaxRows(groupId), ResolveMaxColumns(groupId), ResolveFill(groupId), originX, originY);
+
+            PluginStatusBarGroups.Track(groupId, UIManager.AnchorManager[ordered[0]]);
         }
 
         // --- Pure layout helpers (unit-tested) ---
@@ -406,6 +564,39 @@ namespace ClassicUO.Game.Managers
             bool startNewLine = index % lineLength == 0;
             int neighbor = startNewLine ? index - lineLength : index - 1;
             return (neighbor, startNewLine);
+        }
+
+        /// <summary>
+        /// Indices into <paramref name="priorities"/> ordered by priority
+        /// descending, ties broken by ascending original index (stable). This
+        /// is the single source of truth for group member ordering.
+        /// </summary>
+        internal static int[] OrderByPriority(int[] priorities)
+        {
+            int[] order = new int[priorities.Length];
+
+            for (int i = 0; i < order.Length; i++)
+            {
+                order[i] = i;
+            }
+
+            // Stable insertion sort: small member counts, and it guarantees the
+            // ascending-index tiebreak without extra key allocation.
+            for (int i = 1; i < order.Length; i++)
+            {
+                int cur = order[i];
+                int j = i - 1;
+
+                while (j >= 0 && priorities[order[j]] < priorities[cur])
+                {
+                    order[j + 1] = order[j];
+                    j--;
+                }
+
+                order[j + 1] = cur;
+            }
+
+            return order;
         }
     }
 }
