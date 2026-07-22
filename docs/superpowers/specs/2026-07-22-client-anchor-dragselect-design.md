@@ -13,8 +13,10 @@ Make user-defined anchor groups usable from the **pure client**, not just plugin
 1. **Drag-select routing** — extend the existing "drag a rectangle to open health
    bars" feature so the held modifier keys + each mobile's allegiance route the
    opened bars into specific anchor groups. Each anchor group can be bound to a
-   modifier combination (Ctrl/Shift/Alt checkboxes) and a target filter
-   (Any/Allied/Hostile). A single drag can populate several anchors at once.
+   modifier combination (Ctrl/Shift/Alt checkboxes) and target categories
+   (Allied/Hostile/Neutral checkboxes). A single drag can populate several
+   anchors at once — e.g. Ctrl+drag sends hostiles to one anchor and allies to
+   another.
 2. **Drag-into-anchor** — dragging a free (unanchored) health bar onto the bars of
    an anchor group automatically adds it to that group (tracked membership: grid,
    capacity, reflow, priority), not just an ad-hoc AnchorManager attach.
@@ -52,34 +54,36 @@ already reachable without a live plugin.
 ### 1. Data model — extend `PluginAnchorGroupDef`
 
 Add (append; keep JSON round-trip):
-- `bool DragCtrl`, `bool DragShift`, `bool DragAlt` — modifier checkboxes. A group
-  has a drag-select binding iff at least one is true; all-false = no binding.
-- `DragTargetFilter DragTarget` — new enum `{ Any = 0, Allied = 1, Hostile = 2 }`.
+- `bool DragCtrl`, `bool DragShift`, `bool DragAlt` — modifier checkboxes.
+- `bool DragAllied`, `bool DragHostile`, `bool DragNeutral` — target **category**
+  checkboxes (consistent with the modifier checkboxes). All three checked = "any".
 
-A binding is the tuple `(modifiers = {Ctrl?,Shift?,Alt?}, target)`.
+A group has an active drag-select binding iff **at least one modifier AND at least
+one category** are checked; otherwise it has no binding and is ignored by routing.
+A binding is the tuple `(modifiers = {Ctrl?,Shift?,Alt?}, categories ⊆ {Allied,Hostile,Neutral})`.
 
 ### 2. Matching — the pure routing decision
 
 New pure, unit-tested helper (in `PluginStatusBars` or a small new static class):
 ```
-// Given the modifier set held at drag time and a mobile's allegiance, pick the
-// target group id, or 0 for "no anchor → default unanchored".
+// Given the modifier set held at drag time and a mobile's allegiance category,
+// pick the target group id, or 0 for "no anchor → default unanchored".
 int ResolveDragAnchor(ModifierSet held, Allegiance mob, IReadOnlyList<PluginAnchorGroupDef> defs)
 ```
 Rules:
-- Consider only defs with a binding (≥1 modifier true) whose modifier set **exactly
-  equals** `held`.
-- Among those, pick the one whose `DragTarget` matches `mob`: `Any` matches any;
-  `Allied` matches allied mobiles; `Hostile` matches hostile mobiles.
-- Preference when both a specific filter and `Any` match: the **more specific**
-  (Allied/Hostile) wins over `Any`.
+- Consider only defs with an active binding (≥1 modifier AND ≥1 category) whose
+  modifier set **exactly equals** `held`.
+- Among those, match the one whose category set contains the mobile's category
+  (`Allied`/`Hostile`/`Neutral`).
+- Validation (§4) guarantees at most one anchor covers a given
+  `(modifier set, category)` cell, so the match is unambiguous — no precedence
+  rules needed. (Defensive: if two somehow qualify, take the first in list order.)
 - If none match → return 0 (mobile falls to default unanchored behavior).
 
 `Allegiance` (Allied/Hostile/Neutral) is derived from the mobile's notoriety,
 reusing the SAME classification the existing `DragSelectHostileOnly` filter uses
 (`GameSceneInputHandler` already distinguishes hostile). "Allied" = the allied/
-party/innocent side of that classification; anything neither is Neutral (matches
-only `Any`).
+party/innocent side of that classification; anything neither is `Neutral`.
 
 ### 3. Drag-select integration (`DoDragSelect`)
 
@@ -103,9 +107,12 @@ only `Any`).
 ### 4. Validation (Options Apply)
 
 A **conflict** exists only when two groups share the **same modifier set** AND
-their target filters **overlap** (same filter, or either is `Any`). Non-overlapping
-(e.g. Ctrl+Hostile vs Ctrl+Allied) is allowed. On conflict at Apply: surface a
-warning and keep the first (drop the later binding, i.e. clear its modifiers).
+their category sets **overlap** (share at least one of Allied/Hostile/Neutral).
+Disjoint categories (e.g. Ctrl+{Hostile} vs Ctrl+{Allied,Neutral}) are allowed and
+are the intended way to split one modifier across multiple anchors. On conflict at
+Apply: surface a warning and keep the first (drop the later binding, i.e. clear its
+modifiers). The `(modifier set × category)` space is thus partitioned — each cell
+routes to at most one anchor.
 
 ### 5. Drag-into-anchor (feature 2)
 
@@ -137,8 +144,9 @@ not depend on it.
 
 ### 7. Options UI — extend `AnchorGroupRow`
 
-Add per row: three checkboxes `Ctrl` / `Shift` / `Alt` and a target `Combobox`
-(`Any`/`Allied`/`Hostile`), wired to `def.DragCtrl/Shift/Alt/DragTarget`. Row grows
+Add per row: three modifier checkboxes `Ctrl` / `Shift` / `Alt` and three category
+checkboxes `Allied` / `Hostile` / `Neutral`, wired to
+`def.DragCtrl/Shift/Alt` and `def.DragAllied/DragHostile/DragNeutral`. Row grows
 wider or wraps to a second sub-line per group; commit on Apply alongside the
 existing id/label/cols/rows/fill fields. Add a small header/legend so the columns
 are understandable. Update the default-set control (former `DragSelectModifierKey`)
@@ -146,9 +154,10 @@ label to reflect its new "default (unanchored) drag-select" meaning.
 
 ## Testing
 
-- **Pure**: `ResolveDragAnchor` — exact modifier match; Allied/Hostile/Any
-  selection and Any-vs-specific preference; no-match → 0; empty-binding groups
-  ignored. Conflict-detection helper (same modifiers + overlapping filter).
+- **Pure**: `ResolveDragAnchor` — exact modifier match; Allied/Hostile/Neutral
+  category membership; no-match → 0; groups with no modifier OR no category
+  ignored; one drag routing different categories to different anchors. Conflict-
+  detection helper (same modifiers + overlapping category set).
 - Allegiance classification maps notoriety → Allied/Hostile/Neutral consistently
   with the existing hostile filter.
 - `PluginAnchorGroupDef` JSON round-trip includes the new fields.
@@ -158,7 +167,7 @@ label to reflect its new "default (unanchored) drag-select" meaning.
 ## Out of scope
 
 - Overlay/priority tint on classic bars (noted as optional follow-up in §6).
-- Target filters beyond Any/Allied/Hostile (Humanoid/Monster) — can be added later
-  to the same enum if wanted.
+- Target categories beyond Allied/Hostile/Neutral (Humanoid/Monster) — can be added
+  later as more category checkboxes if wanted.
 - Changing how the classic vs custom bar looks; only which one is created.
 - Non-drag ways of assigning client bars to groups (macros, etc.).
