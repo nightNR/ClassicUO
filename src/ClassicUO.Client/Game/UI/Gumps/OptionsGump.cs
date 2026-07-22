@@ -992,35 +992,11 @@ namespace ClassicUO.Game.UI.Gumps
 
             section3.Add
             (
-                _holdDownKeyAlt = AddCheckBox
-                (
-                    null,
-                    ResGumps.AltCloseGumps,
-                    _currentProfile.HoldDownKeyAltToCloseAnchored,
-                    0,
-                    0
-                )
-            );
-
-            section3.Add
-            (
                 _holdAltToMoveGumps = AddCheckBox
                 (
                     null,
                     ResGumps.AltMoveGumps,
                     _currentProfile.HoldAltToMoveGumps,
-                    0,
-                    0
-                )
-            );
-
-            section3.Add
-            (
-                _closeAllAnchoredGumpsWithRClick = AddCheckBox
-                (
-                    null,
-                    ResGumps.ClickCloseAllGumps,
-                    _currentProfile.CloseAllAnchoredGumpsInGroupWithRightClick,
                     0,
                     0
                 )
@@ -1302,14 +1278,6 @@ namespace ClassicUO.Game.UI.Gumps
 
             section4.Add(new Label(ResGumps.DragSelectStartingPosY, true, HUE_FONT));
             section4.Add(_dragSelectStartY = new HSliderBar(startX, startY, 200, 0, Client.Game.Scene.Camera.Bounds.Height, _currentProfile.DragSelectStartY, HSliderBarStyle.MetalWidgetRecessedBar, true, 0, HUE_FONT));
-            section4.Add
-            (
-                _dragSelectAsAnchor = AddCheckBox
-                (
-                    null, ResGumps.DragSelectAnchoredHB, _currentProfile.DragSelectAsAnchor, startX,
-                    startY
-                )
-            );
 
             section4.PopIndent();
 
@@ -3513,6 +3481,30 @@ namespace ClassicUO.Game.UI.Gumps
 
             section.Add
             (
+                _holdDownKeyAlt = AddCheckBox
+                (
+                    null,
+                    ResGumps.AltCloseGumps,
+                    _currentProfile.HoldDownKeyAltToCloseAnchored,
+                    0,
+                    0
+                )
+            );
+
+            section.Add
+            (
+                _closeAllAnchoredGumpsWithRClick = AddCheckBox
+                (
+                    null,
+                    ResGumps.ClickCloseAllGumps,
+                    _currentProfile.CloseAllAnchoredGumpsInGroupWithRightClick,
+                    0,
+                    0
+                )
+            );
+
+            section.Add
+            (
                 _customBars = AddCheckBox
                 (
                     null,
@@ -3582,6 +3574,15 @@ namespace ClassicUO.Game.UI.Gumps
             section.AddRight(_healtbarType);
             section.PopIndent();
 
+            section.Add
+            (
+                _dragSelectAsAnchor = AddCheckBox
+                (
+                    null, ResGumps.DragSelectAnchoredHB, _currentProfile.DragSelectAsAnchor, 0,
+                    0
+                )
+            );
+
             // Grid layout for plugin-opened, grouped status bars: bars stack down
             // a column up to MaxRows, then wrap into a new column; opens past
             // MaxRows*MaxColumns are dropped.
@@ -3622,8 +3623,6 @@ namespace ClassicUO.Game.UI.Gumps
 
             _pluginStatusBarMaxColumns.SetText(_currentProfile.PluginStatusBarMaxColumns.ToString());
             section.AddRight(_pluginStatusBarMaxColumns);
-
-            // (anchor-behavior toggles added in Task 4)
 
             // Permanent anchor groups: each group gets its own on-screen widget
             // and its own rows/columns/fill capacity, overriding the fallback
