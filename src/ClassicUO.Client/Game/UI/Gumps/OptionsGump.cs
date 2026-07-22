@@ -258,6 +258,19 @@ namespace ClassicUO.Game.UI.Gumps
                     140,
                     25,
                     ButtonAction.SwitchPage,
+                    "Status Bars"
+                ) { ButtonParameter = 15 }
+            );
+
+            Add
+            (
+                new NiceButton
+                (
+                    10,
+                    10 + 30 * i++,
+                    140,
+                    25,
+                    ButtonAction.SwitchPage,
                     ResGumps.Macros
                 ) { ButtonParameter = 4 }
             );
@@ -459,6 +472,7 @@ namespace ClassicUO.Game.UI.Gumps
             BuildExperimental();
             BuildAliases();
             BuildStatusbarColors();
+            BuildStatusBars();
 
             ChangePage(1);
         }
@@ -3620,6 +3634,17 @@ namespace ClassicUO.Game.UI.Gumps
             rightArea.Add(addTarget);
             rightArea.Add(addManual);
             rightArea.Add(databox);
+
+            Add(rightArea, PAGE);
+        }
+
+        private void BuildStatusBars()
+        {
+            const int PAGE = 15;
+
+            ScrollArea rightArea = new ScrollArea(190, 20, WIDTH - 210, 420, true);
+
+            // (controls added in Tasks 2-4)
 
             Add(rightArea, PAGE);
         }
