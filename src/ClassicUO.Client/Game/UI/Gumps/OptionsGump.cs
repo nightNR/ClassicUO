@@ -1118,37 +1118,6 @@ namespace ClassicUO.Game.UI.Gumps
                 )
             );
 
-            // Permanent anchor groups: each group gets its own on-screen widget
-            // and its own rows/columns/fill capacity, overriding the fallback
-            // above for that group id.
-            section3.Add(AddLabel(null, "Anchor groups", 0, 0));
-
-            NiceButton addAnchorGroupButton = new NiceButton(0, 0, 130, 25, ButtonAction.Activate, "Add group") { ButtonParameter = 999 };
-            addAnchorGroupButton.MouseUp += (s, e) =>
-            {
-                if (e.Button != MouseButtonType.Left)
-                {
-                    return;
-                }
-
-                PluginAnchorGroupDef newDef = new PluginAnchorGroupDef();
-                _currentProfile.PluginAnchorGroups.Add(newDef);
-
-                _anchorGroupsBox.Add(new AnchorGroupRow(this, newDef) { Y = _anchorGroupsBox.Children.Count * 26 });
-                _anchorGroupsBox.WantUpdateSize = true;
-            };
-            section3.Add(addAnchorGroupButton);
-
-            _anchorGroupsBox = new DataBox(0, 0, 0, 0) { WantUpdateSize = true };
-
-            foreach (PluginAnchorGroupDef def in _currentProfile.PluginAnchorGroups)
-            {
-                _anchorGroupsBox.Add(new AnchorGroupRow(this, def) { Y = _anchorGroupsBox.Children.Count * 26 });
-            }
-
-            section3.Add(_anchorGroupsBox);
-
-
             SettingsSection section4 = AddSettingsSection(box, "Miscellaneous");
             section4.Y = section3.Bounds.Bottom + 40;
 
@@ -3654,7 +3623,47 @@ namespace ClassicUO.Game.UI.Gumps
             _pluginStatusBarMaxColumns.SetText(_currentProfile.PluginStatusBarMaxColumns.ToString());
             section.AddRight(_pluginStatusBarMaxColumns);
 
-            // (anchor groups editor + anchor-behavior toggles added in Tasks 3-4)
+            // (anchor-behavior toggles added in Task 4)
+
+            // Permanent anchor groups: each group gets its own on-screen widget
+            // and its own rows/columns/fill capacity, overriding the fallback
+            // above for that group id.
+            //
+            // The DataBox below is a DIRECT child of rightArea (the page
+            // ScrollArea), NOT nested inside a SettingsSection: sections freeze
+            // their height at build time, so a growable list living inside one
+            // would overlap/clip as rows are added. Every "Add group" click
+            // also calls ReArrangeChildren() to restack the rows and update the
+            // box's size/scroll extents immediately.
+            int anchorY = box.Bounds.Bottom + 15;
+
+            rightArea.Add(AddLabel(null, "Anchor groups", startX, anchorY));
+
+            NiceButton addAnchorGroupButton = new NiceButton(startX, anchorY + 20, 130, 25, ButtonAction.Activate, "Add group") { ButtonParameter = 999 };
+            addAnchorGroupButton.MouseUp += (s, e) =>
+            {
+                if (e.Button != MouseButtonType.Left)
+                {
+                    return;
+                }
+
+                PluginAnchorGroupDef newDef = new PluginAnchorGroupDef();
+                _currentProfile.PluginAnchorGroups.Add(newDef);
+
+                _anchorGroupsBox.Add(new AnchorGroupRow(this, newDef) { Y = _anchorGroupsBox.Children.Count * 26 });
+                _anchorGroupsBox.ReArrangeChildren();
+            };
+            rightArea.Add(addAnchorGroupButton);
+
+            _anchorGroupsBox = new DataBox(startX, anchorY + 50, 0, 0) { WantUpdateSize = true };
+
+            foreach (PluginAnchorGroupDef def in _currentProfile.PluginAnchorGroups)
+            {
+                _anchorGroupsBox.Add(new AnchorGroupRow(this, def) { Y = _anchorGroupsBox.Children.Count * 26 });
+            }
+
+            _anchorGroupsBox.ReArrangeChildren();
+            rightArea.Add(_anchorGroupsBox);
 
             Add(rightArea, PAGE);
         }
