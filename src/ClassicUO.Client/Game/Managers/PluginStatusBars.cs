@@ -56,6 +56,37 @@ namespace ClassicUO.Game.Managers
     }
 
     /// <summary>
+    /// Plugin-driven per-serial ordering priority. Absence == priority 0
+    /// (the default); a value of 0 is stored as removal to keep the map small.
+    /// Policy lives in the plugin; the client only stores and sorts.
+    /// </summary>
+    internal static class PluginStatusPriorities
+    {
+        private static readonly Dictionary<uint, int> _priorities = new Dictionary<uint, int>();
+
+        public static void Set(uint serial, int priority)
+        {
+            if (priority == 0)
+            {
+                _priorities.Remove(serial);
+                return;
+            }
+
+            _priorities[serial] = priority;
+        }
+
+        public static int Get(uint serial)
+        {
+            return _priorities.TryGetValue(serial, out int p) ? p : 0;
+        }
+
+        public static void Clear(uint serial) => _priorities.Remove(serial);
+
+        /// <summary>Test-only: drops every priority so tests start clean.</summary>
+        public static void Reset() => _priorities.Clear();
+    }
+
+    /// <summary>
     /// Maps plugin-supplied group ids to the existing anchor-system
     /// <see cref="AnchorManager.AnchorGroup"/> objects so plugins can snap status
     /// bars into a shared, drag-as-a-unit group. The anchor matrix machinery is
@@ -406,6 +437,39 @@ namespace ClassicUO.Game.Managers
             bool startNewLine = index % lineLength == 0;
             int neighbor = startNewLine ? index - lineLength : index - 1;
             return (neighbor, startNewLine);
+        }
+
+        /// <summary>
+        /// Indices into <paramref name="priorities"/> ordered by priority
+        /// descending, ties broken by ascending original index (stable). This
+        /// is the single source of truth for group member ordering.
+        /// </summary>
+        internal static int[] OrderByPriority(int[] priorities)
+        {
+            int[] order = new int[priorities.Length];
+
+            for (int i = 0; i < order.Length; i++)
+            {
+                order[i] = i;
+            }
+
+            // Stable insertion sort: small member counts, and it guarantees the
+            // ascending-index tiebreak without extra key allocation.
+            for (int i = 1; i < order.Length; i++)
+            {
+                int cur = order[i];
+                int j = i - 1;
+
+                while (j >= 0 && priorities[order[j]] < priorities[cur])
+                {
+                    order[j + 1] = order[j];
+                    j--;
+                }
+
+                order[j + 1] = cur;
+            }
+
+            return order;
         }
     }
 }
