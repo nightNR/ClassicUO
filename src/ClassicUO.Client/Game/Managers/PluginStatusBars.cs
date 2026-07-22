@@ -298,12 +298,12 @@ namespace ClassicUO.Game.Managers
             // setting, mirroring every other spawn site (DoDragSelect, party, etc.).
             GameObjects.Entity entity = world.Get(serial);
 
-            if (entity == null)
-            {
-                return;
-            }
-
-            BaseHealthBarGump bar = HealthBarFactory.Create(world, entity);
+            // Known entity -> factory picks custom/classic per profile. Unknown serial
+            // (not yet loaded) -> keep the original serial-ctor behavior so a bar still
+            // opens (e.g. out-of-range mobile), never silently dropped.
+            BaseHealthBarGump bar = entity != null
+                ? HealthBarFactory.Create(world, entity)
+                : new HealthBarGumpCustom(world, serial);
             bar.X = seedX;
             bar.Y = seedY;
 
