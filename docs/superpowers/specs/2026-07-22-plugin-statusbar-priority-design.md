@@ -14,8 +14,9 @@ void SetStatusBarPriority(uint serial, int priority);
 
 The client keeps a per-serial priority value (default `0`). Within an anchor
 group, member status bars are ordered by **priority descending, then insertion
-order ascending** (stable tiebreak). Changing a bar's priority — or opening a
-new bar — reflows its group so cells reflect the new order. Priority is only
+order ascending** (stable tiebreak). Opening a bar, closing a bar, or changing a
+bar's priority reflows its group so cells reflect the new order and surviving
+bars always collapse upward into a dense grid. Priority is only
 meaningful **within the bar's own group**; a serial not currently in a group
 just has its value stored for when it next joins one.
 
@@ -208,13 +209,13 @@ open and reflow share one implementation (DRY).
   `rows*cols`); priority reorders within capacity, it does not change how many
   fit.
 
-**5h. Cleanup**: on `CloseStatusBar`, after detach+dispose+`PruneEmpty`, the
-remaining members keep their relative order; no explicit reflow is required
-(closing removes a cell; the neighbors' existing positions remain valid). A
-reflow on close is optional and out of scope unless a visible gap appears — with
-`DropControl`-based anchoring the surviving bars retain their positions.
-`PluginStatusPriorities` entries for closed serials may be left as-is (harmless)
-or cleared; clearing on `CloseStatusBar` is preferred to avoid unbounded growth.
+**5h. Cleanup**: on `CloseStatusBar`, after detach+dispose+`PruneEmpty`, call
+`ReflowGroup(groupId)` for the group the closed bar belonged to, so the
+surviving bars **collapse upward** into a dense grid with no gap left by the
+removed cell. Capture the closed bar's groupId (via `FindGroupOf` **before**
+disposing, since pruning removes it) and, after dispose+prune, reflow that group
+if it still has live members. `PluginStatusPriorities.Clear(serial)` is called
+for the closed serial to avoid unbounded growth of the priority store.
 
 ### 6. Edge cases
 
