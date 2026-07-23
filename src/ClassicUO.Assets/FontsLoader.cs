@@ -75,6 +75,8 @@ namespace ClassicUO.Assets
         private FontCharacterData[,] _fontDataASCII;
         private FontCharacterDataUnicode[,] _fontDataUNICODE;
         private readonly UOFile[] _unicodeFontAddress = new UOFile[MAX_UNICODE_FONTS];
+        private readonly bool[] _isAtlasFont = new bool[MAX_UNICODE_FONTS];
+        private readonly string[] _atlasFontNames = new string[MAX_UNICODE_FONTS];
         private readonly long[] _unicodeFontSize = new long[20];
         private readonly VisitedUrlCache _visitedUrls = new VisitedUrlCache(1024);
         private readonly int[] _offsetCharTable = { 2, 0, 2, 2, 0, 0, 2, 2, 0, 0 };
@@ -298,7 +300,58 @@ namespace ClassicUO.Assets
 
         public bool UnicodeFontExists(byte font)
         {
-            return font < MAX_UNICODE_FONTS && _unicodeFontAddress[font] != null;
+            return font < MAX_UNICODE_FONTS && (_unicodeFontAddress[font] != null || _isAtlasFont[font]);
+        }
+
+        /// <summary>
+        /// True when `font` is usable by the unicode text pipeline — either a
+        /// classic mul-backed unicode font (non-null `_unicodeFontAddress`) or a
+        /// registered TTF atlas font (see <see cref="RegisterAtlasFont"/>).
+        /// </summary>
+        private bool SlotUsable(byte font) => font < MAX_UNICODE_FONTS && (_unicodeFontAddress[font] != null || _isAtlasFont[font]);
+
+        /// <summary>
+        /// Registers a baked TTF atlas font (see <see cref="AtlasFontFile"/>) into a
+        /// synthetic unicode font slot so it renders and measures through the
+        /// existing unicode text pipeline (`GetCharUni`/`GetWidthUnicode`/etc.)
+        /// without a backing `fonts.mul`-style `UOFile`.
+        /// </summary>
+        public void RegisterAtlasFont(int slot, string displayName, ReadOnlySpan<byte> atlasBytes)
+        {
+            AtlasFontFile atlas = AtlasFontFile.Read(atlasBytes);
+
+            _fontDataUNICODE ??= new FontCharacterDataUnicode[_unicodeFontAddress.Length, 0x10000];
+
+            for (int c = atlas.FirstChar; c <= atlas.LastChar; c++)
+            {
+                if (!atlas.TryGetGlyph((char)c, out AtlasGlyph g))
+                {
+                    continue;
+                }
+
+                _fontDataUNICODE[slot, c] = new FontCharacterDataUnicode
+                {
+                    OffsetX = g.OffsetX,
+                    OffsetY = g.OffsetY,
+                    Width = (sbyte)g.Width,
+                    Height = (sbyte)g.Height,
+                    Data = null,
+                    Coverage = g.Coverage
+                };
+            }
+
+            _isAtlasFont[slot] = true;
+            _atlasFontNames[slot] = displayName;
+        }
+
+        public bool IsAtlasFont(int slot)
+        {
+            return slot >= 0 && slot < MAX_UNICODE_FONTS && _isAtlasFont[slot];
+        }
+
+        public string GetFontDisplayName(int slot)
+        {
+            return slot >= 0 && slot < MAX_UNICODE_FONTS ? _atlasFontNames[slot] : null;
         }
 
         /// <summary> Get the index in ASCII fonts of a character. </summary>
@@ -1203,7 +1256,7 @@ namespace ClassicUO.Assets
             ushort flags
         )
         {
-            if (font >= MAX_UNICODE_FONTS || _unicodeFontAddress[font] == null || str.IsEmpty)
+            if (!SlotUsable(font) || str.IsEmpty)
             {
                 return string.Empty;
             }
@@ -1289,7 +1342,7 @@ namespace ClassicUO.Assets
 
         public int GetWidthUnicode(byte font, string str)
         {
-            if (font >= MAX_UNICODE_FONTS || _unicodeFontAddress[font] == null || string.IsNullOrEmpty(str))
+            if (!SlotUsable(font) || string.IsNullOrEmpty(str))
             {
                 return 0;
             }
@@ -1299,7 +1352,7 @@ namespace ClassicUO.Assets
 
         private int GetWidthUnicode(byte font, ReadOnlySpan<char> str)
         {
-            if (font >= MAX_UNICODE_FONTS || _unicodeFontAddress[font] == null || str.IsEmpty)
+            if (!SlotUsable(font) || str.IsEmpty)
             {
                 return 0;
             }
@@ -1331,7 +1384,7 @@ namespace ClassicUO.Assets
 
         public int GetCharWidthUnicode(byte font, char c)
         {
-            if (font >= MAX_UNICODE_FONTS || _unicodeFontAddress[font] == null || c == 0 || c == '\r')
+            if (!SlotUsable(font) || c == 0 || c == '\r')
             {
                 return 0;
             }
@@ -1360,7 +1413,7 @@ namespace ClassicUO.Assets
         )
         {
             if (
-                font >= MAX_UNICODE_FONTS || _unicodeFontAddress[font] == null || string.IsNullOrEmpty(text)
+                !SlotUsable(font) || string.IsNullOrEmpty(text)
             )
             {
                 return 0;
@@ -1409,7 +1462,7 @@ namespace ClassicUO.Assets
             _htmlStatus.BackgroundColor = 0;
             _htmlStatus.Margins = Margin.Empty;
 
-            if (font >= MAX_UNICODE_FONTS || _unicodeFontAddress[font] == null)
+            if (!SlotUsable(font))
             {
                 return null;
             }
@@ -1699,7 +1752,7 @@ namespace ClassicUO.Assets
             bool saveHitmap
         )
         {
-            if (font >= MAX_UNICODE_FONTS || _unicodeFontAddress[font] == null)
+            if (!SlotUsable(font))
             {
                 return FontInfo.Empty;
             }
@@ -2822,7 +2875,7 @@ namespace ClassicUO.Assets
                     case HTML_TAG_TYPE.HTT_SMALL:
 
                         if (
-                            current.Font != 0xFF && _unicodeFontAddress[current.Font] != null
+                            current.Font != 0xFF && SlotUsable(current.Font)
                         )
                         {
                             info.Font = current.Font;
@@ -2833,7 +2886,7 @@ namespace ClassicUO.Assets
                     case HTML_TAG_TYPE.HTT_BASEFONT:
 
                         if (
-                            current.Font != 0xFF && _unicodeFontAddress[current.Font] != null
+                            current.Font != 0xFF && SlotUsable(current.Font)
                         )
                         {
                             info.Font = current.Font;
@@ -2857,7 +2910,7 @@ namespace ClassicUO.Assets
                     case HTML_TAG_TYPE.HTT_H6:
 
                         if (
-                            current.Font != 0xFF && _unicodeFontAddress[current.Font] != null
+                            current.Font != 0xFF && SlotUsable(current.Font)
                         )
                         {
                             info.Font = current.Font;
@@ -3587,7 +3640,7 @@ namespace ClassicUO.Assets
             ushort flags
         )
         {
-            if (font >= MAX_UNICODE_FONTS || _unicodeFontAddress[font] == null || string.IsNullOrEmpty(str))
+            if (!SlotUsable(font) || string.IsNullOrEmpty(str))
             {
                 return 0;
             }
@@ -3646,7 +3699,7 @@ namespace ClassicUO.Assets
                     break;
             }
 
-            if (font >= MAX_UNICODE_FONTS || _unicodeFontAddress[font] == null || string.IsNullOrEmpty(str))
+            if (!SlotUsable(font) || string.IsNullOrEmpty(str))
             {
                 return (x, y);
             }
@@ -3921,7 +3974,7 @@ namespace ClassicUO.Assets
         /// </summary>
         public SingleGlyphInfo RenderSingleGlyphUnicode(byte font, char c, bool hasBorder, bool isSolid, bool isItalic = false, uint charcolor = 0)
         {
-            if (font >= MAX_UNICODE_FONTS || _unicodeFontAddress[font] == null)
+            if (!SlotUsable(font))
                 return SingleGlyphInfo.Empty;
 
             if (c == ' ')
