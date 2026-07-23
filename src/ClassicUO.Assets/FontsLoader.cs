@@ -3954,19 +3954,39 @@ namespace ClassicUO.Assets
             {
                 int italicOffset = isItalic ? (int)((dh - y) / ITALIC_FONT_KOEFFICIENT) : 0;
 
-                for (int sc = 0; sc < scanlineCount; sc++)
+                if (ch.IsAntiAliased)
                 {
-                    int coff = sc << 3;
-                    for (int j = 0; j < 8; j++)
+                    // 8bpp coverage path (TTF atlas glyphs)
+                    for (int x = 0; x < dw; x++)
                     {
-                        int x = coff + j;
-                        if (x >= dw)
-                            break;
+                        byte cov = ch.Coverage[y * dw + x];
 
-                        byte cl = (byte)(ch.Data[scanLineOff + sc] & (1 << (7 - j)));
-                        if (cl != 0)
+                        if (cov == 0)
                         {
-                            pData[(y + pad) * bufW + (x + italicOffset + solidShift + pad)] = charcolor;
+                            continue;
+                        }
+
+                        int block = (y + pad) * bufW + (x + italicOffset + solidShift + pad);
+                        pData[block] = BlendCoverage(pData[block], charcolor, cov);
+                    }
+                }
+                else
+                {
+                    // existing 1bpp path — unchanged
+                    for (int sc = 0; sc < scanlineCount; sc++)
+                    {
+                        int coff = sc << 3;
+                        for (int j = 0; j < 8; j++)
+                        {
+                            int x = coff + j;
+                            if (x >= dw)
+                                break;
+
+                            byte cl = (byte)(ch.Data[scanLineOff + sc] & (1 << (7 - j)));
+                            if (cl != 0)
+                            {
+                                pData[(y + pad) * bufW + (x + italicOffset + solidShift + pad)] = charcolor;
+                            }
                         }
                     }
                 }
