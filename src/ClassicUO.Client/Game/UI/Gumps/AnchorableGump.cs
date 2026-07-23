@@ -39,6 +39,36 @@ namespace ClassicUO.Game.UI.Gumps
 
         protected override void OnMove(int x, int y)
         {
+            // Status bars in a group with an anchor widget cannot be dragged
+            // individually: the anchor moves the cluster, and only Alt-drag
+            // ejects a single bar (then the group reflows by priority).
+            if (this is BaseHealthBarGump bar &&
+                PluginStatusBars.TryGetHeaderedGroup(bar, out int gid))
+            {
+                PluginStatusBars.GroupedDragAction action = PluginStatusBars.ResolveGroupedDrag(
+                    inAnchoredGroup: true,
+                    altHeld: Keyboard.Alt,
+                    holdAltToMoveGumps: ProfileManager.CurrentProfile.HoldAltToMoveGumps);
+
+                if (action == PluginStatusBars.GroupedDragAction.SnapBack)
+                {
+                    // Locked to the anchor group: pin the bar in place. _prevX/_prevY
+                    // are left untouched so every drag frame snaps back to the same spot.
+                    X = _prevX;
+                    Y = _prevY;
+                    base.OnMove(x, y);
+                    return;
+                }
+
+                if (action == PluginStatusBars.GroupedDragAction.Eject)
+                {
+                    // Detaches from the matrix + drops membership + reflows the rest.
+                    // Falls through to the free-move path below so the ejected bar
+                    // follows the cursor (DetachControl there is now a no-op).
+                    PluginStatusBars.LeaveGroup(gid, bar);
+                }
+            }
+
             if (Keyboard.Alt && !ProfileManager.CurrentProfile.HoldAltToMoveGumps)
             {
                 UIManager.AnchorManager.DetachControl(this);
