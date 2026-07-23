@@ -222,11 +222,11 @@ namespace ClassicUO.Assets
 
             ref var cc = ref _fontDataUNICODE[font, index];
 
-            if (cc.Data == null)
+            if (!cc.HasPixels)
             {
                 LoadChar(font, index);
 
-                if (cc.Data == null)
+                if (!cc.HasPixels)
                 {
                     return ref _nullChar;
                 }
@@ -1238,7 +1238,7 @@ namespace ClassicUO.Assets
             {
                 ref var @char = ref GetCharUni(font, '.');
 
-                if (@char.Data != null)
+                if (@char.HasPixels)
                 {
                     width -= @char.Width * 3 + 3;
                 }
@@ -1251,7 +1251,7 @@ namespace ClassicUO.Assets
                 ref var @char = ref GetCharUni(font, c);
                 sbyte charWidth = 0;
 
-                if (@char.Data != null)
+                if (@char.HasPixels)
                 {
                     charWidth = (sbyte)(@char.OffsetX + @char.Width + 1);
                 }
@@ -1309,7 +1309,7 @@ namespace ClassicUO.Assets
             {
                 ref var @char = ref GetCharUni(font, c);
 
-                if (c != '\r' && @char.Data != null)
+                if (c != '\r' && @char.HasPixels)
                 {
                     textLength += (sbyte)(@char.OffsetX + @char.Width + 1);
                 }
@@ -1336,7 +1336,7 @@ namespace ClassicUO.Assets
 
             ref var @char = ref GetCharUni(font, c);
 
-            if (@char.Data != null)
+            if (@char.HasPixels)
             {
                 return (sbyte)(@char.OffsetX + @char.Width + 1);
             }
@@ -1452,7 +1452,7 @@ namespace ClassicUO.Assets
 
                 ref var @char = ref GetCharUni(font, si);
 
-                if (@char.Data == null && si != ' ' && si != '\n' && si != '\r')
+                if (!@char.HasPixels && si != ' ' && si != '\n' && si != '\r')
                 {
                     continue;
                 }
@@ -1897,7 +1897,7 @@ namespace ClassicUO.Assets
                             {
                                 ofsX = UNICODE_SPACE_WIDTH;
                             }
-                            else if (@char.Data == null && si != ' ')
+                            else if (!@char.HasPixels && si != ' ')
                             {
                             }
                             else
@@ -1915,7 +1915,7 @@ namespace ClassicUO.Assets
                             oldLink = 0;
                         }
 
-                        if (@char.Data == null && si != ' ')
+                        if (!@char.HasPixels && si != ' ')
                         {
                             continue;
                         }
@@ -2393,7 +2393,7 @@ namespace ClassicUO.Assets
                     }
                 }
 
-                if (@char.Data == null && si != ' ' && si != '\n')
+                if (!@char.HasPixels && si != ' ' && si != '\n')
                 {
                     continue;
                 }
@@ -3656,7 +3656,7 @@ namespace ClassicUO.Assets
                     {
                         char ch = info.Data[i].Item;
                         ref var @char = ref GetCharUni(font, ch);
-                        if (ch != '\r' && @char.Data != null)
+                        if (ch != '\r' && @char.HasPixels)
                         {
                             x += (sbyte)(@char.OffsetX + @char.Width + 1);
                         }
@@ -3894,7 +3894,7 @@ namespace ClassicUO.Assets
 
             ref var ch = ref GetCharUni(font, c);
 
-            if (ch.Data == null)
+            if (!ch.HasPixels)
             {
                 return SingleGlyphInfo.Empty;
             }
