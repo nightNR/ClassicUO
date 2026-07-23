@@ -313,6 +313,30 @@ namespace ClassicUO.Assets
             return ch - NOPRINT_CHARS;
         }
 
+        internal const byte COVERAGE_EDGE_THRESHOLD = 128;
+
+        // Alpha-composite src over dst weighted by coverage/255, per 8-bit channel.
+        // dst/src are packed the same way as the pData pixel buffer.
+        internal static uint BlendCoverage(uint dst, uint src, byte coverage)
+        {
+            if (coverage == 0) return dst;
+            if (coverage == 255) return src;
+
+            uint a = coverage;
+            uint ia = 255u - a;
+
+            uint BlendChannel(int shift)
+            {
+                uint d = (dst >> shift) & 0xFF;
+                uint s = (src >> shift) & 0xFF;
+                return (((s * a) + (d * ia) + 127u) / 255u) << shift;
+            }
+
+            return BlendChannel(0) | BlendChannel(8) | BlendChannel(16) | BlendChannel(24);
+        }
+
+        internal static bool CoverageIsSet(byte coverage) => coverage >= COVERAGE_EDGE_THRESHOLD;
+
         public int GetWidthASCII(byte font, string str)
         {
             if (font >= FontCount || string.IsNullOrEmpty(str))
@@ -4097,11 +4121,18 @@ namespace ClassicUO.Assets
             Width = w;
             Height = h;
             Data = data;
+            Coverage = null;
         }
 
         public sbyte OffsetX, OffsetY;
         public sbyte Width, Height;
-        public byte[] Data;
+        public byte[] Data;            // 1bpp bitmask (original UO fonts)
+        public byte[] Coverage;        // 8bpp coverage (TTF atlas fonts), else null
+
+        public readonly bool IsAntiAliased => Coverage != null;
+        // "Glyph has drawable pixels" — the whole unicode pipeline currently
+        // uses `Data != null` for this; atlas glyphs carry Coverage instead.
+        public readonly bool HasPixels => Data != null || Coverage != null;
     }
 
     public sealed class MultilinesFontInfo
