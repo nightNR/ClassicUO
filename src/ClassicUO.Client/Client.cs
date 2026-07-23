@@ -191,6 +191,12 @@ namespace ClassicUO
             FileManager = new UOFileManager(clientVersion, clientPath, filesOverride);
             FileManager.Load(Settings.GlobalSettings.UseVerdata, Settings.GlobalSettings.Language, Settings.GlobalSettings.MapsLayouts);
 
+            // Populate the synthetic TTF-atlas unicode font slots (20-31) right after
+            // FontsLoader.Load() completes and before anything renders text. See
+            // ClassicUO.Resources.AtlasFontRegistry for the single slot<->name<->bytes
+            // mapping shared with the font picker UI.
+            ClassicUO.Resources.AtlasFontRegistry.RegisterAll(FileManager.Fonts);
+
             StaticFilters.Load(FileManager.TileData);
             BuffTable.Load();
             ChairTable.Load();
