@@ -1993,19 +1993,11 @@ namespace ClassicUO.Assets
 
                                 int testX = w + offsX + italicOffset + (isSolid ? 1 : 0);
 
-                                for (int c = 0; c < scanlineCount; c++)
+                                if (@char.IsAntiAliased)
                                 {
-                                    int coff = c << 3;
-
-                                    for (int j = 0; j < 8; j++)
+                                    // 8bpp coverage path (TTF atlas glyphs)
+                                    for (int x = 0; x < dw; x++)
                                     {
-                                        int x = coff + j;
-
-                                        if (x >= dw)
-                                        {
-                                            break;
-                                        }
-
                                         int nowX = testX + x;
 
                                         if (nowX >= width)
@@ -2013,12 +2005,47 @@ namespace ClassicUO.Assets
                                             break;
                                         }
 
-                                        byte cl = (byte)(@char.Data[scanLineOff + c] & (1 << (7 - j)));
-                                        int block = testY * width + nowX;
+                                        byte cov = @char.Coverage[y * dw + x];
 
-                                        if (cl != 0)
+                                        if (cov == 0)
                                         {
-                                            pData[block] = charcolor;
+                                            continue;
+                                        }
+
+                                        int block = testY * width + nowX;
+                                        pData[block] = BlendCoverage(pData[block], charcolor, cov);
+                                    }
+                                }
+                                else
+                                {
+                                    // existing 1bpp path — unchanged
+                                    for (int c = 0; c < scanlineCount; c++)
+                                    {
+                                        int coff = c << 3;
+
+                                        for (int j = 0; j < 8; j++)
+                                        {
+                                            int x = coff + j;
+
+                                            if (x >= dw)
+                                            {
+                                                break;
+                                            }
+
+                                            int nowX = testX + x;
+
+                                            if (nowX >= width)
+                                            {
+                                                break;
+                                            }
+
+                                            byte cl = (byte)(@char.Data[scanLineOff + c] & (1 << (7 - j)));
+                                            int block = testY * width + nowX;
+
+                                            if (cl != 0)
+                                            {
+                                                pData[block] = charcolor;
+                                            }
                                         }
                                     }
                                 }
