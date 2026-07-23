@@ -2277,7 +2277,7 @@ namespace ClassicUO.Game.UI.Gumps
             startY += text.Height + 2;
             startX += 40;
 
-            _tooltip_font_selector = new FontSelector(7, _currentProfile.TooltipFont, ResGumps.TooltipFontSelect)
+            _tooltip_font_selector = new FontSelector(FontsLoader.MAX_UNICODE_FONTS, _currentProfile.TooltipFont, ResGumps.TooltipFontSelect)
             {
                 X = startX,
                 Y = startY
@@ -2346,7 +2346,7 @@ namespace ClassicUO.Game.UI.Gumps
             startX += 40;
             startY += text.Height + 2;
 
-            _fontSelectorChat = new FontSelector(20, _currentProfile.ChatFont, ResGumps.ThatSClassicUO)
+            _fontSelectorChat = new FontSelector(FontsLoader.MAX_UNICODE_FONTS, _currentProfile.ChatFont, ResGumps.ThatSClassicUO)
             {
                 X = startX,
                 Y = startY
@@ -5451,10 +5451,14 @@ namespace ClassicUO.Game.UI.Gumps
 
                 _buttons = new RadioButton[max_font];
 
+                FontsLoader fonts = Client.Game.UO.FileManager.Fonts;
+
                 for (byte i = 0; i < max_font; i++)
                 {
-                    if (IsSelectableUnicodeSlot(i) && Client.Game.UO.FileManager.Fonts.UnicodeFontExists(i))
+                    if (IsSelectableUnicodeSlot(i) && fonts.UnicodeFontExists(i))
                     {
+                        string label = fonts.IsAtlasFont(i) ? fonts.GetFontDisplayName(i) : markup;
+
                         Add
                         (
                             _buttons[i] = new RadioButton
@@ -5462,7 +5466,7 @@ namespace ClassicUO.Game.UI.Gumps
                                 0,
                                 0x00D0,
                                 0x00D1,
-                                markup,
+                                label,
                                 i,
                                 HUE_FONT
                             )

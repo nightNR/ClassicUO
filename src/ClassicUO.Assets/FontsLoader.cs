@@ -31,7 +31,7 @@ namespace ClassicUO.Assets
         private const byte NOPRINT_CHARS = 32;
         private const float ITALIC_FONT_KOEFFICIENT = 3.3f;
 
-        internal const int MAX_UNICODE_FONTS = 32;
+        public const int MAX_UNICODE_FONTS = 32;
 
         public struct Margin
         {
