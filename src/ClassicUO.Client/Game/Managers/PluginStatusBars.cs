@@ -628,5 +628,42 @@ namespace ClassicUO.Game.Managers
 
             return order;
         }
+
+        /// <summary>
+        /// The three outcomes of dragging a status bar that belongs to a group
+        /// with an anchor widget.
+        /// </summary>
+        internal enum GroupedDragAction
+        {
+            /// <summary>Not a grouped bar; run the normal anchor drag logic.</summary>
+            PassThrough,
+
+            /// <summary>Grouped and locked; pin the bar (the anchor moves the cluster).</summary>
+            SnapBack,
+
+            /// <summary>Grouped and Alt-dragged; eject the bar from the group.</summary>
+            Eject
+        }
+
+        /// <summary>
+        /// Pure classification of a drag on a status bar. A bar in an anchored group
+        /// may only leave via Alt-drag (when the eject modifier is enabled, i.e.
+        /// HoldAltToMoveGumps is off); otherwise it is pinned. Bars not in an
+        /// anchored group pass through to the existing anchor logic.
+        /// </summary>
+        internal static GroupedDragAction ResolveGroupedDrag(bool inAnchoredGroup, bool altHeld, bool holdAltToMoveGumps)
+        {
+            if (!inAnchoredGroup)
+            {
+                return GroupedDragAction.PassThrough;
+            }
+
+            if (altHeld && !holdAltToMoveGumps)
+            {
+                return GroupedDragAction.Eject;
+            }
+
+            return GroupedDragAction.SnapBack;
+        }
     }
 }
