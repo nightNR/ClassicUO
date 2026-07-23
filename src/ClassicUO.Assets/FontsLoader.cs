@@ -31,6 +31,8 @@ namespace ClassicUO.Assets
         private const byte NOPRINT_CHARS = 32;
         private const float ITALIC_FONT_KOEFFICIENT = 3.3f;
 
+        internal const int MAX_UNICODE_FONTS = 32;
+
         public struct Margin
         {
             public int X, Y, Width, Height;
@@ -72,7 +74,7 @@ namespace ClassicUO.Assets
 
         private FontCharacterData[,] _fontDataASCII;
         private FontCharacterDataUnicode[,] _fontDataUNICODE;
-        private readonly UOFile[] _unicodeFontAddress = new UOFile[20];
+        private readonly UOFile[] _unicodeFontAddress = new UOFile[MAX_UNICODE_FONTS];
         private readonly long[] _unicodeFontSize = new long[20];
         private readonly VisitedUrlCache _visitedUrls = new VisitedUrlCache(1024);
         private readonly int[] _offsetCharTable = { 2, 0, 2, 2, 0, 0, 2, 2, 0, 0 };
@@ -296,7 +298,7 @@ namespace ClassicUO.Assets
 
         public bool UnicodeFontExists(byte font)
         {
-            return font < 20 && _unicodeFontAddress[font] != null;
+            return font < MAX_UNICODE_FONTS && _unicodeFontAddress[font] != null;
         }
 
         /// <summary> Get the index in ASCII fonts of a character. </summary>
@@ -1201,7 +1203,7 @@ namespace ClassicUO.Assets
             ushort flags
         )
         {
-            if (font >= 20 || _unicodeFontAddress[font] == null || str.IsEmpty)
+            if (font >= MAX_UNICODE_FONTS || _unicodeFontAddress[font] == null || str.IsEmpty)
             {
                 return string.Empty;
             }
@@ -1287,7 +1289,7 @@ namespace ClassicUO.Assets
 
         public int GetWidthUnicode(byte font, string str)
         {
-            if (font >= 20 || _unicodeFontAddress[font] == null || string.IsNullOrEmpty(str))
+            if (font >= MAX_UNICODE_FONTS || _unicodeFontAddress[font] == null || string.IsNullOrEmpty(str))
             {
                 return 0;
             }
@@ -1297,7 +1299,7 @@ namespace ClassicUO.Assets
 
         private int GetWidthUnicode(byte font, ReadOnlySpan<char> str)
         {
-            if (font >= 20 || _unicodeFontAddress[font] == null || str.IsEmpty)
+            if (font >= MAX_UNICODE_FONTS || _unicodeFontAddress[font] == null || str.IsEmpty)
             {
                 return 0;
             }
@@ -1329,7 +1331,7 @@ namespace ClassicUO.Assets
 
         public int GetCharWidthUnicode(byte font, char c)
         {
-            if (font >= 20 || _unicodeFontAddress[font] == null || c == 0 || c == '\r')
+            if (font >= MAX_UNICODE_FONTS || _unicodeFontAddress[font] == null || c == 0 || c == '\r')
             {
                 return 0;
             }
@@ -1358,7 +1360,7 @@ namespace ClassicUO.Assets
         )
         {
             if (
-                font >= 20 || _unicodeFontAddress[font] == null || string.IsNullOrEmpty(text)
+                font >= MAX_UNICODE_FONTS || _unicodeFontAddress[font] == null || string.IsNullOrEmpty(text)
             )
             {
                 return 0;
@@ -1407,7 +1409,7 @@ namespace ClassicUO.Assets
             _htmlStatus.BackgroundColor = 0;
             _htmlStatus.Margins = Margin.Empty;
 
-            if (font >= 20 || _unicodeFontAddress[font] == null)
+            if (font >= MAX_UNICODE_FONTS || _unicodeFontAddress[font] == null)
             {
                 return null;
             }
@@ -1697,7 +1699,7 @@ namespace ClassicUO.Assets
             bool saveHitmap
         )
         {
-            if (font >= 20 || _unicodeFontAddress[font] == null)
+            if (font >= MAX_UNICODE_FONTS || _unicodeFontAddress[font] == null)
             {
                 return FontInfo.Empty;
             }
@@ -3585,7 +3587,7 @@ namespace ClassicUO.Assets
             ushort flags
         )
         {
-            if (font >= 20 || _unicodeFontAddress[font] == null || string.IsNullOrEmpty(str))
+            if (font >= MAX_UNICODE_FONTS || _unicodeFontAddress[font] == null || string.IsNullOrEmpty(str))
             {
                 return 0;
             }
@@ -3644,7 +3646,7 @@ namespace ClassicUO.Assets
                     break;
             }
 
-            if (font >= 20 || _unicodeFontAddress[font] == null || string.IsNullOrEmpty(str))
+            if (font >= MAX_UNICODE_FONTS || _unicodeFontAddress[font] == null || string.IsNullOrEmpty(str))
             {
                 return (x, y);
             }
@@ -3919,7 +3921,7 @@ namespace ClassicUO.Assets
         /// </summary>
         public SingleGlyphInfo RenderSingleGlyphUnicode(byte font, char c, bool hasBorder, bool isSolid, bool isItalic = false, uint charcolor = 0)
         {
-            if (font >= 20 || _unicodeFontAddress[font] == null)
+            if (font >= MAX_UNICODE_FONTS || _unicodeFontAddress[font] == null)
                 return SingleGlyphInfo.Empty;
 
             if (c == ' ')
