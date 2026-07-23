@@ -336,7 +336,16 @@ namespace ClassicUO.Assets
                     Width = (sbyte)g.Width,
                     Height = (sbyte)g.Height,
                     Data = null,
-                    Coverage = g.Coverage
+                    // A zero-area (or otherwise empty) glyph — e.g. the space
+                    // U+0020 — must report HasPixels==false, matching bitmap
+                    // fonts' semantics (Data==null there). Otherwise a
+                    // non-null empty Coverage array falsely reports
+                    // HasPixels/IsAntiAliased==true and the space's advance
+                    // is computed as OffsetX+Width+1 (1px) instead of
+                    // UNICODE_SPACE_WIDTH (8px), while the layout/rasterizer
+                    // paths special-case ' ' before consulting the glyph and
+                    // still use 8px — causing a width/render mismatch.
+                    Coverage = (g.Width == 0 || g.Height == 0 || g.Coverage == null || g.Coverage.Length == 0) ? null : g.Coverage
                 };
             }
 
