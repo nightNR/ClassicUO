@@ -172,6 +172,24 @@ namespace ClassicUO.Game.Managers
             list.Add(bar);
         }
 
+        /// <summary>
+        /// Drops a live (non-disposed) bar from a group's tracked membership so a
+        /// subsequent <see cref="PluginStatusBars"/> reflow will not replace it.
+        /// Used when a bar is ejected without being disposed. No-op if untracked.
+        /// </summary>
+        public static void RemoveMember(int groupId, BaseHealthBarGump bar)
+        {
+            if (bar == null)
+            {
+                return;
+            }
+
+            if (_members.TryGetValue(groupId, out List<BaseHealthBarGump> list))
+            {
+                list.Remove(bar);
+            }
+        }
+
         public static void PruneEmpty()
         {
             List<int> dead = _groups
@@ -229,6 +247,56 @@ namespace ClassicUO.Game.Managers
                 ReflowGroup(groupId); // surviving bars collapse upward
             }
 
+            PluginStatusBarGroups.PruneEmpty();
+        }
+
+        /// <summary>
+        /// True when the bar belongs to a tracked group that has an anchor widget
+        /// (a <see cref="PluginAnchorGroupDef"/> exists for its id). "Headered" is
+        /// the internal predicate name for "has an anchor widget", chosen to avoid
+        /// overloading the word <em>anchor</em>. <paramref name="groupId"/> is the
+        /// group's id on success, else 0.
+        /// </summary>
+        public static bool TryGetHeaderedGroup(BaseHealthBarGump bar, out int groupId)
+        {
+            groupId = 0;
+
+            if (bar == null)
+            {
+                return false;
+            }
+
+            int gid = PluginStatusBarGroups.FindGroupOf(bar.LocalSerial);
+
+            if (gid == 0 || GetDef(gid) == null)
+            {
+                return false;
+            }
+
+            groupId = gid;
+            return true;
+        }
+
+        /// <summary>
+        /// Ejects one bar from its anchor group without disposing it: detaches it
+        /// from the anchor matrix, drops its membership, then reflows the remaining
+        /// members by priority so the grid collapses densely. The ejected bar's
+        /// <see cref="PluginStatusPriorities"/> entry is preserved (unlike
+        /// <see cref="CloseStatusBar"/>, which clears it) so a later re-join
+        /// restores its ordering. The explicit DetachControl clears the ejected
+        /// bar's own stale anchor mapping, which ReflowGroup (rebuilding only the
+        /// survivors) would otherwise leave behind.
+        /// </summary>
+        public static void LeaveGroup(int groupId, BaseHealthBarGump bar)
+        {
+            if (groupId == 0 || bar == null)
+            {
+                return;
+            }
+
+            UIManager.AnchorManager.DetachControl(bar);
+            PluginStatusBarGroups.RemoveMember(groupId, bar);
+            ReflowGroup(groupId);
             PluginStatusBarGroups.PruneEmpty();
         }
 
@@ -627,6 +695,43 @@ namespace ClassicUO.Game.Managers
             }
 
             return order;
+        }
+
+        /// <summary>
+        /// The three outcomes of dragging a status bar that belongs to a group
+        /// with an anchor widget.
+        /// </summary>
+        internal enum GroupedDragAction
+        {
+            /// <summary>Not a grouped bar; run the normal anchor drag logic.</summary>
+            PassThrough,
+
+            /// <summary>Grouped and locked; pin the bar (the anchor moves the cluster).</summary>
+            SnapBack,
+
+            /// <summary>Grouped and Alt-dragged; eject the bar from the group.</summary>
+            Eject
+        }
+
+        /// <summary>
+        /// Pure classification of a drag on a status bar. A bar in an anchored group
+        /// may only leave via Alt-drag (when the eject modifier is enabled, i.e.
+        /// HoldAltToMoveGumps is off); otherwise it is pinned. Bars not in an
+        /// anchored group pass through to the existing anchor logic.
+        /// </summary>
+        internal static GroupedDragAction ResolveGroupedDrag(bool inAnchoredGroup, bool altHeld, bool holdAltToMoveGumps)
+        {
+            if (!inAnchoredGroup)
+            {
+                return GroupedDragAction.PassThrough;
+            }
+
+            if (altHeld && !holdAltToMoveGumps)
+            {
+                return GroupedDragAction.Eject;
+            }
+
+            return GroupedDragAction.SnapBack;
         }
     }
 }
