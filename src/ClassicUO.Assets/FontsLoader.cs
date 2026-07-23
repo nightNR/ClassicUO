@@ -2053,6 +2053,19 @@ namespace ClassicUO.Assets
 
                             if (isSolid)
                             {
+                                // Coverage note: this pass tests the assembled pData buffer
+                                // ("!= 0" / "!= solidColor"), not @char.Data/@char.Coverage — it
+                                // has to, since the -1..dw+1 padded neighborhood it scans can
+                                // reach into already-rendered pixels from a previous character.
+                                // That pixel-identity test is already coverage-safe: BlendCoverage
+                                // only ever writes a nonzero value when coverage > 0 (see its
+                                // `coverage == 0` early-out below), so any anti-aliased fringe
+                                // pixel that received ink is treated as "set," exactly like a
+                                // bitmap glyph's set bit. Thresholding via CoverageIsSet(cov >= 128)
+                                // doesn't apply here (there's no per-glyph coverage array in scope
+                                // for out-of-range/neighboring pixels) and would instead punch gaps
+                                // in the outline around partially-covered AA edge pixels, so this is
+                                // intentionally left as a plain non-zero test.
                                 uint solidColor = blackColor;
 
                                 if (solidColor == charcolor)
@@ -2166,6 +2179,9 @@ namespace ClassicUO.Assets
 
                             if (isBlackBorder && !isBlackPixel)
                             {
+                                // Same pixel-value ("!= 0" / "!= blackColor") test as the isSolid
+                                // pass above, and coverage-safe for the same reason — see the
+                                // comment there.
                                 int minXOk = w + offsX > 0 ? -1 : 0;
                                 int minYOk = offsY + lineOffsY > 0 ? -1 : 0;
                                 int maxXOk = w + offsX + dw < width ? 1 : 0;
@@ -3995,6 +4011,12 @@ namespace ClassicUO.Assets
             // Apply solid effect (outline with solidColor, then overwrite interior back to charcolor)
             if (isSolid)
             {
+                // Coverage note: same as GenerateUnicode's isSolid pass — this tests the
+                // assembled pData buffer ("!= 0" / "!= solidColor"), which is already
+                // coverage-safe because BlendCoverage only writes a nonzero value for
+                // coverage > 0. Left as a plain non-zero test rather than a
+                // CoverageIsSet(cov >= 128) threshold, which would leave gaps around
+                // partially-covered AA edge pixels.
                 uint solidColor = blackColor;
                 if (solidColor == charcolor)
                     solidColor++;
@@ -4058,6 +4080,8 @@ namespace ClassicUO.Assets
             // Apply black border effect
             if (hasBorder)
             {
+                // Same pixel-value test as the isSolid pass above, and coverage-safe for
+                // the same reason.
                 for (int cy = 0; cy < bufH; cy++)
                 {
                     for (int cx = 0; cx < bufW; cx++)
