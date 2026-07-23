@@ -5425,9 +5425,19 @@ namespace ClassicUO.Game.UI.Gumps
             }
         }
 
-        private class FontSelector : Control
+        internal class FontSelector : Control
         {
             private readonly RadioButton[] _buttons;
+
+            // Unicode font slots 7–12 render decorative rune glyphs, not useful
+            // as a readable UI font. Hidden from the picker (render path unaffected).
+            private const int RUNE_FONT_FIRST = 7;
+            private const int RUNE_FONT_LAST = 12;
+
+            internal static bool IsSelectableUnicodeSlot(int slot)
+            {
+                return slot < RUNE_FONT_FIRST || slot > RUNE_FONT_LAST;
+            }
 
             public FontSelector(int max_font, int current_font_index, string markup)
             {
@@ -5440,7 +5450,7 @@ namespace ClassicUO.Game.UI.Gumps
 
                 for (byte i = 0; i < max_font; i++)
                 {
-                    if (Client.Game.UO.FileManager.Fonts.UnicodeFontExists(i))
+                    if (IsSelectableUnicodeSlot(i) && Client.Game.UO.FileManager.Fonts.UnicodeFontExists(i))
                     {
                         Add
                         (
