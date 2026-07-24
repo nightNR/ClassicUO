@@ -17,11 +17,13 @@ namespace ClassicUO.Renderer.Arts
         private readonly Rectangle[] _realArtBounds;
         private readonly ArtLoader _artLoader;
         private readonly HuesLoader _huesLoader;
+        private readonly AssetOverrides _overrides;
 
-        public Art(ArtLoader artLoader, HuesLoader huesLoader, GraphicsDevice device)
+        public Art(ArtLoader artLoader, HuesLoader huesLoader, AssetOverrides overrides, GraphicsDevice device)
         {
             _artLoader = artLoader;
             _huesLoader = huesLoader;
+            _overrides = overrides;
             _atlas = new TextureAtlas(device, 4096, 4096, SurfaceFormat.Color);
             _spriteInfos = new SpriteInfo[_artLoader.File.Entries.Length];
             _realArtBounds = new Rectangle[_spriteInfos.Length];
@@ -42,6 +44,41 @@ namespace ClassicUO.Renderer.Arts
 
             if (spriteInfo.Texture == null)
             {
+                bool isStatic = idx >= 0x4000;
+                uint naturalId = isStatic ? idx - 0x4000 : idx;
+
+                if (_overrides != null && _overrides.TryGetImage(
+                        isStatic ? AssetOverrideKind.Art : AssetOverrideKind.Land, naturalId,
+                        out uint[] opx, out int ow, out int oh, out bool oHasC, out int ocx, out int ocy))
+                {
+                    spriteInfo.Texture = _atlas.AddSprite(opx, ow, oh, out spriteInfo.UV);
+                    if (oHasC)
+                        spriteInfo.Center = new Point(ocx, ocy);
+
+                    if (isStatic)
+                    {
+                        _picker.Set(naturalId, ow, oh, opx);
+
+                        int pos1 = 0, minX = ow, minY = oh, maxX = 0, maxY = 0;
+                        for (int y = 0; y < oh; ++y)
+                        {
+                            for (int x = 0; x < ow; ++x)
+                            {
+                                if (opx[pos1++] != 0)
+                                {
+                                    minX = Math.Min(minX, x);
+                                    maxX = Math.Max(maxX, x);
+                                    minY = Math.Min(minY, y);
+                                    maxY = Math.Max(maxY, y);
+                                }
+                            }
+                        }
+                        _realArtBounds[naturalId] = new Rectangle(minX, minY, maxX - minX, maxY - minY);
+                    }
+
+                    return ref spriteInfo;
+                }
+
                 var artInfo = _artLoader.GetArt(idx);
 
                 if (artInfo.Pixels.IsEmpty && idx > 0)

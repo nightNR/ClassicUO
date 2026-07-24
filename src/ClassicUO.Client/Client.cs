@@ -82,7 +82,7 @@ namespace ClassicUO
             game.GraphicsDevice.Textures[2] = hueSamplers[1];
 
             Animations = new Renderer.Animations.Animations(FileManager.Animations, game.GraphicsDevice);
-            Arts = new Renderer.Arts.Art(FileManager.Arts, FileManager.Hues, game.GraphicsDevice);
+            Arts = new Renderer.Arts.Art(FileManager.Arts, FileManager.Hues, FileManager.Overrides, game.GraphicsDevice);
             Gumps = new Renderer.Gumps.Gump(FileManager.Gumps, FileManager.Overrides, game.GraphicsDevice);
             Texmaps = new Renderer.Texmaps.Texmap(FileManager.Texmaps, game.GraphicsDevice);
             Lights = new Renderer.Lights.Light(FileManager.Lights, game.GraphicsDevice);
