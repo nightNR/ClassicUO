@@ -9,10 +9,12 @@ namespace ClassicUO.Renderer.Texmaps
         private readonly SpriteInfo[] _spriteInfos;
         private readonly PixelPicker _picker = new PixelPicker();
         private readonly TexmapsLoader _texmapsLoader;
+        private readonly AssetOverrides _overrides;
 
-        public Texmap(TexmapsLoader texmapsLoader, GraphicsDevice device)
+        public Texmap(TexmapsLoader texmapsLoader, AssetOverrides overrides, GraphicsDevice device)
         {
             _texmapsLoader = texmapsLoader;
+            _overrides = overrides;
             _atlas = new TextureAtlas(device, 2048, 2048, SurfaceFormat.Color);
             _spriteInfos = new SpriteInfo[texmapsLoader.File.Entries.Length];
         }
@@ -26,6 +28,15 @@ namespace ClassicUO.Renderer.Texmaps
 
             if (spriteInfo.Texture == null)
             {
+                if (_overrides != null && _overrides.TryGetImage(
+                        AssetOverrideKind.Texmap, idx,
+                        out uint[] opx, out int ow, out int oh, out _, out _, out _))
+                {
+                    spriteInfo.Texture = _atlas.AddSprite(opx, ow, oh, out spriteInfo.UV);
+                    _picker.Set(idx, ow, oh, opx);
+                    return ref spriteInfo;
+                }
+
                 var texmapInfo = _texmapsLoader.GetTexmap(idx);
                 if (!texmapInfo.Pixels.IsEmpty)
                 {
