@@ -12,13 +12,15 @@ namespace ClassicUO.Renderer.Animations
         private readonly TextureAtlas _atlas;
         private readonly PixelPicker _picker = new PixelPicker();
         private readonly AnimationsLoader _animationLoader;
+        private readonly AssetOverrides _overrides;
         private IndexAnimation[] _dataIndex = new IndexAnimation[MAX_ANIMATIONS_DATA_INDEX_COUNT];
 
         private AnimationDirection[][][] _cache;
 
-        public Animations(AnimationsLoader animationLoader, GraphicsDevice device)
+        public Animations(AnimationsLoader animationLoader, AssetOverrides overrides, GraphicsDevice device)
         {
             _animationLoader = animationLoader;
+            _overrides = overrides;
             _atlas = new TextureAtlas(device, 4096, 4096, SurfaceFormat.Color);
         }
 
@@ -354,6 +356,24 @@ namespace ClassicUO.Renderer.Animations
                 for (int i = 0; i < frames.Length; i++)
                 {
                     ref var frame = ref frames[i];
+
+                    if (_overrides != null && _overrides.TryGetAnimationFrame(
+                            id, action, dir, frame.Num,
+                            out uint[] ofpx, out int ofw, out int ofh,
+                            out bool ofHasC, out int ofcx, out int ofcy))
+                    {
+                        ref var oSprite = ref animDir.SpriteInfos[frame.Num];
+                        uint oKeyUpper = (uint)((action | (dir << 8) | ((useUOP ? 1 : 0) << 16)));
+                        uint oKeyLower = (uint)((id | (frame.Num << 16)));
+                        ulong oKey = (oKeyLower | ((ulong)oKeyUpper << 32));
+
+                        _picker.Set(oKey, ofw, ofh, ofpx);
+                        oSprite.Center.X = ofHasC ? ofcx : frame.CenterX;
+                        oSprite.Center.Y = ofHasC ? ofcy : frame.CenterY;
+                        oSprite.Texture = _atlas.AddSprite(ofpx.AsSpan(), ofw, ofh, out oSprite.UV);
+                        continue;
+                    }
+
                     ref var spriteInfo = ref animDir.SpriteInfos[frame.Num];
 
                     if (frame.Width <= 0 || frame.Height <= 0)
