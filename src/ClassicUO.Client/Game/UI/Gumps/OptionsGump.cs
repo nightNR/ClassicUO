@@ -1224,66 +1224,6 @@ namespace ClassicUO.Game.UI.Gumps
 
             section4.Add
             (
-                _enableDragSelect = AddCheckBox
-                (
-                    null,
-                    ResGumps.EnableDragHPBars,
-                    _currentProfile.EnableDragSelect,
-                    startX,
-                    startY
-                )
-            );
-
-            section4.PushIndent();
-            section4.Add(AddLabel(null, "Drag-select modifier (default / unanchored)", startX, startY));
-
-            section4.AddRight
-            (
-                _dragSelectModifierKey = AddCombobox
-                (
-                    null,
-                    new[] { ResGumps.KeyMod_None, ResGumps.KeyMod_Ctrl, ResGumps.KeyMod_Shift },
-                    _currentProfile.DragSelectModifierKey,
-                    startX,
-                    startY,
-                    100
-                )
-            );
-
-            section4.Add
-            (
-                _dragSelectHumanoidsOnly = AddCheckBox
-                (
-                    null,
-                    ResGumps.DragHumanoidsOnly,
-                    _currentProfile.DragSelectHumanoidsOnly,
-                    startX,
-                    startY
-                )
-            );
-            
-            section4.Add
-            (
-                _dragSelectHostileOnly = AddCheckBox
-                (
-                    null,
-                    ResGumps.DragHostileOnly,
-                    _currentProfile.DragSelectHostileOnly,
-                    startX,
-                    startY
-                )
-            );
-
-            section4.Add(new Label(ResGumps.DragSelectStartingPosX, true, HUE_FONT));
-            section4.Add(_dragSelectStartX = new HSliderBar(startX, startY, 200, 0, Client.Game.Scene.Camera.Bounds.Width, _currentProfile.DragSelectStartX, HSliderBarStyle.MetalWidgetRecessedBar, true, 0, HUE_FONT));
-
-            section4.Add(new Label(ResGumps.DragSelectStartingPosY, true, HUE_FONT));
-            section4.Add(_dragSelectStartY = new HSliderBar(startX, startY, 200, 0, Client.Game.Scene.Camera.Bounds.Height, _currentProfile.DragSelectStartY, HSliderBarStyle.MetalWidgetRecessedBar, true, 0, HUE_FONT));
-
-            section4.PopIndent();
-
-            section4.Add
-            (
                 _showStatsMessage = AddCheckBox
                 (
                     null,
@@ -3583,6 +3523,69 @@ namespace ClassicUO.Game.UI.Gumps
                     0
                 )
             );
+
+            // Global drag-select toggle + its filters. Anchor-group drag routing
+            // (configured in the rows below) fires on its own modifier regardless
+            // of this toggle; these controls govern the default/unanchored drag.
+            section.Add
+            (
+                _enableDragSelect = AddCheckBox
+                (
+                    null,
+                    ResGumps.EnableDragHPBars,
+                    _currentProfile.EnableDragSelect,
+                    0,
+                    0
+                )
+            );
+
+            section.PushIndent();
+            section.Add(AddLabel(null, "Drag-select modifier (default / unanchored)", 0, 0));
+
+            section.AddRight
+            (
+                _dragSelectModifierKey = AddCombobox
+                (
+                    null,
+                    new[] { ResGumps.KeyMod_None, ResGumps.KeyMod_Ctrl, ResGumps.KeyMod_Shift },
+                    _currentProfile.DragSelectModifierKey,
+                    0,
+                    0,
+                    100
+                )
+            );
+
+            section.Add
+            (
+                _dragSelectHumanoidsOnly = AddCheckBox
+                (
+                    null,
+                    ResGumps.DragHumanoidsOnly,
+                    _currentProfile.DragSelectHumanoidsOnly,
+                    0,
+                    0
+                )
+            );
+
+            section.Add
+            (
+                _dragSelectHostileOnly = AddCheckBox
+                (
+                    null,
+                    ResGumps.DragHostileOnly,
+                    _currentProfile.DragSelectHostileOnly,
+                    0,
+                    0
+                )
+            );
+
+            section.Add(new Label(ResGumps.DragSelectStartingPosX, true, HUE_FONT));
+            section.Add(_dragSelectStartX = new HSliderBar(0, 0, 200, 0, Client.Game.Scene.Camera.Bounds.Width, _currentProfile.DragSelectStartX, HSliderBarStyle.MetalWidgetRecessedBar, true, 0, HUE_FONT));
+
+            section.Add(new Label(ResGumps.DragSelectStartingPosY, true, HUE_FONT));
+            section.Add(_dragSelectStartY = new HSliderBar(0, 0, 200, 0, Client.Game.Scene.Camera.Bounds.Height, _currentProfile.DragSelectStartY, HSliderBarStyle.MetalWidgetRecessedBar, true, 0, HUE_FONT));
+
+            section.PopIndent();
 
             // Grid layout for plugin-opened, grouped status bars: bars stack down
             // a column up to MaxRows, then wrap into a new column; opens past

@@ -35,6 +35,11 @@ namespace ClassicUO.Game.Scenes
         private Point _selectionStart,
             _selectionEnd;
         private DragModifier _dragSelectModifiers;
+
+        // True when the active drag was armed by an anchor-group binding rather
+        // than the global drag-select trigger. In that mode only anchor-matched
+        // mobiles open bars; unmatched ones are skipped (no default cascade).
+        private bool _dragSelectAnchorOnly;
         private int AnchorOffset => ProfileManager.CurrentProfile.DragSelectAsAnchor ? 0 : 2;
 
         private bool MoveCharacterByMouseInput()
@@ -222,13 +227,6 @@ namespace ClassicUO.Game.Scenes
 
             foreach (Mobile mobile in _world.Mobiles.Values)
             {
-                if (ProfileManager.CurrentProfile.DragSelectHumanoidsOnly && !mobile.IsHuman)
-                    continue;
-
-                // Skip if is Renamable (follower), or non-hostile notoriety
-                if (ProfileManager.CurrentProfile.DragSelectHostileOnly && (mobile.IsRenamable || mobile.NotorietyFlag is NotorietyFlag.Ally or NotorietyFlag.Innocent or NotorietyFlag.Invulnerable))
-                    continue;
-
                 Point p = mobile.RealScreenPosition;
 
                 p.X += (int)mobile.Offset.X + 22 + 5;
@@ -268,6 +266,24 @@ namespace ClassicUO.Game.Scenes
                             PluginStatusBars.OpenStatusBar(mobile.Serial, finalX, finalY, 1, anchorGroupId);
                             continue;
                         }
+
+                        if (_dragSelectAnchorOnly)
+                        {
+                            // Anchor-only drag: this mobile matched no anchor group,
+                            // so it gets no default health bar.
+                            continue;
+                        }
+
+                        // Humanoids-only / Hostiles-only gate ONLY the default
+                        // cascade. Anchor routing above already ran and obeys each
+                        // group's own allegiance categories, so a mobile these
+                        // filters would exclude can still land in an anchor group.
+                        if (ProfileManager.CurrentProfile.DragSelectHumanoidsOnly && !mobile.IsHuman)
+                            continue;
+
+                        // Skip if is Renamable (follower), or non-hostile notoriety
+                        if (ProfileManager.CurrentProfile.DragSelectHostileOnly && (mobile.IsRenamable || mobile.NotorietyFlag is NotorietyFlag.Ally or NotorietyFlag.Innocent or NotorietyFlag.Invulnerable))
+                            continue;
 
                         BaseHealthBarGump hbgc = HealthBarFactory.Create(_world, mobile);
 
@@ -417,14 +433,25 @@ namespace ClassicUO.Game.Scenes
 
                 DragModifier heldDragModifiers = CurrentHeldDragModifiers();
 
-                if (ProfileManager.CurrentProfile.EnableDragSelect &&
-                    (DragSelectModifierActive() || AnchorGroupDragBindingActive(heldDragModifiers)))
+                // Two independent triggers: the global drag-select (gated by its
+                // EnableDragSelect toggle + modifier) and an anchor-group binding
+                // (fires on its own held modifier, regardless of the global toggle).
+                bool globalDragSelect = ProfileManager.CurrentProfile.EnableDragSelect && DragSelectModifierActive();
+                bool anchorDragSelect = AnchorGroupDragBindingActive(heldDragModifiers);
+
+                if (globalDragSelect || anchorDragSelect)
                 {
                     if (CanDragSelectOnObject(SelectedObject.Object as GameObject))
                     {
                         _selectionStart = Mouse.Position;
                         _isSelectionActive = true;
                         _dragSelectModifiers = heldDragModifiers;
+
+                        // Anchor-only when the global drag-select did not arm this
+                        // drag: unmatched mobiles are skipped rather than opening a
+                        // default health bar, so turning the global toggle off means
+                        // anchor modifiers route into groups without any mass-select.
+                        _dragSelectAnchorOnly = !globalDragSelect;
                     }
                 }
                 else
