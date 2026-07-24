@@ -32,12 +32,15 @@ Static art and animation frames draw relative to a center point. If your
 replacement is a different size and needs precise placement, add a sidecar
 JSON next to the image:
 
-- single image: `<id>.json`
+- single image: `<id>.json` — always the decimal id, even if the image
+  itself is named in hex (e.g. `Art/0x10.png` needs sidecar `16.json`, not
+  `0x10.json`)
 - animation frame: `<group>_<dir>_<frame>.json`
 
 ```json
 { "centerX": 12, "centerY": 40 }
 ```
 
-Without a sidecar, gumps/texmaps/lights use top-left origin, and
-art/animation frames keep the original asset's center.
+Without a sidecar, animation frames keep the built-in frame's center;
+gumps, static art, texmaps, and lights use the default origin (top-left,
+0,0).
