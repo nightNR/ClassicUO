@@ -379,8 +379,16 @@ namespace ClassicUO.Assets
 
         internal const byte COVERAGE_EDGE_THRESHOLD = 128;
 
-        // Alpha-composite src over dst weighted by coverage/255, per 8-bit channel.
-        // dst/src are packed the same way as the pData pixel buffer.
+        // Composite a coverage-weighted glyph pixel over dst, per 8-bit channel.
+        // The glyph's color is already baked into src (RenderedText bakes the hue
+        // via GetPolygoneColor and draws mode NONE), and the draw pipeline uses
+        // premultiplied AlphaBlend. A straight src-over LERP toward dst therefore
+        // produces exactly the premultiplied color×coverage the pipeline wants:
+        // RGB and alpha both scale with coverage, so partial-coverage edges carry
+        // proportionally less color AND less alpha (correct anti-aliasing). NB:
+        // keep RGB scaled with coverage — folding coverage into alpha only would
+        // leave RGB at full intensity and, under premultiplied blend, render hard
+        // (jagged) edges.
         internal static uint BlendCoverage(uint dst, uint src, byte coverage)
         {
             if (coverage == 0) return dst;
@@ -397,6 +405,26 @@ namespace ClassicUO.Assets
             }
 
             return BlendChannel(0) | BlendChannel(8) | BlendChannel(16) | BlendChannel(24);
+        }
+
+        // Perceptual boost for anti-aliased coverage. TTF atlas glyphs baked at
+        // small pixel sizes (14-22) have thin, heavily-antialiased strokes whose
+        // partial coverage makes text look faint beside the hard-edged classic
+        // 1bpp fonts. Lifting mid-coverage with a sub-1 gamma thickens/darkens the
+        // strokes while keeping the smooth edge intact (no thresholding, so no
+        // jaggies). 1.0f disables it; lower = bolder. Endpoints (0 and 255) are
+        // preserved so fully-transparent and fully-covered pixels never shift.
+        internal const float CoverageGamma = 0.70f;
+
+        internal static byte StrengthenCoverage(byte coverage)
+        {
+            if (coverage == 0 || coverage == 255 || CoverageGamma == 1.0f)
+            {
+                return coverage;
+            }
+
+            int v = (int)(System.MathF.Pow(coverage / 255f, CoverageGamma) * 255f + 0.5f);
+            return (byte)(v > 255 ? 255 : v);
         }
 
         internal static bool CoverageIsSet(byte coverage) => coverage >= COVERAGE_EDGE_THRESHOLD;
@@ -2075,6 +2103,8 @@ namespace ClassicUO.Assets
                                         {
                                             continue;
                                         }
+
+                                        cov = StrengthenCoverage(cov);
 
                                         int block = testY * width + nowX;
                                         pData[block] = BlendCoverage(pData[block], charcolor, cov);
@@ -4045,6 +4075,8 @@ namespace ClassicUO.Assets
                         {
                             continue;
                         }
+
+                        cov = StrengthenCoverage(cov);
 
                         int block = (y + pad) * bufW + (x + italicOffset + solidShift + pad);
                         pData[block] = BlendCoverage(pData[block], charcolor, cov);
