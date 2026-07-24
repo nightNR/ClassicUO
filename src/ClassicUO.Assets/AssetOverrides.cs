@@ -73,6 +73,10 @@ namespace ClassicUO.Assets
 
             width = image.Width;
             height = image.Height;
+
+            if (image.Data.Length < width * height * 4)
+                return false;
+
             pixels = new uint[width * height];
 
             byte[] d = image.Data; // RGBA, 4 bytes per pixel
@@ -227,56 +231,84 @@ namespace ClassicUO.Assets
                 if (!Directory.Exists(dir))
                     continue;
 
-                foreach (string file in Directory.EnumerateFiles(dir, "*.png"))
+                try
                 {
-                    string stem = Path.GetFileNameWithoutExtension(file);
-                    if (TryParseId(stem, out uint id))
-                        _images[kind][id] = file;
-                    else
-                        Log.Warn($"AssetOverrides: skipping unparseable file name '{file}'");
+                    foreach (string file in Directory.EnumerateFiles(dir, "*.png"))
+                    {
+                        string stem = Path.GetFileNameWithoutExtension(file);
+                        if (TryParseId(stem, out uint id))
+                            _images[kind][id] = file;
+                        else
+                            Log.Warn($"AssetOverrides: skipping unparseable file name '{file}'");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Log.Warn($"AssetOverrides: failed to enumerate '{dir}' ({ex.Message}); skipping.");
                 }
             }
 
             string animRoot = Path.Combine(overridesRoot, "Anim");
             if (Directory.Exists(animRoot))
             {
-                foreach (string idDir in Directory.EnumerateDirectories(animRoot))
+                try
                 {
-                    if (!TryParseId(Path.GetFileName(idDir), out uint id))
+                    foreach (string idDir in Directory.EnumerateDirectories(animRoot))
                     {
-                        Log.Warn($"AssetOverrides: skipping non-id anim folder '{idDir}'");
-                        continue;
-                    }
+                        if (!TryParseId(Path.GetFileName(idDir), out uint id))
+                        {
+                            Log.Warn($"AssetOverrides: skipping non-id anim folder '{idDir}'");
+                            continue;
+                        }
 
-                    foreach (string file in Directory.EnumerateFiles(idDir, "*.png"))
-                    {
-                        string stem = Path.GetFileNameWithoutExtension(file);
-                        string[] parts = stem.Split('_');
-                        if (parts.Length == 3 &&
-                            int.TryParse(parts[0], out int group) &&
-                            int.TryParse(parts[1], out int dir) &&
-                            int.TryParse(parts[2], out int frame))
+                        try
                         {
-                            _anim[(id, group, dir, frame)] = file;
+                            foreach (string file in Directory.EnumerateFiles(idDir, "*.png"))
+                            {
+                                string stem = Path.GetFileNameWithoutExtension(file);
+                                string[] parts = stem.Split('_');
+                                if (parts.Length == 3 &&
+                                    int.TryParse(parts[0], out int group) &&
+                                    int.TryParse(parts[1], out int dir) &&
+                                    int.TryParse(parts[2], out int frame))
+                                {
+                                    _anim[(id, group, dir, frame)] = file;
+                                }
+                                else
+                                {
+                                    Log.Warn($"AssetOverrides: skipping unparseable anim frame '{file}'");
+                                }
+                            }
                         }
-                        else
+                        catch (Exception ex)
                         {
-                            Log.Warn($"AssetOverrides: skipping unparseable anim frame '{file}'");
+                            Log.Warn($"AssetOverrides: failed to enumerate '{idDir}' ({ex.Message}); skipping.");
                         }
                     }
+                }
+                catch (Exception ex)
+                {
+                    Log.Warn($"AssetOverrides: failed to enumerate '{animRoot}' ({ex.Message}); skipping.");
                 }
             }
 
             string soundDir = Path.Combine(overridesRoot, "Sound");
             if (Directory.Exists(soundDir))
             {
-                foreach (string file in Directory.EnumerateFiles(soundDir, "*.wav"))
+                try
                 {
-                    string stem = Path.GetFileNameWithoutExtension(file);
-                    if (TryParseId(stem, out uint id))
-                        _sounds[id] = file;
-                    else
-                        Log.Warn($"AssetOverrides: skipping unparseable file name '{file}'");
+                    foreach (string file in Directory.EnumerateFiles(soundDir, "*.wav"))
+                    {
+                        string stem = Path.GetFileNameWithoutExtension(file);
+                        if (TryParseId(stem, out uint id))
+                            _sounds[id] = file;
+                        else
+                            Log.Warn($"AssetOverrides: skipping unparseable file name '{file}'");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Log.Warn($"AssetOverrides: failed to enumerate '{soundDir}' ({ex.Message}); skipping.");
                 }
             }
         }

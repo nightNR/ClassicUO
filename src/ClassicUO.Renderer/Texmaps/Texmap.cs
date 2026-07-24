@@ -32,9 +32,14 @@ namespace ClassicUO.Renderer.Texmaps
                         AssetOverrideKind.Texmap, idx,
                         out uint[] opx, out int ow, out int oh, out _, out _, out _))
                 {
-                    spriteInfo.Texture = _atlas.AddSprite(opx, ow, oh, out spriteInfo.UV);
-                    _picker.Set(idx, ow, oh, opx);
-                    return ref spriteInfo;
+                    var otex = _atlas.AddSprite(opx, ow, oh, out var ouv);
+                    if (otex != null)
+                    {
+                        spriteInfo.Texture = otex;
+                        spriteInfo.UV = ouv;
+                        _picker.Set(idx, ow, oh, opx);
+                        return ref spriteInfo;
+                    }
                 }
 
                 var texmapInfo = _texmapsLoader.GetTexmap(idx);

@@ -362,16 +362,21 @@ namespace ClassicUO.Renderer.Animations
                             out uint[] ofpx, out int ofw, out int ofh,
                             out bool ofHasC, out int ofcx, out int ofcy))
                     {
-                        ref var oSprite = ref animDir.SpriteInfos[frame.Num];
-                        uint oKeyUpper = (uint)((action | (dir << 8) | ((useUOP ? 1 : 0) << 16)));
-                        uint oKeyLower = (uint)((id | (frame.Num << 16)));
-                        ulong oKey = (oKeyLower | ((ulong)oKeyUpper << 32));
+                        var otex = _atlas.AddSprite(ofpx.AsSpan(), ofw, ofh, out var ouv);
+                        if (otex != null)
+                        {
+                            ref var oSprite = ref animDir.SpriteInfos[frame.Num];
+                            uint oKeyUpper = (uint)((action | (dir << 8) | ((useUOP ? 1 : 0) << 16)));
+                            uint oKeyLower = (uint)((id | (frame.Num << 16)));
+                            ulong oKey = (oKeyLower | ((ulong)oKeyUpper << 32));
 
-                        _picker.Set(oKey, ofw, ofh, ofpx);
-                        oSprite.Center.X = ofHasC ? ofcx : frame.CenterX;
-                        oSprite.Center.Y = ofHasC ? ofcy : frame.CenterY;
-                        oSprite.Texture = _atlas.AddSprite(ofpx.AsSpan(), ofw, ofh, out oSprite.UV);
-                        continue;
+                            _picker.Set(oKey, ofw, ofh, ofpx);
+                            oSprite.Center.X = ofHasC ? ofcx : frame.CenterX;
+                            oSprite.Center.Y = ofHasC ? ofcy : frame.CenterY;
+                            oSprite.Texture = otex;
+                            oSprite.UV = ouv;
+                            continue;
+                        }
                     }
 
                     ref var spriteInfo = ref animDir.SpriteInfos[frame.Num];

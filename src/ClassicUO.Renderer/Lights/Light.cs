@@ -32,8 +32,13 @@ namespace ClassicUO.Renderer.Lights
                         AssetOverrideKind.Light, idx,
                         out uint[] opx, out int ow, out int oh, out _, out _, out _))
                 {
-                    spriteInfo.Texture = _atlas.AddSprite(opx, ow, oh, out spriteInfo.UV);
-                    return ref spriteInfo;
+                    var otex = _atlas.AddSprite(opx, ow, oh, out var ouv);
+                    if (otex != null)
+                    {
+                        spriteInfo.Texture = otex;
+                        spriteInfo.UV = ouv;
+                        return ref spriteInfo;
+                    }
                 }
 
                 var lightInfo = _lightsLoader.GetLight(idx);

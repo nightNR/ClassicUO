@@ -34,6 +34,15 @@ namespace ClassicUO.Renderer
             out Rectangle pr
         )
         {
+            if (width > _width || height > _height)
+            {
+                Utility.Logging.Log.Warn(
+                    $"TextureAtlas: sprite {width}x{height} exceeds atlas {_width}x{_height}; skipping."
+                );
+                pr = Rectangle.Empty;
+                return null;
+            }
+
             var index = _textureList.Count - 1;
 
             if (index < 0)
