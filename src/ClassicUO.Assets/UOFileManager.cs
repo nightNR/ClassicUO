@@ -48,6 +48,7 @@ namespace ClassicUO.Assets
             Professions = new ProfessionLoader(this);
             TileArt = new TileArtLoader(this);
             StringDictionary = new StringDictionaryLoader(this);
+            Overrides = new AssetOverrides();
         }
 
         public ClientVersion Version { get; }
@@ -74,6 +75,7 @@ namespace ClassicUO.Assets
         public ProfessionLoader Professions { get; }
         public TileArtLoader TileArt { get; }
         public StringDictionaryLoader StringDictionary { get; }
+        public AssetOverrides Overrides { get; }
 
 
 

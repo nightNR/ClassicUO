@@ -92,6 +92,8 @@ namespace ClassicUO.Configuration
         
         [JsonPropertyName("files_override")] public string OverrideFile { get; set; }
 
+        [JsonPropertyName("enable_asset_overrides")] public bool EnableAssetOverrides { get; set; } = true;
+
         public static string GetSettingsFilepath()
         {
             if (CustomSettingsFilepath != null)
