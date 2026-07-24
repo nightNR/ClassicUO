@@ -87,7 +87,7 @@ namespace ClassicUO
             Texmaps = new Renderer.Texmaps.Texmap(FileManager.Texmaps, FileManager.Overrides, game.GraphicsDevice);
             Lights = new Renderer.Lights.Light(FileManager.Lights, FileManager.Overrides, game.GraphicsDevice);
             MultiMaps = new Renderer.MultiMaps.MultiMap(FileManager.MultiMaps, game.GraphicsDevice);
-            Sounds = new Renderer.Sounds.Sound(FileManager.Sounds);
+            Sounds = new Renderer.Sounds.Sound(FileManager.Sounds, FileManager.Overrides);
             FontGlyphAtlas = new Renderer.FontGlyphAtlas(FileManager.Fonts, game.GraphicsDevice);
 
             LightColors.LoadLights();

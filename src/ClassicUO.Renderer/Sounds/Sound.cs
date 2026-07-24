@@ -17,11 +17,13 @@ namespace ClassicUO.Renderer.Sounds
         private readonly IO.Audio.Sound[] _sounds = new IO.Audio.Sound[MAX_SOUND_DATA_INDEX_COUNT];
         private readonly bool _useDigitalMusicFolder;
         private readonly SoundsLoader _soundsLoader;
+        private readonly AssetOverrides _overrides;
 
-        public Sound(SoundsLoader soundsLoader)
+        public Sound(SoundsLoader soundsLoader, AssetOverrides overrides)
         {
             _soundsLoader = soundsLoader;
             _useDigitalMusicFolder = Directory.Exists(Path.Combine(soundsLoader.FileManager.BasePath, "Music", "Digital"));
+            _overrides = overrides;
         }
 
         public IO.Audio.Sound GetSound(int index)
@@ -30,9 +32,16 @@ namespace ClassicUO.Renderer.Sounds
             {
                 ref IO.Audio.Sound sound = ref _sounds[index];
 
-                if (sound == null && _soundsLoader.TryGetSound(index, out byte[] data, out string name))
+                if (sound == null)
                 {
-                    sound = new UOSound(name, index, data);
+                    if (_overrides != null && _overrides.TryGetSound((uint)index, out byte[] opcm))
+                    {
+                        sound = new UOSound($"override_{index}", index, opcm);
+                    }
+                    else if (_soundsLoader.TryGetSound(index, out byte[] data, out string name))
+                    {
+                        sound = new UOSound(name, index, data);
+                    }
                 }
 
                 return sound;
