@@ -52,5 +52,39 @@ namespace ClassicUO.UnitTests
             Assert.False(AssetOverrides.TryDecodePng(new byte[] { 1, 2, 3 }, out _, out _, out _));
             Assert.False(AssetOverrides.TryDecodePng(null, out _, out _, out _));
         }
+
+        // 22050Hz 16-bit mono PCM WAV, data = 0x11,0x11,0x22,0x22
+        private const string Wav22050Mono16 =
+            "UklGRigAAABXQVZFZm10IBAAAAABAAEAIlYAAESsAAACABAAZGF0YQQAAAARESIi";
+
+        [Fact]
+        public void TryParseSidecarCenter_ReadsCenter()
+        {
+            Assert.True(AssetOverrides.TryParseSidecarCenter(
+                "{ \"centerX\": 12, \"centerY\": 40 }", out int cx, out int cy));
+            Assert.Equal(12, cx);
+            Assert.Equal(40, cy);
+        }
+
+        [Fact]
+        public void TryParseSidecarCenter_RejectsMalformed()
+        {
+            Assert.False(AssetOverrides.TryParseSidecarCenter("not json", out _, out _));
+            Assert.False(AssetOverrides.TryParseSidecarCenter("{}", out _, out _));
+        }
+
+        [Fact]
+        public void TryExtractWavPcm_ReturnsDataChunk()
+        {
+            byte[] bytes = System.Convert.FromBase64String(Wav22050Mono16);
+            Assert.True(AssetOverrides.TryExtractWavPcm(bytes, out byte[] pcm));
+            Assert.Equal(new byte[] { 0x11, 0x11, 0x22, 0x22 }, pcm);
+        }
+
+        [Fact]
+        public void TryExtractWavPcm_RejectsGarbage()
+        {
+            Assert.False(AssetOverrides.TryExtractWavPcm(new byte[] { 1, 2, 3, 4 }, out _));
+        }
     }
 }
