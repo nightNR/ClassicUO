@@ -9,10 +9,12 @@ namespace ClassicUO.Renderer.Gumps
         private readonly SpriteInfo[] _spriteInfos;
         private readonly PixelPicker _picker = new PixelPicker();
         private readonly GumpsLoader _gumpsLoader;
+        private readonly AssetOverrides _overrides;
 
-        public Gump(GumpsLoader gumpsLoader, GraphicsDevice device)
+        public Gump(GumpsLoader gumpsLoader, AssetOverrides overrides, GraphicsDevice device)
         {
             _gumpsLoader = gumpsLoader;
+            _overrides = overrides;
             _atlas = new TextureAtlas(device, 4096, 4096, SurfaceFormat.Color);
             _spriteInfos = new SpriteInfo[gumpsLoader.File.Entries.Length];
         }
@@ -26,6 +28,15 @@ namespace ClassicUO.Renderer.Gumps
 
             if (spriteInfo.Texture == null)
             {
+                if (_overrides != null && _overrides.TryGetImage(
+                        AssetOverrideKind.Gump, idx,
+                        out uint[] opx, out int ow, out int oh, out _, out _, out _))
+                {
+                    spriteInfo.Texture = _atlas.AddSprite(opx, ow, oh, out spriteInfo.UV);
+                    _picker.Set(idx, ow, oh, opx);
+                    return ref spriteInfo;
+                }
+
                 var gumpInfo = _gumpsLoader.GetGump(idx);
                 if (!gumpInfo.Pixels.IsEmpty)
                 {
