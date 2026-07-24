@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: BSD-2-Clause
 
 using System;
+using System.Collections.Generic;
 using System.Globalization;
+using System.IO;
 using System.Text.Json;
 using ClassicUO.Utility.Logging;
 using StbImageSharp;
@@ -187,6 +189,175 @@ namespace ClassicUO.Assets
             {
                 return false;
             }
+        }
+
+        private readonly Dictionary<AssetOverrideKind, Dictionary<uint, string>> _images =
+            new Dictionary<AssetOverrideKind, Dictionary<uint, string>>();
+        private readonly Dictionary<(uint id, int group, int dir, int frame), string> _anim =
+            new Dictionary<(uint, int, int, int), string>();
+        private readonly Dictionary<uint, string> _sounds = new Dictionary<uint, string>();
+
+        private static readonly (AssetOverrideKind kind, string folder)[] _imageFolders =
+        {
+            (AssetOverrideKind.Gump, "Gump"),
+            (AssetOverrideKind.Art, "Art"),
+            (AssetOverrideKind.Land, "Land"),
+            (AssetOverrideKind.Texmap, "Texmap"),
+            (AssetOverrideKind.Light, "Light"),
+        };
+
+        public void Build(string overridesRoot)
+        {
+            _images.Clear();
+            _anim.Clear();
+            _sounds.Clear();
+            Enabled = false;
+
+            foreach (var (kind, _) in _imageFolders)
+                _images[kind] = new Dictionary<uint, string>();
+
+            if (string.IsNullOrEmpty(overridesRoot) || !Directory.Exists(overridesRoot))
+                return;
+
+            Enabled = true;
+
+            foreach (var (kind, folder) in _imageFolders)
+            {
+                string dir = Path.Combine(overridesRoot, folder);
+                if (!Directory.Exists(dir))
+                    continue;
+
+                foreach (string file in Directory.EnumerateFiles(dir, "*.png"))
+                {
+                    string stem = Path.GetFileNameWithoutExtension(file);
+                    if (TryParseId(stem, out uint id))
+                        _images[kind][id] = file;
+                    else
+                        Log.Warn($"AssetOverrides: skipping unparseable file name '{file}'");
+                }
+            }
+
+            string animRoot = Path.Combine(overridesRoot, "Anim");
+            if (Directory.Exists(animRoot))
+            {
+                foreach (string idDir in Directory.EnumerateDirectories(animRoot))
+                {
+                    if (!TryParseId(Path.GetFileName(idDir), out uint id))
+                    {
+                        Log.Warn($"AssetOverrides: skipping non-id anim folder '{idDir}'");
+                        continue;
+                    }
+
+                    foreach (string file in Directory.EnumerateFiles(idDir, "*.png"))
+                    {
+                        string stem = Path.GetFileNameWithoutExtension(file);
+                        string[] parts = stem.Split('_');
+                        if (parts.Length == 3 &&
+                            int.TryParse(parts[0], out int group) &&
+                            int.TryParse(parts[1], out int dir) &&
+                            int.TryParse(parts[2], out int frame))
+                        {
+                            _anim[(id, group, dir, frame)] = file;
+                        }
+                        else
+                        {
+                            Log.Warn($"AssetOverrides: skipping unparseable anim frame '{file}'");
+                        }
+                    }
+                }
+            }
+
+            string soundDir = Path.Combine(overridesRoot, "Sound");
+            if (Directory.Exists(soundDir))
+            {
+                foreach (string file in Directory.EnumerateFiles(soundDir, "*.wav"))
+                {
+                    string stem = Path.GetFileNameWithoutExtension(file);
+                    if (TryParseId(stem, out uint id))
+                        _sounds[id] = file;
+                    else
+                        Log.Warn($"AssetOverrides: skipping unparseable file name '{file}'");
+                }
+            }
+        }
+
+        private static bool LoadImageFile(
+            string path, string sidecar, out uint[] pixels, out int width, out int height,
+            out bool hasCenter, out int centerX, out int centerY)
+        {
+            pixels = null; width = 0; height = 0;
+            hasCenter = false; centerX = 0; centerY = 0;
+
+            byte[] bytes;
+            try { bytes = File.ReadAllBytes(path); }
+            catch (Exception ex) { Log.Warn($"AssetOverrides: cannot read '{path}' ({ex.Message})"); return false; }
+
+            if (!TryDecodePng(bytes, out pixels, out width, out height))
+                return false;
+
+            if (File.Exists(sidecar))
+            {
+                try
+                {
+                    if (TryParseSidecarCenter(File.ReadAllText(sidecar), out centerX, out centerY))
+                        hasCenter = true;
+                    else
+                        Log.Warn($"AssetOverrides: malformed sidecar '{sidecar}'");
+                }
+                catch (Exception ex) { Log.Warn($"AssetOverrides: cannot read sidecar '{sidecar}' ({ex.Message})"); }
+            }
+
+            return true;
+        }
+
+        public bool TryGetImage(
+            AssetOverrideKind kind, uint id,
+            out uint[] pixels, out int width, out int height,
+            out bool hasCenter, out int centerX, out int centerY)
+        {
+            pixels = null; width = 0; height = 0;
+            hasCenter = false; centerX = 0; centerY = 0;
+
+            if (!Enabled || !_images.TryGetValue(kind, out var byId) || !byId.TryGetValue(id, out string path))
+                return false;
+
+            string sidecar = Path.Combine(
+                Path.GetDirectoryName(path) ?? string.Empty,
+                id.ToString(CultureInfo.InvariantCulture) + ".json");
+
+            return LoadImageFile(path, sidecar, out pixels, out width, out height, out hasCenter, out centerX, out centerY);
+        }
+
+        public bool TryGetAnimationFrame(
+            uint id, int group, int dir, int frame,
+            out uint[] pixels, out int width, out int height,
+            out bool hasCenter, out int centerX, out int centerY)
+        {
+            pixels = null; width = 0; height = 0;
+            hasCenter = false; centerX = 0; centerY = 0;
+
+            if (!Enabled || !_anim.TryGetValue((id, group, dir, frame), out string path))
+                return false;
+
+            string sidecar = Path.Combine(
+                Path.GetDirectoryName(path) ?? string.Empty,
+                $"{group}_{dir}_{frame}.json");
+
+            return LoadImageFile(path, sidecar, out pixels, out width, out height, out hasCenter, out centerX, out centerY);
+        }
+
+        public bool TryGetSound(uint id, out byte[] pcm)
+        {
+            pcm = null;
+
+            if (!Enabled || !_sounds.TryGetValue(id, out string path))
+                return false;
+
+            byte[] bytes;
+            try { bytes = File.ReadAllBytes(path); }
+            catch (Exception ex) { Log.Warn($"AssetOverrides: cannot read '{path}' ({ex.Message})"); return false; }
+
+            return TryExtractWavPcm(bytes, out pcm);
         }
     }
 }

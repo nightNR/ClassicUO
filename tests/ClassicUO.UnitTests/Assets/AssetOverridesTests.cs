@@ -86,5 +86,85 @@ namespace ClassicUO.UnitTests
         {
             Assert.False(AssetOverrides.TryExtractWavPcm(new byte[] { 1, 2, 3, 4 }, out _));
         }
+
+        private static string WriteTempTree()
+        {
+            byte[] png = System.Convert.FromBase64String(Png2x2);
+            byte[] wav = System.Convert.FromBase64String(Wav22050Mono16);
+
+            string root = System.IO.Path.Combine(
+                System.IO.Path.GetTempPath(),
+                "cuo_ovr_" + System.Guid.NewGuid().ToString("N"));
+
+            System.IO.Directory.CreateDirectory(System.IO.Path.Combine(root, "Gump"));
+            System.IO.Directory.CreateDirectory(System.IO.Path.Combine(root, "Art"));
+            System.IO.Directory.CreateDirectory(System.IO.Path.Combine(root, "Anim", "400"));
+            System.IO.Directory.CreateDirectory(System.IO.Path.Combine(root, "Sound"));
+
+            System.IO.File.WriteAllBytes(System.IO.Path.Combine(root, "Gump", "1234.png"), png);
+            System.IO.File.WriteAllBytes(System.IO.Path.Combine(root, "Gump", "bogus.png"), png); // skipped
+            System.IO.File.WriteAllBytes(System.IO.Path.Combine(root, "Art", "0x10.png"), png);    // id 16
+            System.IO.File.WriteAllBytes(System.IO.Path.Combine(root, "Art", "16.json"),
+                System.Text.Encoding.UTF8.GetBytes("{ \"centerX\": 3, \"centerY\": 7 }"));
+            System.IO.File.WriteAllBytes(System.IO.Path.Combine(root, "Anim", "400", "1_2_3.png"), png);
+            System.IO.File.WriteAllBytes(System.IO.Path.Combine(root, "Sound", "55.wav"), wav);
+
+            return root;
+        }
+
+        [Fact]
+        public void Build_IndexesAndServesOverrides()
+        {
+            string root = WriteTempTree();
+            try
+            {
+                var ovr = new AssetOverrides();
+                ovr.Build(root);
+                Assert.True(ovr.Enabled);
+
+                // Gump: decimal id, no sidecar
+                Assert.True(ovr.TryGetImage(AssetOverrideKind.Gump, 1234,
+                    out uint[] gpx, out int gw, out int gh, out bool gHasC, out _, out _));
+                Assert.Equal(4, gpx.Length);
+                Assert.Equal(2, gw);
+                Assert.Equal(2, gh);
+                Assert.False(gHasC);
+
+                // bogus filename was skipped, missing id returns false
+                Assert.False(ovr.TryGetImage(AssetOverrideKind.Gump, 9999,
+                    out _, out _, out _, out _, out _, out _));
+
+                // Art: hex id + sidecar center
+                Assert.True(ovr.TryGetImage(AssetOverrideKind.Art, 16,
+                    out _, out _, out _, out bool aHasC, out int acx, out int acy));
+                Assert.True(aHasC);
+                Assert.Equal(3, acx);
+                Assert.Equal(7, acy);
+
+                // Animation frame
+                Assert.True(ovr.TryGetAnimationFrame(400, 1, 2, 3,
+                    out uint[] fpx, out _, out _, out _, out _, out _));
+                Assert.Equal(4, fpx.Length);
+                Assert.False(ovr.TryGetAnimationFrame(400, 9, 9, 9,
+                    out _, out _, out _, out _, out _, out _));
+
+                // Sound
+                Assert.True(ovr.TryGetSound(55, out byte[] pcm));
+                Assert.Equal(new byte[] { 0x11, 0x11, 0x22, 0x22 }, pcm);
+            }
+            finally
+            {
+                System.IO.Directory.Delete(root, true);
+            }
+        }
+
+        [Fact]
+        public void Build_MissingRoot_Disabled()
+        {
+            var ovr = new AssetOverrides();
+            ovr.Build(System.IO.Path.Combine(System.IO.Path.GetTempPath(), "cuo_ovr_missing_" + System.Guid.NewGuid().ToString("N")));
+            Assert.False(ovr.Enabled);
+            Assert.False(ovr.TryGetImage(AssetOverrideKind.Gump, 1, out _, out _, out _, out _, out _, out _));
+        }
     }
 }
