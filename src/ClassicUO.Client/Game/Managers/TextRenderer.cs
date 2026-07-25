@@ -13,6 +13,10 @@ namespace ClassicUO.Game.Managers
     {
         private readonly List<Rectangle> _bounds = new List<Rectangle>();
 
+        // TEMP diagnostic: log the first N overhead (non-gump) text draws to
+        // pin down why TTF overhead text renders faint/transparent. Remove after.
+        private static int _overheadDiagCount;
+
         public TextRenderer(World world) : base (world)
         {
             FirstNode = this;
@@ -76,6 +80,20 @@ namespace ClassicUO.Game.Managers
                 {
                     x += startX;
                     y += startY;
+                }
+
+                if (!isGump && _overheadDiagCount < 40)
+                {
+                    _overheadDiagCount++;
+                    var rt = o.RenderedText;
+                    string preview = rt.Text == null
+                        ? "<null>"
+                        : (rt.Text.Length > 16 ? rt.Text.Substring(0, 16) : rt.Text);
+                    ClassicUO.Utility.Logging.Log.Trace(
+                        $"[overheaddiag] font={rt.Font} unicode={rt.IsUnicode} " +
+                        $"atlasTTF={(rt.IsUnicode && rt.Font >= 20)} isTransparent={o.IsTransparent} " +
+                        $"oAlpha={o.Alpha} drawAlpha={alpha:0.00} text='{preview}'"
+                    );
                 }
 
                 o.RenderedText.Draw
