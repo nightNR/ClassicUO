@@ -24,9 +24,26 @@ namespace ClassicUO
         public static readonly bool IsUnix = !IsWindows;
 
         public static readonly string Version = Assembly.GetExecutingAssembly()?.GetName()?.Version?.ToString() ?? "0.0.0.0";
-        // Anchor to the binary's own directory (where Data/, Overrides/, etc. live)
-        // rather than the process working directory, which varies by how the client
-        // is launched (IDE, shortcut, cwd). Matches the NETFRAMEWORK branch.
-        public static readonly string ExecutablePath = AppContext.BaseDirectory;
+        // Anchor to the directory where the cuo client itself lives (alongside
+        // Data/, Overrides/, etc.) rather than the process working directory,
+        // which varies by launch method. When cuo is loaded as a plugin by a
+        // hosting launcher from a subfolder (e.g. .../client/cuo.dll), the app
+        // base points at the HOST, not the client - so prefer this assembly's
+        // own location. Assembly.Location is empty under NativeAOT/single-file,
+        // where AppContext.BaseDirectory is the correct (and only) fallback.
+        public static readonly string ExecutablePath = ResolveExecutablePath();
+
+        private static string ResolveExecutablePath()
+        {
+            string loc = Assembly.GetExecutingAssembly()?.Location;
+            if (!string.IsNullOrEmpty(loc))
+            {
+                string dir = Path.GetDirectoryName(loc);
+                if (!string.IsNullOrEmpty(dir))
+                    return dir;
+            }
+
+            return AppContext.BaseDirectory;
+        }
     }
 }
