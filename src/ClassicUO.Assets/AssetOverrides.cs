@@ -221,7 +221,10 @@ namespace ClassicUO.Assets
                 _images[kind] = new Dictionary<uint, string>();
 
             if (string.IsNullOrEmpty(overridesRoot) || !Directory.Exists(overridesRoot))
+            {
+                Log.Trace($"AssetOverrides: no folder at '{overridesRoot}' - disabled");
                 return;
+            }
 
             Enabled = true;
 
@@ -311,6 +314,15 @@ namespace ClassicUO.Assets
                     Log.Warn($"AssetOverrides: failed to enumerate '{soundDir}' ({ex.Message}); skipping.");
                 }
             }
+
+            int imageCount = 0;
+            foreach (var kv in _images)
+                imageCount += kv.Value.Count;
+
+            Log.Trace(
+                $"AssetOverrides: enabled, root='{overridesRoot}', " +
+                $"images={imageCount}, anim={_anim.Count}, sounds={_sounds.Count}"
+            );
         }
 
         private static bool LoadImageFile(

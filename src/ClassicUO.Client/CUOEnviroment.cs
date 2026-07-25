@@ -24,11 +24,9 @@ namespace ClassicUO
         public static readonly bool IsUnix = !IsWindows;
 
         public static readonly string Version = Assembly.GetExecutingAssembly()?.GetName()?.Version?.ToString() ?? "0.0.0.0";
-        public static readonly string ExecutablePath =
-#if NETFRAMEWORK
-           AppContext.BaseDirectory; // Path.GetDirectoryName(Assembly.GetEntryAssembly()?.Location);
-#else
-            Environment.CurrentDirectory;
-#endif
+        // Anchor to the binary's own directory (where Data/, Overrides/, etc. live)
+        // rather than the process working directory, which varies by how the client
+        // is launched (IDE, shortcut, cwd). Matches the NETFRAMEWORK branch.
+        public static readonly string ExecutablePath = AppContext.BaseDirectory;
     }
 }
