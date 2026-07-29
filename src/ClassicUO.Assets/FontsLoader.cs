@@ -416,12 +416,41 @@ namespace ClassicUO.Assets
         // preserved so fully-transparent and fully-covered pixels never shift.
         internal const float CoverageGamma = 0.70f;
 
+        // Coverage at or above this is treated as glyph interior and forced fully
+        // opaque, so stroke interiors are never see-through under premultiplied
+        // blend. Below it, a gamma ramp preserves smooth anti-aliased edges.
+        // Lower = more solid (thicker, less AA); higher = softer (thinner, more AA).
+        internal const byte CoverageSolidAt = 176;
+
         internal static byte StrengthenCoverage(byte coverage)
         {
-            // TEMP diagnostic: force every covered pixel fully opaque (1bpp-like)
-            // to confirm the faint/patchy infill is caused by sub-255 interior
-            // coverage. Revert after testing.
-            return coverage == 0 ? (byte)0 : (byte)255;
+            if (coverage == 0)
+            {
+                return 0;
+            }
+
+            // Interior: saturate to fully opaque so the fill isn't patchy/faint.
+            if (coverage >= CoverageSolidAt)
+            {
+                return 255;
+            }
+
+            // Edge: gamma-lift toward the solid threshold, keeping a smooth ramp
+            // (continuous at CoverageSolidAt, which maps to ~255) so edges stay
+            // anti-aliased instead of hard/jagged.
+            float t = coverage / (float)CoverageSolidAt;
+            int v = (int)(System.MathF.Pow(t, CoverageGamma) * 255f + 0.5f);
+
+            if (v < 1)
+            {
+                v = 1;
+            }
+            else if (v > 255)
+            {
+                v = 255;
+            }
+
+            return (byte)v;
         }
 
         internal static bool CoverageIsSet(byte coverage) => coverage >= COVERAGE_EDGE_THRESHOLD;
