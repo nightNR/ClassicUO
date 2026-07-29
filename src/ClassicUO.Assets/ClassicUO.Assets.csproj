@@ -8,6 +8,7 @@
     <ProjectReference Include="..\ClassicUO.IO\ClassicUO.IO.csproj" />
     <ProjectReference Include="..\ClassicUO.Utility\ClassicUO.Utility.csproj" />
     <PackageReference Include="StbImageSharp" Version="2.30.15" />
+    <PackageReference Include="StbTrueTypeSharp" Version="1.26.12" />
   </ItemGroup>
 
   <ItemGroup>
