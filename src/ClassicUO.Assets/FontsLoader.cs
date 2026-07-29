@@ -77,6 +77,9 @@ namespace ClassicUO.Assets
         private readonly UOFile[] _unicodeFontAddress = new UOFile[MAX_UNICODE_FONTS];
         private readonly bool[] _isAtlasFont = new bool[MAX_UNICODE_FONTS];
         private readonly string[] _atlasFontNames = new string[MAX_UNICODE_FONTS];
+        private readonly TtfGlyphSource[] _atlasGlyphSources = new TtfGlyphSource[MAX_UNICODE_FONTS];
+        private readonly System.Collections.Generic.HashSet<int>[] _atlasMissing =
+            new System.Collections.Generic.HashSet<int>[MAX_UNICODE_FONTS];
         private readonly long[] _unicodeFontSize = new long[20];
         private readonly VisitedUrlCache _visitedUrls = new VisitedUrlCache(1024);
         private readonly int[] _offsetCharTable = { 2, 0, 2, 2, 0, 0, 2, 2, 0, 0 };
@@ -241,6 +244,12 @@ namespace ClassicUO.Assets
 
         private void LoadChar(byte font, int index)
         {
+            if (font < MAX_UNICODE_FONTS && _isAtlasFont[font])
+            {
+                LoadAtlasChar(font, index);
+                return;
+            }
+
             var file = _unicodeFontAddress[font];
 
             if (file == null)
@@ -298,6 +307,48 @@ namespace ClassicUO.Assets
             }
         }
 
+        private void LoadAtlasChar(byte font, int index)
+        {
+            TtfGlyphSource source = _atlasGlyphSources[font];
+            if (source == null)
+            {
+                return;
+            }
+
+            // Skip glyphs already known to be absent from this face, so a missing
+            // codepoint isn't re-rasterized on every access.
+            System.Collections.Generic.HashSet<int> missing = _atlasMissing[font];
+            if (missing != null && missing.Contains(index))
+            {
+                return;
+            }
+
+            if (source.TryRasterize((char)index, out sbyte offX, out sbyte offY,
+                    out sbyte w, out sbyte h, out byte[] coverage))
+            {
+                _fontDataUNICODE[font, index] = new FontCharacterDataUnicode
+                {
+                    OffsetX = offX,
+                    OffsetY = offY,
+                    Width = w,
+                    Height = h,
+                    Data = null,
+                    Coverage = (w <= 0 || h <= 0 || coverage == null || coverage.Length == 0) ? null : coverage
+                };
+
+                // A rasterized-but-empty glyph (shouldn't happen: TryRasterize
+                // returns false for those) is treated as missing to avoid retries.
+                if (_fontDataUNICODE[font, index].Coverage == null)
+                {
+                    missing?.Add(index);
+                }
+            }
+            else
+            {
+                missing?.Add(index);
+            }
+        }
+
         public bool UnicodeFontExists(byte font)
         {
             return font < MAX_UNICODE_FONTS && (_unicodeFontAddress[font] != null || _isAtlasFont[font]);
@@ -349,6 +400,29 @@ namespace ClassicUO.Assets
                 };
             }
 
+            _isAtlasFont[slot] = true;
+            _atlasFontNames[slot] = displayName;
+        }
+
+        /// <summary>
+        /// Registers a TTF face into a synthetic unicode slot (20-31). Glyphs are
+        /// rasterized on demand by <see cref="LoadChar"/> via <see cref="TtfGlyphSource"/>;
+        /// nothing is baked up front. A corrupt/unloadable TTF leaves the slot unusable.
+        /// </summary>
+        public void RegisterAtlasFont(int slot, string displayName, ReadOnlySpan<byte> ttfBytes, int pixelSize)
+        {
+            TtfGlyphSource source = TtfGlyphSource.Create(ttfBytes.ToArray(), pixelSize);
+
+            if (source == null)
+            {
+                Utility.Logging.Log.Warn($"RegisterAtlasFont: could not load TTF for slot {slot} ('{displayName}'); slot disabled.");
+                return;
+            }
+
+            _fontDataUNICODE ??= new FontCharacterDataUnicode[_unicodeFontAddress.Length, 0x10000];
+
+            _atlasGlyphSources[slot] = source;
+            _atlasMissing[slot] = new System.Collections.Generic.HashSet<int>();
             _isAtlasFont[slot] = true;
             _atlasFontNames[slot] = displayName;
         }
