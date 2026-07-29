@@ -362,49 +362,6 @@ namespace ClassicUO.Assets
         private bool SlotUsable(byte font) => font < MAX_UNICODE_FONTS && (_unicodeFontAddress[font] != null || _isAtlasFont[font]);
 
         /// <summary>
-        /// Registers a baked TTF atlas font (see <see cref="AtlasFontFile"/>) into a
-        /// synthetic unicode font slot so it renders and measures through the
-        /// existing unicode text pipeline (`GetCharUni`/`GetWidthUnicode`/etc.)
-        /// without a backing `fonts.mul`-style `UOFile`.
-        /// </summary>
-        public void RegisterAtlasFont(int slot, string displayName, ReadOnlySpan<byte> atlasBytes)
-        {
-            AtlasFontFile atlas = AtlasFontFile.Read(atlasBytes);
-
-            _fontDataUNICODE ??= new FontCharacterDataUnicode[_unicodeFontAddress.Length, 0x10000];
-
-            for (int c = atlas.FirstChar; c <= atlas.LastChar; c++)
-            {
-                if (!atlas.TryGetGlyph((char)c, out AtlasGlyph g))
-                {
-                    continue;
-                }
-
-                _fontDataUNICODE[slot, c] = new FontCharacterDataUnicode
-                {
-                    OffsetX = g.OffsetX,
-                    OffsetY = g.OffsetY,
-                    Width = (sbyte)g.Width,
-                    Height = (sbyte)g.Height,
-                    Data = null,
-                    // A zero-area (or otherwise empty) glyph — e.g. the space
-                    // U+0020 — must report HasPixels==false, matching bitmap
-                    // fonts' semantics (Data==null there). Otherwise a
-                    // non-null empty Coverage array falsely reports
-                    // HasPixels/IsAntiAliased==true and the space's advance
-                    // is computed as OffsetX+Width+1 (1px) instead of
-                    // UNICODE_SPACE_WIDTH (8px), while the layout/rasterizer
-                    // paths special-case ' ' before consulting the glyph and
-                    // still use 8px — causing a width/render mismatch.
-                    Coverage = (g.Width == 0 || g.Height == 0 || g.Coverage == null || g.Coverage.Length == 0) ? null : g.Coverage
-                };
-            }
-
-            _isAtlasFont[slot] = true;
-            _atlasFontNames[slot] = displayName;
-        }
-
-        /// <summary>
         /// Registers a TTF face into a synthetic unicode slot (20-31). Glyphs are
         /// rasterized on demand by <see cref="LoadChar"/> via <see cref="TtfGlyphSource"/>;
         /// nothing is baked up front. A corrupt/unloadable TTF leaves the slot unusable.

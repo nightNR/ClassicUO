@@ -138,6 +138,19 @@
     </Reference>
   </ItemGroup>
 
+  <!--
+    Live-rasterized TTF faces backing the in-game unicode font picker's
+    synthetic slots 20-31 (see AtlasFontRegistry in Resources/Loader.cs +
+    FontsLoader.RegisterAtlasFont). Always embedded, independent of
+    CustomLoginScene: in-game font rendering doesn't depend on that feature.
+  -->
+  <ItemGroup>
+    <EmbeddedResource Include="..\..\Assets\fonts\Cinzel\static\Cinzel-SemiBold.ttf" LogicalName="Cinzel.ttf" />
+    <EmbeddedResource Include="..\..\Assets\fonts\Cormorant_Garamond\static\CormorantGaramond-SemiBold.ttf" LogicalName="Cormorant.ttf" />
+    <EmbeddedResource Include="..\..\Assets\fonts\Inter\static\Inter_18pt-Regular.ttf" LogicalName="Inter.ttf" />
+    <EmbeddedResource Include="..\..\Assets\fonts\Source_Sans_3\static\SourceSans3-Regular.ttf" LogicalName="SourceSans.ttf" />
+  </ItemGroup>
+
   <PropertyGroup>
     <_IsWindows Condition="'$([System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform($([System.Runtime.InteropServices.OSPlatform]::Windows)))' == 'true'">true</_IsWindows>
     <_IsMacOS Condition="'$([System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform($([System.Runtime.InteropServices.OSPlatform]::OSX)))' == 'true'">true</_IsMacOS>
