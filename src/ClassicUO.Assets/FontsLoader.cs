@@ -418,13 +418,10 @@ namespace ClassicUO.Assets
 
         internal static byte StrengthenCoverage(byte coverage)
         {
-            if (coverage == 0 || coverage == 255 || CoverageGamma == 1.0f)
-            {
-                return coverage;
-            }
-
-            int v = (int)(System.MathF.Pow(coverage / 255f, CoverageGamma) * 255f + 0.5f);
-            return (byte)(v > 255 ? 255 : v);
+            // TEMP diagnostic: force every covered pixel fully opaque (1bpp-like)
+            // to confirm the faint/patchy infill is caused by sub-255 interior
+            // coverage. Revert after testing.
+            return coverage == 0 ? (byte)0 : (byte)255;
         }
 
         internal static bool CoverageIsSet(byte coverage) => coverage >= COVERAGE_EDGE_THRESHOLD;
