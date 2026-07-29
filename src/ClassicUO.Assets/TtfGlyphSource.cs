@@ -36,6 +36,26 @@ namespace ClassicUO.Assets
                 return null;
             }
 
+            // Validate the sfnt header in managed code before handing the buffer to
+            // native stbtt_InitFont. Malformed input can make the native parser read
+            // out of bounds and raise an AccessViolationException, which is a
+            // corrupted-state exception that a normal try/catch cannot intercept and
+            // would otherwise abort the process.
+            if (ttfBytes.Length < 12)
+            {
+                return null;
+            }
+
+            uint sfntVersion = (uint)((ttfBytes[0] << 24) | (ttfBytes[1] << 16) | (ttfBytes[2] << 8) | ttfBytes[3]);
+
+            if (sfntVersion != 0x00010000 // TrueType outlines
+                && sfntVersion != 0x4F54544F // 'OTTO' - CFF/OpenType
+                && sfntVersion != 0x74727565 // 'true'
+                && sfntVersion != 0x74746366) // 'ttcf' - TrueType Collection
+            {
+                return null;
+            }
+
             stbtt_fontinfo info;
             try
             {
