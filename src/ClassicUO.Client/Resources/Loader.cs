@@ -154,6 +154,11 @@ namespace ClassicUO.Resources
                 byte[] ttf = LoadTtf(entry.TtfResource);
                 fonts.RegisterAtlasFont(entry.Slot, entry.DisplayName, ttf, entry.PixelSize);
             }
+
+            // Build-freshness marker: confirms the running client is using the
+            // live-StbTrueType TTF font path (embedded faces, no baked atlases).
+            ClassicUO.Utility.Logging.Log.Trace(
+                $"AtlasFontRegistry: registered {Entries.Length} TTF font slots (live StbTrueType rasterization)");
         }
     }
 }
