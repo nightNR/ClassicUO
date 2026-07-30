@@ -90,5 +90,16 @@ namespace ClassicUO.UnitTests
             fonts.RegisterAtlasFont(21, "bad", new byte[] { 1, 2, 3, 4 }, 22);
             Assert.False(fonts.IsAtlasFont(21));
         }
+
+        [Fact]
+        public void RegisterAtlasFont_Ttf_SpaceMeasuresAsUnicodeSpaceWidth()
+        {
+            FontsLoader fonts = NewFonts();
+            fonts.RegisterAtlasFont(20, "Inter 22", InterTtf(), 22);
+
+            // A space has no drawable pixels, so it must fall back to the
+            // fixed unicode space advance (8px), not a rasterized width.
+            Assert.Equal(8, fonts.GetWidthUnicode(20, " "));
+        }
     }
 }
