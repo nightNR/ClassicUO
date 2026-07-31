@@ -197,11 +197,10 @@ namespace ClassicUO
                     System.IO.Path.Combine(CUOEnviroment.ExecutablePath, "Overrides"));
             }
 
-            // Populate the synthetic TTF-atlas unicode font slots (20-31) right after
-            // FontsLoader.Load() completes and before anything renders text. See
-            // ClassicUO.Resources.AtlasFontRegistry for the single slot<->name<->bytes
-            // mapping shared with the font picker UI.
-            ClassicUO.Resources.AtlasFontRegistry.RegisterAll(FileManager.Fonts);
+            // Attach the dynamic TTF atlas registry; nothing is registered up
+            // front — slots are created on demand when a profile's font choice
+            // is first resolved. Reset()/repopulate happens on profile load.
+            ClassicUO.Resources.AtlasFontRegistry.Attach(FileManager.Fonts);
 
             StaticFilters.Load(FileManager.TileData);
             BuffTable.Load();

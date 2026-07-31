@@ -73,12 +73,16 @@ namespace ClassicUO.Resources
     }
 
     /// <summary>
-    /// Single source of truth for the slot &lt;-&gt; (display name, TTF face, pixel size)
-    /// mapping for the 12 live-rasterized TTF fonts that populate synthetic unicode font
-    /// slots 20-31. Both the font-init registration (<see cref="ClassicUO.UltimaOnline"/>'s
-    /// LoadUOFiles, which calls <see cref="RegisterAll"/> right after
-    /// <c>FileManager.Load(...)</c>) and the font picker UI must read this table rather
-    /// than re-deriving slot numbers/names, so they cannot drift apart.
+    /// Dynamic on-demand registry mapping (faceId, size) combos to unicode
+    /// font slots in the dynamic pool (<see cref="AtlasFontRegistry.DynamicSlotFirst"/>-
+    /// <see cref="AtlasFontRegistry.DynamicSlotLast"/>). Nothing is registered up
+    /// front: <see cref="Attach"/> is called once at boot (right after
+    /// <c>FileManager.Load(...)</c>), and slots are allocated + rasterized lazily
+    /// the first time <see cref="TryResolve"/> is asked for a given combo.
+    /// <see cref="Reset"/> frees every dynamic slot on profile activation. The
+    /// private <see cref="Entry"/>/<see cref="Entries"/> table below is kept only
+    /// as a legacy lookup for <see cref="LegacySlotToFaceSize"/>, mapping the old
+    /// fixed slots 20-40 to their (faceId, size) for profile migration.
     /// </summary>
     public static class AtlasFontRegistry
     {
@@ -153,26 +157,135 @@ namespace ClassicUO.Resources
             return bytes;
         }
 
+        // --- Dynamic on-demand slot pool -----------------------------------
+        //
+        // Slots 20-95 (FontsLoader.MAX_UNICODE_FONTS == 96) are no longer
+        // registered up front. A (faceId, size) combo is only rasterized and
+        // bound to a slot the first time something asks for it via
+        // TryResolve; Reset() releases every dynamic slot (called whenever a
+        // profile is (re)activated) so stale per-profile fonts don't linger
+        // across character/profile switches.
+
+        public const int DynamicSlotFirst = 20;
+        public const int DynamicSlotLast = 95;
+
+        private static ClassicUO.Assets.FontsLoader _fonts;
+        private static readonly Dictionary<(string face, byte size), byte> _map = new();
+        private static byte _next = DynamicSlotFirst;
+
         /// <summary>
-        /// Registers all 12 live TTF slots into <paramref name="fonts"/> in the fixed
-        /// order defined by <see cref="Entries"/>. Call exactly once, after
-        /// <c>FontsLoader.Load()</c> has run and before any gump renders text.
+        /// Stores the loader that dynamic slots will be registered against and
+        /// clears any previously-tracked state. Call once at boot, right after
+        /// <c>FontsLoader.Load()</c> has run.
         /// </summary>
-        public static void RegisterAll(ClassicUO.Assets.FontsLoader fonts)
+        public static void Attach(ClassicUO.Assets.FontsLoader fonts)
         {
-            foreach (Entry entry in Entries)
+            _fonts = fonts;
+            Reset();
+        }
+
+        /// <summary>
+        /// Frees every dynamic slot currently in use and resets the allocation
+        /// cursor back to <see cref="DynamicSlotFirst"/>. Call on profile
+        /// activation so each profile starts from a clean slot pool.
+        /// </summary>
+        public static void Reset()
+        {
+            if (_fonts != null)
             {
-                byte[] ttf = LoadTtf(entry.TtfResource);
-                fonts.RegisterAtlasFont(entry.Slot, entry.DisplayName, ttf, entry.PixelSize);
+                foreach (byte slot in _map.Values)
+                {
+                    _fonts.ResetAtlasFont(slot);
+                }
+            }
+            _map.Clear();
+            _next = DynamicSlotFirst;
+        }
+
+        /// <summary>
+        /// Resolves a (faceId, size) combo to a unicode font slot, allocating
+        /// and registering a new dynamic slot on first use. Returns false for
+        /// an unknown faceId, a corrupt TTF, or an exhausted slot pool.
+        /// </summary>
+        public static bool TryResolve(string faceId, byte size, out byte slot)
+        {
+            slot = 0;
+            if (_fonts == null || string.IsNullOrEmpty(faceId))
+            {
+                return false;
             }
 
-            // Build-freshness marker: the token below is bumped whenever the TTF
-            // render path changes, so the console line proves WHICH build is
-            // running. "solidify+3x-oversample+tint" == 3x oversampling + coverage
-            // solidify (opaque interiors) + draw-time grayscale tint. An older
-            // string means a stale binary is running, not the current code.
-            ClassicUO.Utility.Logging.Log.Trace(
-                $"AtlasFontRegistry: registered {Entries.Length} TTF font slots (live StbTrueType rasterization) [path=RAW+color+weight+border2-aa-dilate]");
+            if (size < 8) size = 8;
+            if (size > 32) size = 32;
+
+            var key = (faceId, size);
+            if (_map.TryGetValue(key, out slot))
+            {
+                return true;
+            }
+
+            byte[] bytes = FontFaceCatalog.GetBytes(faceId);
+            if (bytes == null)
+            {
+                return false;                      // unknown face
+            }
+
+            if (_next > DynamicSlotLast)
+            {
+                Utility.Logging.Log.Warn($"AtlasFontRegistry: dynamic slot pool exhausted; '{faceId}' {size}px falls back to Classic. Restart to reclaim.");
+                return false;                      // pool exhausted
+            }
+
+            byte candidate = _next;
+            _fonts.RegisterAtlasFont(candidate, $"{faceId} {size}", bytes, size);
+            if (!_fonts.IsAtlasFont(candidate))
+            {
+                return false;                      // corrupt TTF; slot left unusable
+            }
+
+            _map[key] = candidate;
+            _next++;
+            slot = candidate;
+            return true;
         }
+
+        /// <summary>
+        /// Maps an old fixed slot (20-40, from the pre-dynamic-registry
+        /// layout) to the (faceId, size) it used to represent, for profile
+        /// migration. Returns null outside that range.
+        /// </summary>
+        public static (string face, byte size)? LegacySlotToFaceSize(byte legacySlot)
+        {
+            foreach (Entry e in Entries)
+            {
+                if (e.Slot == legacySlot)
+                {
+                    // e.DisplayName is like "Inter 18"; map to faceId + size.
+                    int sp = e.DisplayName.LastIndexOf(' ');
+                    string face = LegacyDisplayToFaceId(e.DisplayName.Substring(0, sp));
+                    byte size = byte.Parse(e.DisplayName.Substring(sp + 1));
+                    return (face, size);
+                }
+            }
+            return null;
+        }
+
+        /// <summary>
+        /// Helper for Task 4's profile migration: the faceId string for an old
+        /// fixed legacy slot, or null if the slot isn't in the legacy range.
+        /// </summary>
+        public static string LegacyFaceId(byte legacySlot) => LegacySlotToFaceSize(legacySlot)?.face;
+
+        private static string LegacyDisplayToFaceId(string display) => display switch
+        {
+            "Cinzel" => "cinzel",
+            "Cormorant" => "cormorant",
+            "Inter" => "inter",
+            "SourceSans" => "sourcesans",
+            "CLF-UoClassic" => "clfuoclassic",
+            "IM Fell English" => "imfellenglish",
+            "MedievalSharp" => "medievalsharp",
+            _ => "",
+        };
     }
 }
