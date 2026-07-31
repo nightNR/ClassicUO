@@ -12,11 +12,12 @@ namespace ClassicUO.UnitTests.Configuration
     [Collection("AtlasRegistrySerial")]
     public class FontResolveTests
     {
-        private static void AttachFonts()
+        private static FontsLoader AttachFonts()
         {
             FontsLoader fonts = new UOFileManager(ClientVersion.CV_300, Path.GetTempPath()).Fonts;
             AtlasFontRegistry.Attach(fonts);
             AtlasFontRegistry.Reset();
+            return fonts;
         }
 
         [Fact]
@@ -72,6 +73,34 @@ namespace ClassicUO.UnitTests.Configuration
             Assert.True(back.LocationFonts.TryGetValue(FontLocation.Chat, out FontChoice c));
             Assert.Equal("inter", c.Face);
             Assert.Equal((byte)18, c.Size);
+        }
+
+        [Fact]
+        public void TtfChoice_SurvivesResetCycle_LegacyBytePointsAtLiveSlot()
+        {
+            FontsLoader fonts = AttachFonts();
+            var p = new Profile();
+            p.LocationFonts[FontLocation.Chat] = new FontChoice { Face = "inter", Size = 18 };
+
+            // First "session": resolve once so ChatFont gets persisted as a dynamic
+            // slot, exactly as picking a TTF face in Options would do.
+            p.ChatFont = p.ResolveFont(FontLocation.Chat).slot;
+            Assert.True(fonts.IsAtlasFont(p.ChatFont));
+
+            // Next boot / profile (re)load: ProfileManager.Load calls Reset() on every
+            // load, which frees every dynamic slot. Without a re-sync, the persisted
+            // legacy byte is now stale/dangling — this is the shipped bug, since
+            // renderers (SystemChatControl, MessageManager, JournalManager, Tooltip,
+            // ...) read Profile.ChatFont/TooltipFont directly and never call
+            // ResolveFont themselves.
+            AtlasFontRegistry.Reset();
+            Assert.False(fonts.IsAtlasFont(p.ChatFont)); // stale byte, now dangling
+
+            // The fix: ProfileManager.Load re-syncs the legacy byte from ResolveFont
+            // right after Reset()+migration, which re-registers the slot via
+            // TryResolve so the byte a renderer reads is live again.
+            p.ChatFont = p.ResolveFont(FontLocation.Chat).slot;
+            Assert.True(fonts.IsAtlasFont(p.ChatFont));
         }
     }
 }

@@ -271,12 +271,6 @@ namespace ClassicUO.Resources
             return null;
         }
 
-        /// <summary>
-        /// Helper for Task 4's profile migration: the faceId string for an old
-        /// fixed legacy slot, or null if the slot isn't in the legacy range.
-        /// </summary>
-        public static string LegacyFaceId(byte legacySlot) => LegacySlotToFaceSize(legacySlot)?.face;
-
         private static string LegacyDisplayToFaceId(string display) => display switch
         {
             "Cinzel" => "cinzel",

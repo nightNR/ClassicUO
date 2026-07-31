@@ -55,6 +55,14 @@ namespace ClassicUO.Configuration
             ClassicUO.Resources.AtlasFontRegistry.Reset();
             MigrateLegacyFont(CurrentProfile, FontLocation.Chat, CurrentProfile.ChatFont);
             MigrateLegacyFont(CurrentProfile, FontLocation.Tooltip, CurrentProfile.TooltipFont);
+
+            // Reset() just freed every dynamic slot, so any legacy byte pointing at a
+            // dynamic TTF slot from a previous session is now stale/unregistered.
+            // Re-resolve through LocationFonts (which re-registers the slot via
+            // TryResolve) and re-sync the legacy bytes so renderers that still read
+            // ChatFont/TooltipFont directly see a live slot.
+            CurrentProfile.ChatFont = CurrentProfile.ResolveFont(FontLocation.Chat).slot;
+            CurrentProfile.TooltipFont = CurrentProfile.ResolveFont(FontLocation.Tooltip).slot;
         }
 
         private static void MigrateLegacyFont(Profile p, string location, byte legacySlot)
