@@ -700,40 +700,22 @@ namespace ClassicUO.Game
 
                             if (isTtf)
                             {
-                                if (IsHTML && charColor != 0)
-                                {
-                                    // HTML supplies an explicit RGB color (not a UO hue
-                                    // index), so tint the white mask with it directly.
-                                    batcher.DrawTinted(
-                                        entry.Texture,
-                                        new Rectangle(drawX, drawY, drawW, drawH),
-                                        entry.UV,
-                                        TintOf(charColor),
-                                        alpha,
-                                        depth
-                                    );
-                                }
-                                else
-                                {
-                                    // Color the white TTF mask through the SAME shader hue
-                                    // path the game uses for classic text: the hue is
-                                    // transformed to RGB by the shader and applied to the
-                                    // glyph (SHADER_TEXT_HUE_NO_BLACK keeps the baked black
-                                    // border black, hues only the fill). This makes TTF text
-                                    // color identical to in-game chat/world text instead of
-                                    // the flat GetPolygoneColor tint, which mis-mapped hues.
-                                    ushort colorHue = drawHue > 0
-                                        ? drawHue
-                                        : (Hue != 0xFFFF ? Hue : (ushort)0);
+                                // INCREMENT 1 (color): tint the raw grayscale mask
+                                // by the glyph's hue via TEXT_RGB. drawHue > 0 is
+                                // the highlight override; else the baked charColor
+                                // (0 => white). Border/oversample/solidify still off.
+                                Vector3 tint = drawHue > 0
+                                    ? TintOf(HueToArgb(drawHue))
+                                    : TintOf(charColor);
 
-                                    batcher.Draw(
-                                        entry.Texture,
-                                        new Rectangle(drawX, drawY, drawW, drawH),
-                                        entry.UV,
-                                        GetHueVector(colorHue, alpha),
-                                        depth
-                                    );
-                                }
+                                batcher.DrawTinted(
+                                    entry.Texture,
+                                    new Rectangle(drawX, drawY, drawW, drawH),
+                                    entry.UV,
+                                    tint,
+                                    alpha,
+                                    depth
+                                );
                             }
                             else
                             {
