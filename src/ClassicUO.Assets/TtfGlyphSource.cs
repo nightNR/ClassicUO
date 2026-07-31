@@ -19,17 +19,15 @@ namespace ClassicUO.Assets
         private readonly stbtt_fontinfo _info;
         private readonly float _scale;
         private readonly int _ascentRaw;
-        private readonly int _ascentPx;
 
         public int PixelSize { get; }
 
-        private TtfGlyphSource(byte[] ttf, stbtt_fontinfo info, float scale, int ascentRaw, int ascentPx, int pixelSize)
+        private TtfGlyphSource(byte[] ttf, stbtt_fontinfo info, float scale, int ascentRaw, int pixelSize)
         {
             _ttf = ttf;
             _info = info;
             _scale = scale;
             _ascentRaw = ascentRaw;
-            _ascentPx = ascentPx;
             PixelSize = pixelSize;
         }
 
@@ -83,9 +81,7 @@ namespace ClassicUO.Assets
                 stbtt_GetFontVMetrics(info, &ascentRaw, &descentRaw, &lineGapRaw);
             }
 
-            int ascentPx = (int)MathF.Round(ascentRaw * scale);
-
-            return new TtfGlyphSource(ttfBytes, info, scale, ascentRaw, ascentPx, pixelSize);
+            return new TtfGlyphSource(ttfBytes, info, scale, ascentRaw, pixelSize);
         }
 
         public unsafe bool TryRasterize(
@@ -125,11 +121,6 @@ namespace ClassicUO.Assets
             stbtt_FreeBitmap(bitmap, null);
 
             byte[] cov = Downsample(over, w, h, Oversample, out int dstW, out int dstH);
-
-            if (dstW <= 0 || dstH <= 0)
-            {
-                return false;
-            }
 
             int ascentPxN = (int)MathF.Round(_ascentRaw * scaleN);
 

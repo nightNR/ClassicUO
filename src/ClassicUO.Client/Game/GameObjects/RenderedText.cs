@@ -468,6 +468,14 @@ namespace ClassicUO.Game
             return hueVector;
         }
 
+        // Baked ARGB for a UO hue index, matching the color the classic path
+        // bakes into a glyph: GetPolygoneColor(Cell, hue) is 0x00BBGGRR, then
+        // (<<8)|0xFF + RgbaToArgb yields 0xFFBBGGRR.
+        private uint HueToArgb(ushort hue) =>
+            HuesHelper.RgbaToArgb(
+                (Client.Game.UO.FileManager.Hues.GetPolygoneColor(Cell, hue) << 8) | 0xFF
+            );
+
         // ── Atlas-based per-glyph drawing ──
 
         private bool DrawGlyphs(
@@ -519,9 +527,7 @@ namespace ClassicUO.Game
             {
                 if (Hue != 0xFFFF)
                 {
-                    baseColor = HuesHelper.RgbaToArgb(
-                        (Client.Game.UO.FileManager.Hues.GetPolygoneColor(Cell, Hue) << 8) | 0xFF
-                    );
+                    baseColor = HueToArgb(Hue);
                 }
             }
             else if (!IsHTML)
@@ -685,8 +691,7 @@ namespace ClassicUO.Game
                             if (isTtf)
                             {
                                 Vector3 tint = drawHue > 0
-                                    ? TintOf(HuesHelper.RgbaToArgb(
-                                        (Client.Game.UO.FileManager.Hues.GetPolygoneColor(Cell, drawHue) << 8) | 0xFF))
+                                    ? TintOf(HueToArgb(drawHue))
                                     : TintOf(charColor);
 
                                 batcher.DrawTinted(

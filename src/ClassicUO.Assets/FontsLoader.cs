@@ -438,15 +438,6 @@ namespace ClassicUO.Assets
             return BlendChannel(0) | BlendChannel(8) | BlendChannel(16) | BlendChannel(24);
         }
 
-        // Perceptual boost for anti-aliased coverage. TTF atlas glyphs baked at
-        // small pixel sizes (14-22) have thin, heavily-antialiased strokes whose
-        // partial coverage makes text look faint beside the hard-edged classic
-        // 1bpp fonts. Lifting mid-coverage with a sub-1 gamma thickens/darkens the
-        // strokes while keeping the smooth edge intact (no thresholding, so no
-        // jaggies). 1.0f disables it; lower = bolder. Endpoints (0 and 255) are
-        // preserved so fully-transparent and fully-covered pixels never shift.
-        internal const float CoverageGamma = 0.70f;
-
         internal static bool CoverageIsSet(byte coverage) => coverage >= COVERAGE_EDGE_THRESHOLD;
 
         public int GetWidthASCII(byte font, string str)
