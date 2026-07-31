@@ -558,8 +558,21 @@ namespace ClassicUO.Game
             MultilinesFontInfo ptr = _info;
             int textWidth = Width;
 
-            // BASELINE: TTF hue tint removed (raw white mask). The TintOf helper
-            // returns with the color increment (baked ARGB 0xAABBGGRR -> rgb tint).
+            // INCREMENT 1 (color): convert a baked ARGB color (the same value the
+            // classic path bakes into the glyph) to a normalized rgb tint applied
+            // to the grayscale mask at draw time. 0 => white (untinted).
+            static Vector3 TintOf(uint argb)
+            {
+                if (argb == 0)
+                {
+                    return new Vector3(1f, 1f, 1f);
+                }
+                // baked color is 0xAABBGGRR via RgbaToArgb; low byte = R.
+                float r = (argb & 0xFF) / 255f;
+                float g = ((argb >> 8) & 0xFF) / 255f;
+                float b = ((argb >> 16) & 0xFF) / 255f;
+                return new Vector3(r, g, b);
+            }
 
             while (ptr != null)
             {
@@ -686,14 +699,19 @@ namespace ClassicUO.Game
 
                             if (isTtf)
                             {
-                                // BASELINE: draw the raw grayscale coverage mask
-                                // as-is (white tint = no hue). Color comes back
-                                // as a later increment.
+                                // INCREMENT 1 (color): tint the raw grayscale mask
+                                // by the glyph's hue via TEXT_RGB. drawHue > 0 is
+                                // the highlight override; else the baked charColor
+                                // (0 => white). Border/oversample/solidify still off.
+                                Vector3 tint = drawHue > 0
+                                    ? TintOf(HueToArgb(drawHue))
+                                    : TintOf(charColor);
+
                                 batcher.DrawTinted(
                                     entry.Texture,
                                     new Rectangle(drawX, drawY, drawW, drawH),
                                     entry.UV,
-                                    new Vector3(1f, 1f, 1f),
+                                    tint,
                                     alpha,
                                     depth
                                 );
