@@ -31,7 +31,9 @@ namespace ClassicUO.Assets
         private const byte NOPRINT_CHARS = 32;
         private const float ITALIC_FONT_KOEFFICIENT = 3.3f;
 
-        public const int MAX_UNICODE_FONTS = 32;
+        // 0-19 classic unicode fonts; 20+ live-rasterized TTF atlas slots.
+        // Must exceed the highest atlas slot in AtlasFontRegistry.Entries (now 40).
+        public const int MAX_UNICODE_FONTS = 41;
 
         public struct Margin
         {

@@ -100,7 +100,9 @@ namespace ClassicUO.Resources
 
         /// <summary>
         /// Fixed slot order: 20-22 Cinzel, 23-25 Cormorant, 26-28 Inter, 29-31 SourceSans,
-        /// each family ascending 14/18/22.
+        /// 32-34 CLF-UoClassic, 35-37 IM Fell English, 38-40 MedievalSharp,
+        /// each family ascending 14/18/22. Slot count must stay below
+        /// FontsLoader.MAX_UNICODE_FONTS.
         /// </summary>
         public static readonly Entry[] Entries =
         {
@@ -116,6 +118,15 @@ namespace ClassicUO.Resources
             new Entry(29, "SourceSans 14", "SourceSans.ttf", 14),
             new Entry(30, "SourceSans 18", "SourceSans.ttf", 18),
             new Entry(31, "SourceSans 22", "SourceSans.ttf", 22),
+            new Entry(32, "CLF-UoClassic 14", "CLFUoClassic.ttf", 14),
+            new Entry(33, "CLF-UoClassic 18", "CLFUoClassic.ttf", 18),
+            new Entry(34, "CLF-UoClassic 22", "CLFUoClassic.ttf", 22),
+            new Entry(35, "IM Fell English 14", "IMFellEnglish.ttf", 14),
+            new Entry(36, "IM Fell English 18", "IMFellEnglish.ttf", 18),
+            new Entry(37, "IM Fell English 22", "IMFellEnglish.ttf", 22),
+            new Entry(38, "MedievalSharp 14", "MedievalSharp.ttf", 14),
+            new Entry(39, "MedievalSharp 18", "MedievalSharp.ttf", 18),
+            new Entry(40, "MedievalSharp 22", "MedievalSharp.ttf", 22),
         };
 
         private static readonly Dictionary<string, byte[]> _ttfCache = new Dictionary<string, byte[]>();
