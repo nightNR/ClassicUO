@@ -69,6 +69,24 @@ namespace ClassicUO.UnitTests
             Assert.Equal(255, FontsLoader.StrengthenCoverage(150));
         }
 
+        [Fact]
+        public void WeightCoverage_PreservesEndpoints()
+        {
+            Assert.Equal(0, FontsLoader.WeightCoverage(0));
+            Assert.Equal(255, FontsLoader.WeightCoverage(255));
+        }
+
+        [Fact]
+        public void WeightCoverage_LiftsMidtonesWithoutSaturating()
+        {
+            // sub-1 gamma thickens partial coverage (>= input) but, unlike the
+            // hard solidify, never forces an interior value to fully opaque.
+            byte mid = FontsLoader.WeightCoverage(128);
+            Assert.True(mid >= 128);
+            Assert.True(mid < 255);
+            Assert.True(FontsLoader.WeightCoverage(64) >= 64);
+        }
+
         [Theory]
         [InlineData(0, false)]
         [InlineData(127, false)]

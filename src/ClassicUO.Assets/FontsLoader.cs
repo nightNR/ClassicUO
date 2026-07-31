@@ -489,6 +489,36 @@ namespace ClassicUO.Assets
             return (byte)v;
         }
 
+        // INCREMENT (weight): gentle stem-darkening for the raw TTF coverage.
+        // A sub-1 gamma lifts partial coverage so thin strokes read heavier/bolder
+        // WITHOUT a hard threshold (unlike StrengthenCoverage), so edges stay fully
+        // anti-aliased and no interior is punched to a hard 255 — no artifacts,
+        // just a bit more weight. Endpoints (0, 255) preserved. TUNE HERE:
+        // 1.0f = off (raw), 0.85f ~ subtle, 0.70f = clearly bolder. Lower = heavier.
+        internal const float CoverageWeightGamma = 0.80f;
+
+        internal static byte WeightCoverage(byte coverage)
+        {
+            if (coverage == 0 || coverage == 255)
+            {
+                return coverage;
+            }
+
+            float t = coverage / 255f;
+            int v = (int)(System.MathF.Pow(t, CoverageWeightGamma) * 255f + 0.5f);
+
+            if (v < 1)
+            {
+                v = 1;
+            }
+            else if (v > 255)
+            {
+                v = 255;
+            }
+
+            return (byte)v;
+        }
+
         internal static bool CoverageIsSet(byte coverage) => coverage >= COVERAGE_EDGE_THRESHOLD;
 
         public int GetWidthASCII(byte font, string str)
@@ -2166,8 +2196,9 @@ namespace ClassicUO.Assets
                                             continue;
                                         }
 
-                                        // BASELINE: solidify disabled — raw coverage.
-                                        // cov = StrengthenCoverage(cov);
+                                        // WEIGHT: gentle stem-darken (gamma), no
+                                        // hard solidify. See CoverageWeightGamma.
+                                        cov = WeightCoverage(cov);
 
                                         int block = testY * width + nowX;
                                         pData[block] = BlendCoverage(pData[block], charcolor, cov);
@@ -4139,8 +4170,9 @@ namespace ClassicUO.Assets
                             continue;
                         }
 
-                        // BASELINE: solidify disabled — raw coverage.
-                        // cov = StrengthenCoverage(cov);
+                        // WEIGHT: gentle stem-darken (gamma), no hard solidify.
+                        // See CoverageWeightGamma.
+                        cov = WeightCoverage(cov);
 
                         int block = (y + pad) * bufW + (x + italicOffset + solidShift + pad);
                         pData[block] = BlendCoverage(pData[block], charcolor, cov);
