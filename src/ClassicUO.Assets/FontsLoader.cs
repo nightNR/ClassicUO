@@ -31,9 +31,8 @@ namespace ClassicUO.Assets
         private const byte NOPRINT_CHARS = 32;
         private const float ITALIC_FONT_KOEFFICIENT = 3.3f;
 
-        // 0-19 classic unicode fonts; 20+ live-rasterized TTF atlas slots.
-        // Must exceed the highest atlas slot in AtlasFontRegistry.Entries (now 40).
-        public const int MAX_UNICODE_FONTS = 41;
+        // 0-12 classic unicode/rune fonts; 13-19 reserved; 20-95 dynamic TTF atlas slots.
+        public const int MAX_UNICODE_FONTS = 96;
 
         public struct Margin
         {
@@ -75,7 +74,7 @@ namespace ClassicUO.Assets
         private HtmlStatus _htmlStatus;
 
         private FontCharacterData[,] _fontDataASCII;
-        private FontCharacterDataUnicode[,] _fontDataUNICODE;
+        private FontCharacterDataUnicode[][] _fontDataUNICODE;
         private readonly UOFile[] _unicodeFontAddress = new UOFile[MAX_UNICODE_FONTS];
         private readonly bool[] _isAtlasFont = new bool[MAX_UNICODE_FONTS];
         private readonly string[] _atlasFontNames = new string[MAX_UNICODE_FONTS];
@@ -215,10 +214,16 @@ namespace ClassicUO.Assets
                 _unicodeFontSize[1] = _unicodeFontSize[0];
             }
 
-            _fontDataUNICODE = new FontCharacterDataUnicode[_unicodeFontAddress.Length, 0x10000];
+            _fontDataUNICODE ??= new FontCharacterDataUnicode[_unicodeFontAddress.Length][];
         }
 
         private static FontCharacterDataUnicode _nullChar = new FontCharacterDataUnicode();
+
+        private FontCharacterDataUnicode[] EnsureUniRow(byte font)
+        {
+            _fontDataUNICODE ??= new FontCharacterDataUnicode[_unicodeFontAddress.Length][];
+            return _fontDataUNICODE[font] ??= new FontCharacterDataUnicode[0x10000];
+        }
 
         private ref FontCharacterDataUnicode GetCharUni(byte font, char c)
         {
@@ -229,7 +234,7 @@ namespace ClassicUO.Assets
                 return ref _nullChar;
             }
 
-            ref var cc = ref _fontDataUNICODE[font, index];
+            ref var cc = ref EnsureUniRow(font)[index];
 
             if (!cc.HasPixels)
             {
@@ -268,7 +273,7 @@ namespace ClassicUO.Assets
 
             file.Seek(lookup, SeekOrigin.Begin);
 
-            ref var cc = ref _fontDataUNICODE[font, index];
+            ref var cc = ref EnsureUniRow(font)[index];
 
             cc.OffsetX = file.ReadInt8();
             cc.OffsetY = file.ReadInt8();
@@ -328,7 +333,8 @@ namespace ClassicUO.Assets
             if (source.TryRasterize((char)index, out sbyte offX, out sbyte offY,
                     out sbyte w, out sbyte h, out byte[] coverage))
             {
-                _fontDataUNICODE[font, index] = new FontCharacterDataUnicode
+                FontCharacterDataUnicode[] row = EnsureUniRow((byte)font);
+                row[index] = new FontCharacterDataUnicode
                 {
                     OffsetX = offX,
                     OffsetY = offY,
@@ -340,7 +346,7 @@ namespace ClassicUO.Assets
 
                 // A rasterized-but-empty glyph (shouldn't happen: TryRasterize
                 // returns false for those) is treated as missing to avoid retries.
-                if (_fontDataUNICODE[font, index].Coverage == null)
+                if (row[index].Coverage == null)
                 {
                     missing?.Add(index);
                 }
@@ -378,12 +384,34 @@ namespace ClassicUO.Assets
                 return;
             }
 
-            _fontDataUNICODE ??= new FontCharacterDataUnicode[_unicodeFontAddress.Length, 0x10000];
+            _fontDataUNICODE ??= new FontCharacterDataUnicode[_unicodeFontAddress.Length][];
 
             _atlasGlyphSources[slot] = source;
             _atlasMissing[slot] = new System.Collections.Generic.HashSet<int>();
             _isAtlasFont[slot] = true;
             _atlasFontNames[slot] = displayName;
+        }
+
+        /// <summary>
+        /// Frees a dynamic atlas slot: clears its TTF source/name/missing set and
+        /// drops its glyph row so the slot can be reused and its memory reclaimed.
+        /// Classic (non-atlas) slots are left untouched.
+        /// </summary>
+        public void ResetAtlasFont(int slot)
+        {
+            if (slot < 0 || slot >= MAX_UNICODE_FONTS || !_isAtlasFont[slot])
+            {
+                return;
+            }
+
+            _isAtlasFont[slot] = false;
+            _atlasGlyphSources[slot] = null;
+            _atlasFontNames[slot] = null;
+            _atlasMissing[slot] = null;
+            if (_fontDataUNICODE != null)
+            {
+                _fontDataUNICODE[slot] = null;
+            }
         }
 
         public bool IsAtlasFont(int slot)
