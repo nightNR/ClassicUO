@@ -7,9 +7,10 @@ namespace ClassicUO.Game.UI.Controls
     {
         private readonly Combobox _face;
         private readonly Combobox _size;
+        private readonly ClickableColorBox _color;
         private readonly string[] _faceIds;   // index 0 = "" (Classic)
 
-        public FontLocationRow(int x, int y, FontChoice current)
+        public FontLocationRow(World world, int x, int y, FontChoice current)
         {
             X = x;
             Y = y;
@@ -35,13 +36,21 @@ namespace ClassicUO.Game.UI.Controls
 
             _face.OnOptionSelected += (_, i) => _size.IsVisible = i != 0;
 
-            Width = 210;
+            // Per-location color override; Hue 0 = no override (use the call
+            // site's original hue). Click opens the same ColorPickerGump the
+            // speech-hue boxes use.
+            _color = new ClickableColorBox(world, 220, 2, 13, 14, current.Hue);
+            Add(_color);
+
+            Width = 260;
             Height = 25;
         }
 
         public FontChoice GetChoice()
         {
-            return FontLocationRowLogic.BuildChoice(_face.SelectedIndex, _size.SelectedIndex, _faceIds);
+            FontChoice c = FontLocationRowLogic.BuildChoice(_face.SelectedIndex, _size.SelectedIndex, _faceIds);
+            c.Hue = _color.Hue;
+            return c;
         }
 
         // Resets the row to the "Classic" default (used by the Options "restore
@@ -50,6 +59,7 @@ namespace ClassicUO.Game.UI.Controls
         public void SelectClassic()
         {
             _face.SelectedIndex = 0;
+            _color.Hue = 0;
         }
     }
 }

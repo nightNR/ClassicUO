@@ -4,10 +4,12 @@ using System.Collections.Generic;
 namespace ClassicUO.Configuration
 {
     // Face null/empty => Classic (use the location's classic fallback).
+    // Hue == 0 => no color override (use the call site's original hue).
     public struct FontChoice
     {
         public string Face { get; set; }
         public byte Size { get; set; }
+        public ushort Hue { get; set; }
     }
 
     public static class FontLocation

@@ -20,7 +20,7 @@ namespace ClassicUO.UnitTests.UI
             "by manual verification in Options > Fonts / Options > Tooltip.")]
         public void GetChoice_DefaultClassic_EmptyFace()
         {
-            var row = new FontLocationRow(0, 0, new FontChoice { Face = "", Size = 0 });
+            var row = new FontLocationRow(null, 0, 0, new FontChoice { Face = "", Size = 0 });
             FontChoice c = row.GetChoice();
             Assert.True(string.IsNullOrEmpty(c.Face));
         }
@@ -30,7 +30,7 @@ namespace ClassicUO.UnitTests.UI
             "above (see that test's Skip reason). Covered by FontLocationRowLogicTests.")]
         public void GetChoice_RoundTripsTtfChoice()
         {
-            var row = new FontLocationRow(0, 0, new FontChoice { Face = "inter", Size = 18 });
+            var row = new FontLocationRow(null, 0, 0, new FontChoice { Face = "inter", Size = 18 });
             FontChoice c = row.GetChoice();
             Assert.Equal("inter", c.Face);
             Assert.Equal((byte)18, c.Size);

@@ -56,6 +56,25 @@ namespace ClassicUO.UnitTests.Configuration
         }
 
         [Fact]
+        public void ResolveHue_NoOverride_ReturnsFallback()
+        {
+            var p = new Profile();
+            // No entry / Hue==0 => the caller's own hue (zero change).
+            Assert.Equal((ushort)0x0386, p.ResolveHue(FontLocation.GumpLabels, 0x0386));
+            p.LocationFonts[FontLocation.GumpLabels] = new FontChoice { Face = "inter", Size = 18, Hue = 0 };
+            Assert.Equal((ushort)0x0386, p.ResolveHue(FontLocation.GumpLabels, 0x0386));
+        }
+
+        [Fact]
+        public void ResolveHue_Override_ReturnsChosenHue()
+        {
+            var p = new Profile();
+            p.LocationFonts[FontLocation.GumpLabels] = new FontChoice { Face = "", Size = 0, Hue = 0x0044 };
+            // A non-zero picked hue overrides the caller's fallback for both Classic and TTF.
+            Assert.Equal((ushort)0x0044, p.ResolveHue(FontLocation.GumpLabels, 0x0386));
+        }
+
+        [Fact]
         public void ResolveFont_PerSiteFallback_ReturnsCallerClassicWhenNoChoice()
         {
             AttachFonts();

@@ -49,6 +49,9 @@ namespace ClassicUO.Game.UI.Gumps
             // pre-pass, which is how every other in-game TTF text (chat, tooltip, journal
             // entries) renders. Match that for TTF; keep the classic ASCII look border-free.
             FontStyle journalCtrlStyle = fontUni ? FontStyle.BlackBorder : 0;
+            // Per-location color override (0 = keep each label's original hue).
+            ushort journalFilterHue = ProfileManager.CurrentProfile.ResolveHue(FontLocation.JournalControls, 0x0386);
+            ushort journalDarkHue = ProfileManager.CurrentProfile.ResolveHue(FontLocation.JournalControls, 0x0288);
 
             string str = ResGumps.DarkMode;
             int width = fontUni
@@ -65,7 +68,7 @@ namespace ClassicUO.Game.UI.Gumps
                     0x00D3,
                     str,
                     font,
-                    0x0288,
+                    journalDarkHue,
                     fontUni,
                     style: journalCtrlStyle
                 )
@@ -113,7 +116,7 @@ namespace ClassicUO.Game.UI.Gumps
                 0x00D3,
                 "System",
                 font,
-                0x0386,
+                journalFilterHue,
                 fontUni,
                 style: journalCtrlStyle
             )
@@ -129,7 +132,7 @@ namespace ClassicUO.Game.UI.Gumps
                 0x00D3,
                 "Objects",
                 font,
-                0x0386,
+                journalFilterHue,
                 fontUni,
                 style: journalCtrlStyle
             )
@@ -145,7 +148,7 @@ namespace ClassicUO.Game.UI.Gumps
                 0x00D3,
                 "Client",
                 font,
-                0x0386,
+                journalFilterHue,
                 fontUni,
                 style: journalCtrlStyle
             )
@@ -161,7 +164,7 @@ namespace ClassicUO.Game.UI.Gumps
                 0x00D3,
                 "Guild",
                 font,
-                0x0386,
+                journalFilterHue,
                 fontUni,
                 style: journalCtrlStyle
             )

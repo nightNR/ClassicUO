@@ -2280,7 +2280,7 @@ namespace ClassicUO.Game.UI.Gumps
             startY += text.Height + 2;
             startX += 40;
 
-            _tooltipFontRow = new FontLocationRow(startX, startY,
+            _tooltipFontRow = new FontLocationRow(World, startX, startY,
                 _currentProfile.LocationFonts != null
                 && _currentProfile.LocationFonts.TryGetValue(FontLocation.Tooltip, out FontChoice tooltipChoice)
                     ? tooltipChoice : new FontChoice { Face = "" });
@@ -2348,7 +2348,7 @@ namespace ClassicUO.Game.UI.Gumps
             startX += 40;
             startY += text.Height + 2;
 
-            _chatFontRow = new FontLocationRow(startX, startY,
+            _chatFontRow = new FontLocationRow(World, startX, startY,
                 _currentProfile.LocationFonts != null
                 && _currentProfile.LocationFonts.TryGetValue(FontLocation.Chat, out FontChoice chatChoice)
                     ? chatChoice : new FontChoice { Face = "" });
@@ -2362,7 +2362,7 @@ namespace ClassicUO.Game.UI.Gumps
             startX += 40;
             startY += journalCtrlText.Height + 2;
 
-            _journalControlsFontRow = new FontLocationRow(startX, startY,
+            _journalControlsFontRow = new FontLocationRow(World, startX, startY,
                 _currentProfile.LocationFonts != null
                 && _currentProfile.LocationFonts.TryGetValue(FontLocation.JournalControls, out FontChoice journalCtrlChoice)
                     ? journalCtrlChoice : new FontChoice { Face = "" });
@@ -2376,7 +2376,7 @@ namespace ClassicUO.Game.UI.Gumps
             startX += 40;
             startY += statusBarsText.Height + 2;
 
-            _statusBarsFontRow = new FontLocationRow(startX, startY,
+            _statusBarsFontRow = new FontLocationRow(World, startX, startY,
                 _currentProfile.LocationFonts != null
                 && _currentProfile.LocationFonts.TryGetValue(FontLocation.StatusBars, out FontChoice statusBarsChoice)
                     ? statusBarsChoice : new FontChoice { Face = "" });
@@ -2390,7 +2390,7 @@ namespace ClassicUO.Game.UI.Gumps
             startX += 40;
             startY += gumpLabelsText.Height + 2;
 
-            _gumpLabelsFontRow = new FontLocationRow(startX, startY,
+            _gumpLabelsFontRow = new FontLocationRow(World, startX, startY,
                 _currentProfile.LocationFonts != null
                 && _currentProfile.LocationFonts.TryGetValue(FontLocation.GumpLabels, out FontChoice gumpLabelsChoice)
                     ? gumpLabelsChoice : new FontChoice { Face = "" });

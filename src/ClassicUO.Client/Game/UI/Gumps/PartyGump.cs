@@ -41,6 +41,8 @@ namespace ClassicUO.Game.UI.Gumps
             // Classic is a zero visual change; a TTF choice overrides them all.
             (byte lbl1, bool uni1) = ProfileManager.CurrentProfile.ResolveFont(FontLocation.GumpLabels, 1, false);
             (byte lbl2, bool uni2) = ProfileManager.CurrentProfile.ResolveFont(FontLocation.GumpLabels, 2, false);
+            // Per-location color override (0 = keep the labels' original hue).
+            ushort partyLabelHue = ProfileManager.CurrentProfile.ResolveHue(FontLocation.GumpLabels, 0x0386);
 
             Add
             (
@@ -53,7 +55,7 @@ namespace ClassicUO.Game.UI.Gumps
 
             Add
             (
-                new Label(ResGumps.Tell, uni1, 0x0386, font: lbl1)
+                new Label(ResGumps.Tell, uni1, partyLabelHue, font: lbl1)
                 {
                     X = 40,
                     Y = 30
@@ -62,7 +64,7 @@ namespace ClassicUO.Game.UI.Gumps
 
             Add
             (
-                new Label(ResGumps.Kick, uni1, 0x0386, font: lbl1)
+                new Label(ResGumps.Kick, uni1, partyLabelHue, font: lbl1)
                 {
                     X = 80,
                     Y = 30
@@ -71,7 +73,7 @@ namespace ClassicUO.Game.UI.Gumps
 
             Add
             (
-                new Label(ResGumps.PartyManifest, uni2, 0x0386, font: lbl2)
+                new Label(ResGumps.PartyManifest, uni2, partyLabelHue, font: lbl2)
                 {
                     X = 153,
                     Y = 20
@@ -149,7 +151,7 @@ namespace ClassicUO.Game.UI.Gumps
 
             Add
             (
-                new Label(ResGumps.SendThePartyAMessage, uni2, 0x0386, font: lbl2)
+                new Label(ResGumps.SendThePartyAMessage, uni2, partyLabelHue, font: lbl2)
                 {
                     X = 110,
                     Y = 307
@@ -170,7 +172,7 @@ namespace ClassicUO.Game.UI.Gumps
 
                 Add
                 (
-                    new Label(ResGumps.PartyCanLootMe, uni2, 0x0386, font: lbl2)
+                    new Label(ResGumps.PartyCanLootMe, uni2, partyLabelHue, font: lbl2)
                     {
                         X = 110,
                         Y = 334
@@ -191,7 +193,7 @@ namespace ClassicUO.Game.UI.Gumps
 
                 Add
                 (
-                    new Label(ResGumps.PartyCannotLootMe, uni2, 0x0386, font: lbl2)
+                    new Label(ResGumps.PartyCannotLootMe, uni2, partyLabelHue, font: lbl2)
                     {
                         X = 110,
                         Y = 334
@@ -214,7 +216,7 @@ namespace ClassicUO.Game.UI.Gumps
             {
                 Add
                 (
-                    new Label(ResGumps.LeaveTheParty, uni2, 0x0386, font: lbl2)
+                    new Label(ResGumps.LeaveTheParty, uni2, partyLabelHue, font: lbl2)
                     {
                         X = 110,
                         Y = 360
@@ -225,7 +227,7 @@ namespace ClassicUO.Game.UI.Gumps
             {
                 Add
                 (
-                    new Label(ResGumps.DisbandTheParty, uni2, 0x0386, font: lbl2)
+                    new Label(ResGumps.DisbandTheParty, uni2, partyLabelHue, font: lbl2)
                     {
                         X = 110,
                         Y = 360
@@ -247,7 +249,7 @@ namespace ClassicUO.Game.UI.Gumps
 
                 Add
                 (
-                    new Label(ResGumps.AddNewMember, uni2, 0x0386, font: lbl2)
+                    new Label(ResGumps.AddNewMember, uni2, partyLabelHue, font: lbl2)
                     {
                         X = 110,
                         Y = 385

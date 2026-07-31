@@ -1382,7 +1382,8 @@ namespace ClassicUO.Game.UI.Gumps
         private Label CreateStatLabel()
         {
             (byte sf, bool su) = ProfileManager.CurrentProfile.ResolveFont(FontLocation.StatusBars, 1, true);
-            return new Label(string.Empty, su, _nameHue, font: sf, style: FontStyle.BlackBorder)
+            ushort sh = ProfileManager.CurrentProfile.ResolveHue(FontLocation.StatusBars, _nameHue);
+            return new Label(string.Empty, su, sh, font: sf, style: FontStyle.BlackBorder)
             {
                 AcceptMouseInput = false,
                 CanMove = true

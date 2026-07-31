@@ -108,6 +108,23 @@ namespace ClassicUO.Configuration
             return (classicFont, classicUnicode);
         }
 
+        /// <summary>
+        /// Resolve a UI location's text hue. Returns the user's per-location color
+        /// override when set (FontChoice.Hue != 0), otherwise the caller's own
+        /// original hue — so an unset picker is a zero visual change.
+        /// </summary>
+        public ushort ResolveHue(string locationId, ushort fallbackHue)
+        {
+            if (LocationFonts != null
+                && LocationFonts.TryGetValue(locationId, out FontChoice choice)
+                && choice.Hue != 0)
+            {
+                return choice.Hue;
+            }
+
+            return fallbackHue;
+        }
+
         public int SpeechDelay { get; set; } = 100;
         public bool ScaleSpeechDelay { get; set; } = true;
         public bool SaveJournalToFile { get; set; } = true;
