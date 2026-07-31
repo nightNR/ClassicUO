@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: BSD-2-Clause
 using System.IO;
+using System.Text.Json;
 using ClassicUO.Assets;
 using ClassicUO.Configuration;
 using ClassicUO.Resources;
@@ -51,6 +52,26 @@ namespace ClassicUO.UnitTests.Configuration
             (byte slot, bool uni) = p.ResolveFont(FontLocation.Tooltip);
             Assert.Equal((byte)1, slot);   // tooltip classic font
             Assert.True(uni);
+        }
+
+        [Fact]
+        public void Profile_LocationFonts_SurvivesSourceGenRoundTrip()
+        {
+            var p = new Profile();
+            p.LocationFonts[FontLocation.Chat] = new FontChoice { Face = "inter", Size = 18 };
+
+            // Exercise the source-gen JsonTypeInfo<Profile> directly (not a bare
+            // JsonSerializer.Serialize(obj) call) so this fails if either
+            // [JsonSerializable(typeof(FontChoice))] or
+            // [JsonSerializable(typeof(Dictionary<string, FontChoice>))] is ever removed
+            // from ProfileJsonContext.
+            ProfileJsonContext ctx = ProfileJsonContext.DefaultToUse;
+            string json = JsonSerializer.Serialize(p, ctx.Profile);
+            Profile back = (Profile)JsonSerializer.Deserialize(json, ctx.Profile);
+
+            Assert.True(back.LocationFonts.TryGetValue(FontLocation.Chat, out FontChoice c));
+            Assert.Equal("inter", c.Face);
+            Assert.Equal((byte)18, c.Size);
         }
     }
 }
