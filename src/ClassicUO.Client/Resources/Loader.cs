@@ -155,10 +155,13 @@ namespace ClassicUO.Resources
                 fonts.RegisterAtlasFont(entry.Slot, entry.DisplayName, ttf, entry.PixelSize);
             }
 
-            // Build-freshness marker: confirms the running client is using the
-            // live-StbTrueType TTF font path (embedded faces, no baked atlases).
+            // Build-freshness marker: the token below is bumped whenever the TTF
+            // render path changes, so the console line proves WHICH build is
+            // running. "solidify+3x-oversample+tint" == 3x oversampling + coverage
+            // solidify (opaque interiors) + draw-time grayscale tint. An older
+            // string means a stale binary is running, not the current code.
             ClassicUO.Utility.Logging.Log.Trace(
-                $"AtlasFontRegistry: registered {Entries.Length} TTF font slots (live StbTrueType rasterization)");
+                $"AtlasFontRegistry: registered {Entries.Length} TTF font slots (live StbTrueType rasterization) [path=solidify+3x-oversample+tint]");
         }
     }
 }
