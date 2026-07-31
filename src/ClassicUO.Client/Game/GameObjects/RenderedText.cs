@@ -552,6 +552,21 @@ namespace ClassicUO.Game
             MultilinesFontInfo ptr = _info;
             int textWidth = Width;
 
+            // Convert a baked ARGB color (the same value the classic path bakes
+            // into the glyph) to a normalized rgb tint. 0 => white (untinted).
+            static Vector3 TintOf(uint argb)
+            {
+                if (argb == 0)
+                {
+                    return new Vector3(1f, 1f, 1f);
+                }
+                // baked color is 0xAABBGGRR via RgbaToArgb; low byte = R.
+                float r = (argb & 0xFF) / 255f;
+                float g = ((argb >> 8) & 0xFF) / 255f;
+                float b = ((argb >> 16) & 0xFF) / 255f;
+                return new Vector3(r, g, b);
+            }
+
             while (ptr != null)
             {
                 int w = 0;
@@ -629,8 +644,10 @@ namespace ClassicUO.Game
                     }
 
                     // Get glyph from atlas
+                    bool isTtf = Client.Game.UO.FileManager.Fonts.IsAtlasFont(charFont);
+
                     GlyphAtlasEntry entry;
-                    if (charColor != 0)
+                    if (charColor != 0 && !isTtf)
                     {
                         entry = atlas.GetColoredEntry(
                             charFont, si, IsUnicode, charBorder, charSolid, charItalic, charColor
@@ -665,13 +682,32 @@ namespace ClassicUO.Game
                             int drawW = (int)(entry.GlyphWidth * scale);
                             int drawH = (int)(entry.GlyphHeight * scale);
 
-                            batcher.Draw(
-                                entry.Texture,
-                                new Rectangle(drawX, drawY, drawW, drawH),
-                                entry.UV,
-                                charHueVector,
-                                depth
-                            );
+                            if (isTtf)
+                            {
+                                Vector3 tint = drawHue > 0
+                                    ? TintOf(HuesHelper.RgbaToArgb(
+                                        (Client.Game.UO.FileManager.Hues.GetPolygoneColor(Cell, drawHue) << 8) | 0xFF))
+                                    : TintOf(charColor);
+
+                                batcher.DrawTinted(
+                                    entry.Texture,
+                                    new Rectangle(drawX, drawY, drawW, drawH),
+                                    entry.UV,
+                                    tint,
+                                    alpha,
+                                    depth
+                                );
+                            }
+                            else
+                            {
+                                batcher.Draw(
+                                    entry.Texture,
+                                    new Rectangle(drawX, drawY, drawW, drawH),
+                                    entry.UV,
+                                    charHueVector,
+                                    depth
+                                );
+                            }
                         }
                     }
 
