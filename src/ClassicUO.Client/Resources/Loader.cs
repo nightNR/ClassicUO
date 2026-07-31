@@ -180,8 +180,8 @@ namespace ClassicUO.Resources
         /// </summary>
         public static void Attach(ClassicUO.Assets.FontsLoader fonts)
         {
+            Reset();       // free slots against whichever loader was attached before
             _fonts = fonts;
-            Reset();
         }
 
         /// <summary>
@@ -260,11 +260,12 @@ namespace ClassicUO.Resources
             {
                 if (e.Slot == legacySlot)
                 {
-                    // e.DisplayName is like "Inter 18"; map to faceId + size.
+                    // e.DisplayName is like "Inter 18"; the face name is the part
+                    // before the trailing " <size>", but the size itself comes
+                    // from the typed PixelSize field rather than re-parsing text.
                     int sp = e.DisplayName.LastIndexOf(' ');
                     string face = LegacyDisplayToFaceId(e.DisplayName.Substring(0, sp));
-                    byte size = byte.Parse(e.DisplayName.Substring(sp + 1));
-                    return (face, size);
+                    return (face, (byte)e.PixelSize);
                 }
             }
             return null;
