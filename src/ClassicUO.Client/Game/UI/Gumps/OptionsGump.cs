@@ -65,6 +65,7 @@ namespace ClassicUO.Game.UI.Gumps
 
         // fonts
         private FontLocationRow _chatFontRow;
+        private FontLocationRow _journalControlsFontRow;
         private Checkbox _forceUnicodeJournal;
         private InputField _gameWindowHeight;
         private Checkbox _maxJournalFilesEnabled;
@@ -2352,6 +2353,20 @@ namespace ClassicUO.Game.UI.Gumps
 
             rightArea.Add(_chatFontRow);
 
+            startX = 5;
+            startY += _chatFontRow.Height + 4;
+
+            Label journalCtrlText = AddLabel(rightArea, "Journal controls", startX, startY);
+            startX += 40;
+            startY += journalCtrlText.Height + 2;
+
+            _journalControlsFontRow = new FontLocationRow(startX, startY,
+                _currentProfile.LocationFonts != null
+                && _currentProfile.LocationFonts.TryGetValue(FontLocation.JournalControls, out FontChoice journalCtrlChoice)
+                    ? journalCtrlChoice : new FontChoice { Face = "" });
+
+            rightArea.Add(_journalControlsFontRow);
+
             Add(rightArea, PAGE);
         }
 
@@ -4240,6 +4255,7 @@ namespace ClassicUO.Game.UI.Gumps
 
                 case 6: // fonts
                     _chatFontRow.SelectClassic();
+                    _journalControlsFontRow.SelectClassic();
                     _overrideAllFonts.IsChecked = false;
                     _overrideAllFontsIsUnicodeCheckbox.SelectedIndex = 1;
 
@@ -4761,6 +4777,10 @@ namespace ClassicUO.Game.UI.Gumps
             (byte chatSlot, _) = _currentProfile.ResolveFont(FontLocation.Chat);
             _currentProfile.ChatFont = chatSlot; // keep legacy field in sync for existing readers
             UIManager.SystemChat.TextBoxControl.Font = chatSlot;
+
+            // Journal control labels have no legacy byte — renderers read them via
+            // ResolveFont(JournalControls) at gump-build time, so just persist the choice.
+            _currentProfile.LocationFonts[FontLocation.JournalControls] = _journalControlsFontRow.GetChoice();
 
             // combat
             _currentProfile.InnocentHue = _innocentColorPickerBox.Hue;

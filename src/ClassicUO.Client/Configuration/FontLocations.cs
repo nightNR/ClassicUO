@@ -14,6 +14,7 @@ namespace ClassicUO.Configuration
     {
         public const string Chat = "chat";
         public const string Tooltip = "tooltip";
+        public const string JournalControls = "journal_controls";
     }
 
     public readonly struct LocationDef
@@ -38,8 +39,9 @@ namespace ClassicUO.Configuration
         // must equal the location's current hardcoded literal so Classic = zero change.
         private static readonly LocationDef[] _locations =
         {
-            new LocationDef(FontLocation.Chat,    "Chat",    1, true),
-            new LocationDef(FontLocation.Tooltip, "Tooltip", 1, true),
+            new LocationDef(FontLocation.Chat,            "Chat",             1, true),
+            new LocationDef(FontLocation.Tooltip,         "Tooltip",          1, true),
+            new LocationDef(FontLocation.JournalControls, "Journal controls", 6, false),
         };
 
         public static IReadOnlyList<LocationDef> Locations => _locations;

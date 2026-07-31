@@ -94,7 +94,7 @@ namespace ClassicUO.Game.UI.Gumps
 
             int cx = 43;   // 63
             int dist = 75; // 85
-            byte font = 6; // 1
+            (byte font, bool fontUni) = ProfileManager.CurrentProfile.ResolveFont(FontLocation.JournalControls);
 
             _filters_chekboxes[0] = new Checkbox
             (
@@ -103,7 +103,7 @@ namespace ClassicUO.Game.UI.Gumps
                 "System",
                 font,
                 0x0386,
-                false
+                fontUni
             )
             {
                 X = cx,
@@ -118,7 +118,7 @@ namespace ClassicUO.Game.UI.Gumps
                 "Objects",
                 font,
                 0x0386,
-                false
+                fontUni
             )
             {
                 X = cx + dist,
@@ -133,7 +133,7 @@ namespace ClassicUO.Game.UI.Gumps
                 "Client",
                 font,
                 0x0386,
-                false
+                fontUni
             )
             {
                 X = cx + dist * 2,
@@ -148,7 +148,7 @@ namespace ClassicUO.Game.UI.Gumps
                 "Guild",
                 font,
                 0x0386,
-                false
+                fontUni
             )
             {
                 X = cx + dist * 3,

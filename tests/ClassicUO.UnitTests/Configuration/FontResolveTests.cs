@@ -32,6 +32,30 @@ namespace ClassicUO.UnitTests.Configuration
         }
 
         [Fact]
+        public void ResolveFont_DefaultJournalControls_IsClassicFallback()
+        {
+            AttachFonts();
+            var p = new Profile();
+            // No LocationFonts entry => Classic => journal-controls' classic
+            // (font 6, unicode false — the JournalGump filter-checkbox literal).
+            (byte slot, bool uni) = p.ResolveFont(FontLocation.JournalControls);
+            Assert.Equal((byte)6, slot);
+            Assert.False(uni);
+        }
+
+        [Fact]
+        public void ResolveFont_JournalControlsTtfChoice_ReturnsDynamicUnicodeSlot()
+        {
+            AttachFonts();
+            var p = new Profile();
+            p.LocationFonts[FontLocation.JournalControls] = new FontChoice { Face = "inter", Size = 18 };
+
+            (byte slot, bool uni) = p.ResolveFont(FontLocation.JournalControls);
+            Assert.True(slot >= AtlasFontRegistry.DynamicSlotFirst);
+            Assert.True(uni);
+        }
+
+        [Fact]
         public void ResolveFont_TtfChoice_ReturnsDynamicUnicodeSlot()
         {
             AttachFonts();
