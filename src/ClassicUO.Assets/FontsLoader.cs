@@ -4154,6 +4154,49 @@ namespace ClassicUO.Assets
             int scanlineCount = ((dw - 1) >> 3) + 1;
             int scanLineOff = 0;
 
+            // AA border pre-pass: lay a black outline built from the SAME coverage,
+            // dilated 1px in all directions, BEFORE the fill. The colored fill is
+            // then blended on top, so anti-aliased edge pixels blend color-over-
+            // black (smooth) instead of leaving a semi-transparent fringe outside a
+            // hard outline. The legacy 1-bit border pass (below) would treat faint
+            // AA fringe as glyph body and produce a ragged, haloed outline.
+            if (ch.IsAntiAliased && hasBorder)
+            {
+                for (int y = 0; y < dh; y++)
+                {
+                    int italicOffset = isItalic ? (int)((dh - y) / ITALIC_FONT_KOEFFICIENT) : 0;
+
+                    for (int x = 0; x < dw; x++)
+                    {
+                        byte raw = ch.Coverage[y * dw + x];
+
+                        if (raw == 0)
+                        {
+                            continue;
+                        }
+
+                        byte cov = WeightCoverage(raw);
+                        int bx = x + italicOffset + solidShift + pad;
+                        int by = y + pad;
+
+                        for (int oy = -1; oy <= 1; oy++)
+                        {
+                            int ny = by + oy;
+                            if (ny < 0 || ny >= bufH) continue;
+
+                            for (int ox = -1; ox <= 1; ox++)
+                            {
+                                int nx = bx + ox;
+                                if (nx < 0 || nx >= bufW) continue;
+
+                                int nblock = ny * bufW + nx;
+                                pData[nblock] = BlendCoverage(pData[nblock], blackColor, cov);
+                            }
+                        }
+                    }
+                }
+            }
+
             for (int y = 0; y < dh; y++, scanLineOff += scanlineCount)
             {
                 int italicOffset = isItalic ? (int)((dh - y) / ITALIC_FONT_KOEFFICIENT) : 0;
@@ -4269,8 +4312,10 @@ namespace ClassicUO.Assets
                 }
             }
 
-            // Apply black border effect
-            if (hasBorder)
+            // Apply black border effect (legacy 1-bit path only). AA glyphs get
+            // their outline from the dilated black pre-pass above; running this
+            // hard-edge pass on an AA glyph produces a ragged, haloed outline.
+            if (hasBorder && !ch.IsAntiAliased)
             {
                 // Same pixel-value test as the isSolid pass above, and coverage-safe for
                 // the same reason.
