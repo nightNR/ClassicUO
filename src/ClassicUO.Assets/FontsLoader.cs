@@ -451,7 +451,7 @@ namespace ClassicUO.Assets
         // opaque, so stroke interiors are never see-through under premultiplied
         // blend. Below it, a gamma ramp preserves smooth anti-aliased edges.
         // Lower = more solid (thicker, less AA); higher = softer (thinner, more AA).
-        internal const byte CoverageSolidAt = 176;
+        internal const byte CoverageSolidAt = 96;
 
         internal static byte StrengthenCoverage(byte coverage)
         {
