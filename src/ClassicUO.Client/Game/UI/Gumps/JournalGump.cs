@@ -41,8 +41,15 @@ namespace ClassicUO.Game.UI.Gumps
 
             const ushort DARK_MODE_JOURNAL_HUE = 903;
 
+            // Resolved once for every journal control label (dark-mode toggle +
+            // the four filter checkboxes below), so a per-location TTF choice or
+            // the classic font-6 fallback drives them all consistently.
+            (byte font, bool fontUni) = ProfileManager.CurrentProfile.ResolveFont(FontLocation.JournalControls);
+
             string str = ResGumps.DarkMode;
-            int width = Client.Game.UO.FileManager.Fonts.GetWidthASCII(6, str);
+            int width = fontUni
+                ? Client.Game.UO.FileManager.Fonts.GetWidthUnicode(font, str)
+                : Client.Game.UO.FileManager.Fonts.GetWidthASCII(font, str);
 
             Checkbox darkMode;
 
@@ -53,9 +60,9 @@ namespace ClassicUO.Game.UI.Gumps
                     0x00D2,
                     0x00D3,
                     str,
-                    6,
+                    font,
                     0x0288,
-                    false
+                    fontUni
                 )
                 {
                     X = _background.Width - width - 2,
@@ -94,7 +101,6 @@ namespace ClassicUO.Game.UI.Gumps
 
             int cx = 43;   // 63
             int dist = 75; // 85
-            (byte font, bool fontUni) = ProfileManager.CurrentProfile.ResolveFont(FontLocation.JournalControls);
 
             _filters_chekboxes[0] = new Checkbox
             (
