@@ -56,6 +56,31 @@ namespace ClassicUO.UnitTests.Configuration
         }
 
         [Fact]
+        public void ResolveFont_PerSiteFallback_ReturnsCallerClassicWhenNoChoice()
+        {
+            AttachFonts();
+            var p = new Profile();
+            // No choice for a broad location => returns the caller-supplied classic
+            // fallback (font 3 here), NOT the LocationDef's nominal font — this is
+            // what lets many differing call sites each stay a zero visual change.
+            (byte slot, bool uni) = p.ResolveFont(FontLocation.StatusBars, 3, true);
+            Assert.Equal((byte)3, slot);
+            Assert.True(uni);
+        }
+
+        [Fact]
+        public void ResolveFont_PerSiteFallback_TtfChoiceOverridesCallerClassic()
+        {
+            AttachFonts();
+            var p = new Profile();
+            p.LocationFonts[FontLocation.StatusBars] = new FontChoice { Face = "inter", Size = 18 };
+            // A TTF choice overrides every site regardless of its own classic font.
+            (byte slot, bool uni) = p.ResolveFont(FontLocation.StatusBars, 3, true);
+            Assert.True(slot >= AtlasFontRegistry.DynamicSlotFirst);
+            Assert.True(uni);
+        }
+
+        [Fact]
         public void ResolveFont_TtfChoice_ReturnsDynamicUnicodeSlot()
         {
             AttachFonts();

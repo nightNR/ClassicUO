@@ -66,6 +66,8 @@ namespace ClassicUO.Game.UI.Gumps
         // fonts
         private FontLocationRow _chatFontRow;
         private FontLocationRow _journalControlsFontRow;
+        private FontLocationRow _statusBarsFontRow;
+        private FontLocationRow _gumpLabelsFontRow;
         private Checkbox _forceUnicodeJournal;
         private InputField _gameWindowHeight;
         private Checkbox _maxJournalFilesEnabled;
@@ -2367,6 +2369,34 @@ namespace ClassicUO.Game.UI.Gumps
 
             rightArea.Add(_journalControlsFontRow);
 
+            startX = 5;
+            startY += _journalControlsFontRow.Height + 4;
+
+            Label statusBarsText = AddLabel(rightArea, "Status bars", startX, startY);
+            startX += 40;
+            startY += statusBarsText.Height + 2;
+
+            _statusBarsFontRow = new FontLocationRow(startX, startY,
+                _currentProfile.LocationFonts != null
+                && _currentProfile.LocationFonts.TryGetValue(FontLocation.StatusBars, out FontChoice statusBarsChoice)
+                    ? statusBarsChoice : new FontChoice { Face = "" });
+
+            rightArea.Add(_statusBarsFontRow);
+
+            startX = 5;
+            startY += _statusBarsFontRow.Height + 4;
+
+            Label gumpLabelsText = AddLabel(rightArea, "Gump labels", startX, startY);
+            startX += 40;
+            startY += gumpLabelsText.Height + 2;
+
+            _gumpLabelsFontRow = new FontLocationRow(startX, startY,
+                _currentProfile.LocationFonts != null
+                && _currentProfile.LocationFonts.TryGetValue(FontLocation.GumpLabels, out FontChoice gumpLabelsChoice)
+                    ? gumpLabelsChoice : new FontChoice { Face = "" });
+
+            rightArea.Add(_gumpLabelsFontRow);
+
             Add(rightArea, PAGE);
         }
 
@@ -4256,6 +4286,8 @@ namespace ClassicUO.Game.UI.Gumps
                 case 6: // fonts
                     _chatFontRow.SelectClassic();
                     _journalControlsFontRow.SelectClassic();
+                    _statusBarsFontRow.SelectClassic();
+                    _gumpLabelsFontRow.SelectClassic();
                     _overrideAllFonts.IsChecked = false;
                     _overrideAllFontsIsUnicodeCheckbox.SelectedIndex = 1;
 
@@ -4781,6 +4813,8 @@ namespace ClassicUO.Game.UI.Gumps
             // Journal control labels have no legacy byte — renderers read them via
             // ResolveFont(JournalControls) at gump-build time, so just persist the choice.
             _currentProfile.LocationFonts[FontLocation.JournalControls] = _journalControlsFontRow.GetChoice();
+            _currentProfile.LocationFonts[FontLocation.StatusBars] = _statusBarsFontRow.GetChoice();
+            _currentProfile.LocationFonts[FontLocation.GumpLabels] = _gumpLabelsFontRow.GetChoice();
 
             // combat
             _currentProfile.InnocentHue = _innocentColorPickerBox.Hue;

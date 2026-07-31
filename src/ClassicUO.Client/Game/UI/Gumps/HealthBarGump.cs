@@ -868,7 +868,7 @@ namespace ClassicUO.Game.UI.Gumps
                     (
                         _textBox = new StbTextBox
                         (
-                            1,
+                            ProfileManager.CurrentProfile.ResolveFont(FontLocation.StatusBars, 1, true).slot,
                             32,
                             HPB_WIDTH,
                             true,
@@ -891,7 +891,7 @@ namespace ClassicUO.Game.UI.Gumps
                     (
                         _textBox = new StbTextBox
                         (
-                            1,
+                            ProfileManager.CurrentProfile.ResolveFont(FontLocation.StatusBars, 1, true).slot,
                             32,
                             HPB_WIDTH,
                             true,
@@ -1063,7 +1063,7 @@ namespace ClassicUO.Game.UI.Gumps
                     (
                         _textBox = new StbTextBox
                         (
-                            1,
+                            ProfileManager.CurrentProfile.ResolveFont(FontLocation.StatusBars, 1, true).slot,
                             32,
                             isunicode: true,
                             style: FontStyle.Cropped | FontStyle.BlackBorder,
@@ -1330,7 +1330,7 @@ namespace ClassicUO.Game.UI.Gumps
                     (
                         _textBox = new StbTextBox
                         (
-                            1,
+                            ProfileManager.CurrentProfile.ResolveFont(FontLocation.StatusBars, 1, true).slot,
                             32,
                             HPB_WIDTH,
                             true,
@@ -1381,7 +1381,8 @@ namespace ClassicUO.Game.UI.Gumps
 
         private Label CreateStatLabel()
         {
-            return new Label(string.Empty, true, _nameHue, font: 1, style: FontStyle.BlackBorder)
+            (byte sf, bool su) = ProfileManager.CurrentProfile.ResolveFont(FontLocation.StatusBars, 1, true);
+            return new Label(string.Empty, su, _nameHue, font: sf, style: FontStyle.BlackBorder)
             {
                 AcceptMouseInput = false,
                 CanMove = true
@@ -1587,7 +1588,7 @@ namespace ClassicUO.Game.UI.Gumps
                     (
                         _textBox = new StbTextBox
                         (
-                            3,
+                            ProfileManager.CurrentProfile.ResolveFont(FontLocation.StatusBars, 3, true).slot,
                             32,
                             120,
                             false,
@@ -1612,7 +1613,7 @@ namespace ClassicUO.Game.UI.Gumps
                     (
                         _textBox = new StbTextBox
                         (
-                            3,
+                            ProfileManager.CurrentProfile.ResolveFont(FontLocation.StatusBars, 3, true).slot,
                             32,
                             109,
                             false,
@@ -1777,7 +1778,7 @@ namespace ClassicUO.Game.UI.Gumps
                     (
                         _textBox = new StbTextBox
                         (
-                            1,
+                            ProfileManager.CurrentProfile.ResolveFont(FontLocation.StatusBars, 1, true).slot,
                             32,
                             120,
                             false,

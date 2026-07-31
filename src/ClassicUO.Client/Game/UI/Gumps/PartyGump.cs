@@ -1,5 +1,6 @@
 ﻿// SPDX-License-Identifier: BSD-2-Clause
 
+using ClassicUO.Configuration;
 using ClassicUO.Game.Data;
 using ClassicUO.Game.Managers;
 using ClassicUO.Game.UI.Controls;
@@ -35,6 +36,12 @@ namespace ClassicUO.Game.UI.Gumps
 
         private void BuildGump()
         {
+            // Gump chrome labels resolve through the shared GumpLabels location,
+            // each keeping its own original font as the classic fallback so
+            // Classic is a zero visual change; a TTF choice overrides them all.
+            (byte lbl1, bool uni1) = ProfileManager.CurrentProfile.ResolveFont(FontLocation.GumpLabels, 1, false);
+            (byte lbl2, bool uni2) = ProfileManager.CurrentProfile.ResolveFont(FontLocation.GumpLabels, 2, false);
+
             Add
             (
                 new ResizePic(0x0A28)
@@ -46,7 +53,7 @@ namespace ClassicUO.Game.UI.Gumps
 
             Add
             (
-                new Label(ResGumps.Tell, false, 0x0386, font: 1)
+                new Label(ResGumps.Tell, uni1, 0x0386, font: lbl1)
                 {
                     X = 40,
                     Y = 30
@@ -55,7 +62,7 @@ namespace ClassicUO.Game.UI.Gumps
 
             Add
             (
-                new Label(ResGumps.Kick, false, 0x0386, font: 1)
+                new Label(ResGumps.Kick, uni1, 0x0386, font: lbl1)
                 {
                     X = 80,
                     Y = 30
@@ -64,7 +71,7 @@ namespace ClassicUO.Game.UI.Gumps
 
             Add
             (
-                new Label(ResGumps.PartyManifest, false, 0x0386, font: 2)
+                new Label(ResGumps.PartyManifest, uni2, 0x0386, font: lbl2)
                 {
                     X = 153,
                     Y = 20
@@ -142,7 +149,7 @@ namespace ClassicUO.Game.UI.Gumps
 
             Add
             (
-                new Label(ResGumps.SendThePartyAMessage, false, 0x0386, font: 2)
+                new Label(ResGumps.SendThePartyAMessage, uni2, 0x0386, font: lbl2)
                 {
                     X = 110,
                     Y = 307
@@ -163,7 +170,7 @@ namespace ClassicUO.Game.UI.Gumps
 
                 Add
                 (
-                    new Label(ResGumps.PartyCanLootMe, false, 0x0386, font: 2)
+                    new Label(ResGumps.PartyCanLootMe, uni2, 0x0386, font: lbl2)
                     {
                         X = 110,
                         Y = 334
@@ -184,7 +191,7 @@ namespace ClassicUO.Game.UI.Gumps
 
                 Add
                 (
-                    new Label(ResGumps.PartyCannotLootMe, false, 0x0386, font: 2)
+                    new Label(ResGumps.PartyCannotLootMe, uni2, 0x0386, font: lbl2)
                     {
                         X = 110,
                         Y = 334
@@ -207,7 +214,7 @@ namespace ClassicUO.Game.UI.Gumps
             {
                 Add
                 (
-                    new Label(ResGumps.LeaveTheParty, false, 0x0386, font: 2)
+                    new Label(ResGumps.LeaveTheParty, uni2, 0x0386, font: lbl2)
                     {
                         X = 110,
                         Y = 360
@@ -218,7 +225,7 @@ namespace ClassicUO.Game.UI.Gumps
             {
                 Add
                 (
-                    new Label(ResGumps.DisbandTheParty, false, 0x0386, font: 2)
+                    new Label(ResGumps.DisbandTheParty, uni2, 0x0386, font: lbl2)
                     {
                         X = 110,
                         Y = 360
@@ -240,7 +247,7 @@ namespace ClassicUO.Game.UI.Gumps
 
                 Add
                 (
-                    new Label(ResGumps.AddNewMember, false, 0x0386, font: 2)
+                    new Label(ResGumps.AddNewMember, uni2, 0x0386, font: lbl2)
                     {
                         X = 110,
                         Y = 385

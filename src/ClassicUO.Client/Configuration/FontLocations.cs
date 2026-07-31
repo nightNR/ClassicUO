@@ -15,6 +15,11 @@ namespace ClassicUO.Configuration
         public const string Chat = "chat";
         public const string Tooltip = "tooltip";
         public const string JournalControls = "journal_controls";
+        // Broad locations: many call sites with differing original fonts. They
+        // resolve via ResolveFont(id, classicFont, classicUnicode) so each site
+        // keeps its own classic fallback; the LocationDef fonts below are nominal.
+        public const string StatusBars = "status_bars";
+        public const string GumpLabels = "gump_labels";
     }
 
     public readonly struct LocationDef
@@ -42,6 +47,8 @@ namespace ClassicUO.Configuration
             new LocationDef(FontLocation.Chat,            "Chat",             1, true),
             new LocationDef(FontLocation.Tooltip,         "Tooltip",          1, true),
             new LocationDef(FontLocation.JournalControls, "Journal controls", 6, false),
+            new LocationDef(FontLocation.StatusBars,      "Status bars",      1, true),
+            new LocationDef(FontLocation.GumpLabels,      "Gump labels",      1, false),
         };
 
         public static IReadOnlyList<LocationDef> Locations => _locations;

@@ -83,7 +83,20 @@ namespace ClassicUO.Configuration
         public (byte slot, bool unicode) ResolveFont(string locationId)
         {
             FontLocationCatalog.TryGet(locationId, out LocationDef def);
+            return ResolveFont(locationId, def.ClassicFont, def.ClassicUnicode);
+        }
 
+        /// <summary>
+        /// Resolve a UI location's font using a caller-supplied classic fallback.
+        /// Use for broad locations shared by many call sites whose original
+        /// hardcoded fonts differ (status bars, gump chrome labels): each site
+        /// passes its own <paramref name="classicFont"/>/<paramref name="classicUnicode"/>,
+        /// so Classic stays a per-site zero visual change while a TTF choice
+        /// overrides them all uniformly. The location's <see cref="LocationDef.ClassicFont"/>
+        /// is ignored by this overload.
+        /// </summary>
+        public (byte slot, bool unicode) ResolveFont(string locationId, byte classicFont, bool classicUnicode)
+        {
             if (LocationFonts != null
                 && LocationFonts.TryGetValue(locationId, out FontChoice choice)
                 && !string.IsNullOrEmpty(choice.Face)
@@ -92,7 +105,7 @@ namespace ClassicUO.Configuration
                 return (slot, true);
             }
 
-            return (def.ClassicFont, def.ClassicUnicode);
+            return (classicFont, classicUnicode);
         }
 
         public int SpeechDelay { get; set; } = 100;
