@@ -447,43 +447,6 @@ namespace ClassicUO.Assets
         // preserved so fully-transparent and fully-covered pixels never shift.
         internal const float CoverageGamma = 0.70f;
 
-        // Coverage at or above this is treated as glyph interior and forced fully
-        // opaque, so stroke interiors are never see-through under premultiplied
-        // blend. Below it, a gamma ramp preserves smooth anti-aliased edges.
-        // Lower = more solid (thicker, less AA); higher = softer (thinner, more AA).
-        internal const byte CoverageSolidAt = 96;
-
-        internal static byte StrengthenCoverage(byte coverage)
-        {
-            if (coverage == 0)
-            {
-                return 0;
-            }
-
-            // Interior: saturate to fully opaque so the fill isn't patchy/faint.
-            if (coverage >= CoverageSolidAt)
-            {
-                return 255;
-            }
-
-            // Edge: gamma-lift toward the solid threshold, keeping a smooth ramp
-            // (continuous at CoverageSolidAt, which maps to ~255) so edges stay
-            // anti-aliased instead of hard/jagged.
-            float t = coverage / (float)CoverageSolidAt;
-            int v = (int)(System.MathF.Pow(t, CoverageGamma) * 255f + 0.5f);
-
-            if (v < 1)
-            {
-                v = 1;
-            }
-            else if (v > 255)
-            {
-                v = 255;
-            }
-
-            return (byte)v;
-        }
-
         internal static bool CoverageIsSet(byte coverage) => coverage >= COVERAGE_EDGE_THRESHOLD;
 
         public int GetWidthASCII(byte font, string str)
@@ -2160,8 +2123,6 @@ namespace ClassicUO.Assets
                                         {
                                             continue;
                                         }
-
-                                        cov = StrengthenCoverage(cov);
 
                                         int block = testY * width + nowX;
                                         pData[block] = BlendCoverage(pData[block], charcolor, cov);
@@ -4132,8 +4093,6 @@ namespace ClassicUO.Assets
                         {
                             continue;
                         }
-
-                        cov = StrengthenCoverage(cov);
 
                         int block = (y + pad) * bufW + (x + italicOffset + solidShift + pad);
                         pData[block] = BlendCoverage(pData[block], charcolor, cov);

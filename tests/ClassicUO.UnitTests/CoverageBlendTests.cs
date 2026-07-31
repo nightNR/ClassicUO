@@ -44,21 +44,6 @@ namespace ClassicUO.UnitTests
             Assert.InRange(r & 0xFF, 0x5Fu, 0x61u);           // R 0xC0 -> ~0x60
         }
 
-        [Fact]
-        public void StrengthenCoverage_PreservesEndpoints()
-        {
-            Assert.Equal(0, FontsLoader.StrengthenCoverage(0));
-            Assert.Equal(255, FontsLoader.StrengthenCoverage(255));
-        }
-
-        [Fact]
-        public void StrengthenCoverage_LiftsMidtones()
-        {
-            // sub-1 gamma boosts partial coverage (never below the input).
-            Assert.True(FontsLoader.StrengthenCoverage(128) >= 128);
-            Assert.True(FontsLoader.StrengthenCoverage(64) >= 64);
-        }
-
         [Theory]
         [InlineData(0, false)]
         [InlineData(127, false)]
