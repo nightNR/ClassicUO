@@ -136,7 +136,7 @@ namespace ClassicUO.Resources
         /// so each face is read from the manifest once and reused across its three
         /// registered pixel sizes rather than re-read per slot.
         /// </summary>
-        private static byte[] LoadTtf(string logicalName)
+        internal static byte[] LoadTtf(string logicalName)
         {
             if (_ttfCache.TryGetValue(logicalName, out byte[] cached))
             {
