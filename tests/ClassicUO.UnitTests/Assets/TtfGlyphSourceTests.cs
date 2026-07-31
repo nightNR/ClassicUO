@@ -76,5 +76,64 @@ namespace ClassicUO.UnitTests
                 Assert.True(w > 0 && h > 0);
             }
         }
+
+        [Fact]
+        public void Downsample_FullBlocks_AverageTo255AndDivideDims()
+        {
+            // 6x3 source, factor 3 -> 2x1 output. Left 3x3 block all 255 -> 255.
+            // Right 3x3 block all 0 -> 0.
+            byte[] src = new byte[6 * 3];
+            for (int y = 0; y < 3; y++)
+                for (int x = 0; x < 3; x++)
+                    src[y * 6 + x] = 255;
+
+            byte[] dst = TtfGlyphSource.Downsample(src, 6, 3, 3, out int dw, out int dh);
+
+            Assert.Equal(2, dw);
+            Assert.Equal(1, dh);
+            Assert.Equal(255, dst[0]);
+            Assert.Equal(0, dst[1]);
+        }
+
+        [Fact]
+        public void Downsample_HalfCoveredBlock_AveragesToMid()
+        {
+            // 3x3 all-255 except: make ~half the block 0 -> average ~113-142.
+            byte[] src = new byte[3 * 3];
+            for (int i = 0; i < src.Length; i++) src[i] = (byte)(i < 4 ? 255 : 0); // 4 of 9 set
+            byte[] dst = TtfGlyphSource.Downsample(src, 3, 3, 3, out int dw, out int dh);
+            Assert.Equal(1, dw);
+            Assert.Equal(1, dh);
+            Assert.Equal((byte)((255 * 4 + 4) / 9), dst[0]); // rounded average = 113
+        }
+
+        [Fact]
+        public void Downsample_EdgeBlockSmallerThanFactor_AveragesOverActualPixels()
+        {
+            // 4x1 source, factor 3 -> 2x1: block0 = px0..2, block1 = px3 only.
+            byte[] src = { 255, 255, 255, 100 };
+            byte[] dst = TtfGlyphSource.Downsample(src, 4, 1, 3, out int dw, out int dh);
+            Assert.Equal(2, dw);
+            Assert.Equal(1, dh);
+            Assert.Equal(255, dst[0]);
+            Assert.Equal(100, dst[1]); // partial edge block = single pixel
+        }
+
+        [Fact]
+        public void TryRasterize_Oversampled_HasOpaqueInteriorAndSoftEdge()
+        {
+            TtfGlyphSource src = TtfGlyphSource.Create(InterTtf(), 22);
+            Assert.True(src.TryRasterize('e', out _, out _, out sbyte w, out sbyte h, out byte[] cov));
+            Assert.True(w > 0 && h > 0);
+
+            bool hasOpaque = false, hasPartial = false;
+            foreach (byte b in cov)
+            {
+                if (b == 255) hasOpaque = true;
+                else if (b > 0) hasPartial = true;
+            }
+            Assert.True(hasOpaque, "expected fully-opaque interior pixels");
+            Assert.True(hasPartial, "expected anti-aliased edge pixels");
+        }
     }
 }

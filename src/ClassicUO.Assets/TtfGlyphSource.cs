@@ -13,18 +13,22 @@ namespace ClassicUO.Assets
     /// </summary>
     internal sealed class TtfGlyphSource
     {
+        internal const int Oversample = 3;
+
         private readonly byte[] _ttf;           // retained: stbtt reads from it
         private readonly stbtt_fontinfo _info;
         private readonly float _scale;
+        private readonly int _ascentRaw;
         private readonly int _ascentPx;
 
         public int PixelSize { get; }
 
-        private TtfGlyphSource(byte[] ttf, stbtt_fontinfo info, float scale, int ascentPx, int pixelSize)
+        private TtfGlyphSource(byte[] ttf, stbtt_fontinfo info, float scale, int ascentRaw, int ascentPx, int pixelSize)
         {
             _ttf = ttf;
             _info = info;
             _scale = scale;
+            _ascentRaw = ascentRaw;
             _ascentPx = ascentPx;
             PixelSize = pixelSize;
         }
@@ -81,7 +85,7 @@ namespace ClassicUO.Assets
 
             int ascentPx = (int)MathF.Round(ascentRaw * scale);
 
-            return new TtfGlyphSource(ttfBytes, info, scale, ascentPx, pixelSize);
+            return new TtfGlyphSource(ttfBytes, info, scale, ascentRaw, ascentPx, pixelSize);
         }
 
         public unsafe bool TryRasterize(
@@ -97,8 +101,12 @@ namespace ClassicUO.Assets
                 return false; // glyph not present in this face
             }
 
+            // Rasterize at Oversample x the target size for full-coverage
+            // interiors + smooth AA, then box-downsample to target.
+            float scaleN = _scale * Oversample;
+
             int w, h, xoff, yoff;
-            byte* bitmap = stbtt_GetCodepointBitmap(_info, _scale, _scale, codepoint, &w, &h, &xoff, &yoff);
+            byte* bitmap = stbtt_GetCodepointBitmap(_info, scaleN, scaleN, codepoint, &w, &h, &xoff, &yoff);
 
             if (bitmap == null || w <= 0 || h <= 0)
             {
@@ -109,17 +117,26 @@ namespace ClassicUO.Assets
                 return false;
             }
 
-            byte[] cov = new byte[w * h];
-            fixed (byte* pCov = cov)
+            byte[] over = new byte[w * h];
+            fixed (byte* pOver = over)
             {
-                Buffer.MemoryCopy(bitmap, pCov, cov.Length, cov.Length);
+                Buffer.MemoryCopy(bitmap, pOver, over.Length, over.Length);
             }
             stbtt_FreeBitmap(bitmap, null);
 
-            offsetX = ClampToSByte(xoff);
-            offsetY = ClampToSByte(_ascentPx + yoff);
-            width = ClampToSByte(w);
-            height = ClampToSByte(h);
+            byte[] cov = Downsample(over, w, h, Oversample, out int dstW, out int dstH);
+
+            if (dstW <= 0 || dstH <= 0)
+            {
+                return false;
+            }
+
+            int ascentPxN = (int)MathF.Round(_ascentRaw * scaleN);
+
+            offsetX = ClampToSByte((int)MathF.Round(xoff / (float)Oversample));
+            offsetY = ClampToSByte((int)MathF.Round((ascentPxN + yoff) / (float)Oversample));
+            width = ClampToSByte(dstW);
+            height = ClampToSByte(dstH);
             coverage = cov;
             return true;
         }
@@ -129,6 +146,46 @@ namespace ClassicUO.Assets
             if (value < sbyte.MinValue) return sbyte.MinValue;
             if (value > sbyte.MaxValue) return sbyte.MaxValue;
             return (sbyte)value;
+        }
+
+        // Box-downsample an 8-bit coverage bitmap by an integer factor. Output
+        // dimensions are ceil(src/factor); edge blocks average over only the
+        // source pixels that exist. Rounded average per block.
+        internal static byte[] Downsample(byte[] src, int srcW, int srcH, int factor, out int dstW, out int dstH)
+        {
+            dstW = (srcW + factor - 1) / factor;
+            dstH = (srcH + factor - 1) / factor;
+
+            byte[] dst = new byte[dstW * dstH];
+
+            for (int dy = 0; dy < dstH; dy++)
+            {
+                int sy0 = dy * factor;
+                int sy1 = System.Math.Min(sy0 + factor, srcH);
+
+                for (int dx = 0; dx < dstW; dx++)
+                {
+                    int sx0 = dx * factor;
+                    int sx1 = System.Math.Min(sx0 + factor, srcW);
+
+                    int sum = 0;
+                    int count = 0;
+
+                    for (int sy = sy0; sy < sy1; sy++)
+                    {
+                        int row = sy * srcW;
+                        for (int sx = sx0; sx < sx1; sx++)
+                        {
+                            sum += src[row + sx];
+                            count++;
+                        }
+                    }
+
+                    dst[dy * dstW + dx] = count == 0 ? (byte)0 : (byte)((sum + count / 2) / count);
+                }
+            }
+
+            return dst;
         }
     }
 }
