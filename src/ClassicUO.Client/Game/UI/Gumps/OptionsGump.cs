@@ -64,7 +64,7 @@ namespace ClassicUO.Game.UI.Gumps
         private Checkbox _enableSounds, _enableMusic, _footStepsSound, _combatMusic, _musicInBackground, _loginMusic;
 
         // fonts
-        private FontSelector _fontSelectorChat;
+        private FontLocationRow _chatFontRow;
         private Checkbox _forceUnicodeJournal;
         private InputField _gameWindowHeight;
         private Checkbox _maxJournalFilesEnabled;
@@ -147,7 +147,7 @@ namespace ClassicUO.Game.UI.Gumps
         private ClickableColorBox _speechColorPickerBox, _emoteColorPickerBox, _yellColorPickerBox, _whisperColorPickerBox, _partyMessageColorPickerBox, _guildMessageColorPickerBox, _allyMessageColorPickerBox, _chatMessageColorPickerBox, _partyAuraColorPickerBox;
         private InputField _spellFormatBox;
         private ClickableColorBox _tooltip_font_hue;
-        private FontSelector _tooltip_font_selector;
+        private FontLocationRow _tooltipFontRow;
         private HSliderBar _dragSelectStartX, _dragSelectStartY;
         private Checkbox _dragSelectAsAnchor;
         private NiceButton _setAsNewDefault;
@@ -2277,13 +2277,12 @@ namespace ClassicUO.Game.UI.Gumps
             startY += text.Height + 2;
             startX += 40;
 
-            _tooltip_font_selector = new FontSelector(FontsLoader.MAX_UNICODE_FONTS, _currentProfile.TooltipFont, ResGumps.TooltipFontSelect)
-            {
-                X = startX,
-                Y = startY
-            };
+            _tooltipFontRow = new FontLocationRow(startX, startY,
+                _currentProfile.LocationFonts != null
+                && _currentProfile.LocationFonts.TryGetValue(FontLocation.Tooltip, out FontChoice tooltipChoice)
+                    ? tooltipChoice : new FontChoice { Face = "" });
 
-            rightArea.Add(_tooltip_font_selector);
+            rightArea.Add(_tooltipFontRow);
 
             Add(rightArea, PAGE);
         }
@@ -2346,13 +2345,12 @@ namespace ClassicUO.Game.UI.Gumps
             startX += 40;
             startY += text.Height + 2;
 
-            _fontSelectorChat = new FontSelector(FontsLoader.MAX_UNICODE_FONTS, _currentProfile.ChatFont, ResGumps.ThatSClassicUO)
-            {
-                X = startX,
-                Y = startY
-            };
+            _chatFontRow = new FontLocationRow(startX, startY,
+                _currentProfile.LocationFonts != null
+                && _currentProfile.LocationFonts.TryGetValue(FontLocation.Chat, out FontChoice chatChoice)
+                    ? chatChoice : new FontChoice { Face = "" });
 
-            rightArea.Add(_fontSelectorChat);
+            rightArea.Add(_chatFontRow);
 
             Add(rightArea, PAGE);
         }
@@ -4236,12 +4234,12 @@ namespace ClassicUO.Game.UI.Gumps
                     _delay_before_display_tooltip.Value = 200;
                     _tooltip_background_opacity.Value = 70;
                     _tooltip_zoom.Value = 100;
-                    _tooltip_font_selector.SetSelectedFont(1);
+                    _tooltipFontRow.SelectClassic();
 
                     break;
 
                 case 6: // fonts
-                    _fontSelectorChat.SetSelectedFont(0);
+                    _chatFontRow.SelectClassic();
                     _overrideAllFonts.IsChecked = false;
                     _overrideAllFontsIsUnicodeCheckbox.SelectedIndex = 1;
 
@@ -4754,15 +4752,15 @@ namespace ClassicUO.Game.UI.Gumps
 
             // fonts
             _currentProfile.ForceUnicodeJournal = _forceUnicodeJournal.IsChecked;
-            byte _fontValue = _fontSelectorChat.GetSelectedFont();
             _currentProfile.OverrideAllFonts = _overrideAllFonts.IsChecked;
             _currentProfile.OverrideAllFontsIsUnicode = _overrideAllFontsIsUnicodeCheckbox.SelectedIndex == 1;
 
-            if (_currentProfile.ChatFont != _fontValue)
-            {
-                _currentProfile.ChatFont = _fontValue;
-                UIManager.SystemChat.TextBoxControl.Font = _fontValue;
-            }
+            FontChoice chatChoice = _chatFontRow.GetChoice();
+            _currentProfile.LocationFonts ??= new System.Collections.Generic.Dictionary<string, FontChoice>();
+            _currentProfile.LocationFonts[FontLocation.Chat] = chatChoice;
+            (byte chatSlot, _) = _currentProfile.ResolveFont(FontLocation.Chat);
+            _currentProfile.ChatFont = chatSlot; // keep legacy field in sync for existing readers
+            UIManager.SystemChat.TextBoxControl.Font = chatSlot;
 
             // combat
             _currentProfile.InnocentHue = _innocentColorPickerBox.Hue;
@@ -5060,7 +5058,12 @@ namespace ClassicUO.Game.UI.Gumps
             _currentProfile.TooltipDelayBeforeDisplay = _delay_before_display_tooltip.Value;
             _currentProfile.TooltipBackgroundOpacity = _tooltip_background_opacity.Value;
             _currentProfile.TooltipDisplayZoom = _tooltip_zoom.Value;
-            _currentProfile.TooltipFont = _tooltip_font_selector.GetSelectedFont();
+
+            FontChoice tipChoice = _tooltipFontRow.GetChoice();
+            _currentProfile.LocationFonts ??= new System.Collections.Generic.Dictionary<string, FontChoice>();
+            _currentProfile.LocationFonts[FontLocation.Tooltip] = tipChoice;
+            (byte tipSlot, _) = _currentProfile.ResolveFont(FontLocation.Tooltip);
+            _currentProfile.TooltipFont = tipSlot;
 
             _currentProfile?.Save(World, ProfileManager.ProfilePath);
         }
