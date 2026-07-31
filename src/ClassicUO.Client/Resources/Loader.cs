@@ -161,7 +161,7 @@ namespace ClassicUO.Resources
             // solidify (opaque interiors) + draw-time grayscale tint. An older
             // string means a stale binary is running, not the current code.
             ClassicUO.Utility.Logging.Log.Trace(
-                $"AtlasFontRegistry: registered {Entries.Length} TTF font slots (live StbTrueType rasterization) [path=solidify+3x-oversample+tint]");
+                $"AtlasFontRegistry: registered {Entries.Length} TTF font slots (live StbTrueType rasterization) [path=RAW-baseline-no-postproc]");
         }
     }
 }

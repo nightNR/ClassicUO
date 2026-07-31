@@ -2164,7 +2164,8 @@ namespace ClassicUO.Assets
                                             continue;
                                         }
 
-                                        cov = StrengthenCoverage(cov);
+                                        // BASELINE: solidify disabled — raw coverage.
+                                        // cov = StrengthenCoverage(cov);
 
                                         int block = testY * width + nowX;
                                         pData[block] = BlendCoverage(pData[block], charcolor, cov);
@@ -4136,7 +4137,8 @@ namespace ClassicUO.Assets
                             continue;
                         }
 
-                        cov = StrengthenCoverage(cov);
+                        // BASELINE: solidify disabled — raw coverage.
+                        // cov = StrengthenCoverage(cov);
 
                         int block = (y + pad) * bufW + (x + italicOffset + solidShift + pad);
                         pData[block] = BlendCoverage(pData[block], charcolor, cov);

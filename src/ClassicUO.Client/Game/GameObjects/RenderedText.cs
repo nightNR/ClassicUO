@@ -558,20 +558,8 @@ namespace ClassicUO.Game
             MultilinesFontInfo ptr = _info;
             int textWidth = Width;
 
-            // Convert a baked ARGB color (the same value the classic path bakes
-            // into the glyph) to a normalized rgb tint. 0 => white (untinted).
-            static Vector3 TintOf(uint argb)
-            {
-                if (argb == 0)
-                {
-                    return new Vector3(1f, 1f, 1f);
-                }
-                // baked color is 0xAABBGGRR via RgbaToArgb; low byte = R.
-                float r = (argb & 0xFF) / 255f;
-                float g = ((argb >> 8) & 0xFF) / 255f;
-                float b = ((argb >> 16) & 0xFF) / 255f;
-                return new Vector3(r, g, b);
-            }
+            // BASELINE: TTF hue tint removed (raw white mask). The TintOf helper
+            // returns with the color increment (baked ARGB 0xAABBGGRR -> rgb tint).
 
             while (ptr != null)
             {
@@ -653,7 +641,15 @@ namespace ClassicUO.Game
                     bool isTtf = Client.Game.UO.FileManager.Fonts.IsAtlasFont(charFont);
 
                     GlyphAtlasEntry entry;
-                    if (charColor != 0 && !isTtf)
+                    if (isTtf)
+                    {
+                        // BASELINE: raw glyph mask — no black border, no solid
+                        // outline, no baked color. Clean rasterizer output only.
+                        entry = atlas.GetEntry(
+                            charFont, si, IsUnicode, false, false, charItalic
+                        );
+                    }
+                    else if (charColor != 0)
                     {
                         entry = atlas.GetColoredEntry(
                             charFont, si, IsUnicode, charBorder, charSolid, charItalic, charColor
@@ -690,15 +686,14 @@ namespace ClassicUO.Game
 
                             if (isTtf)
                             {
-                                Vector3 tint = drawHue > 0
-                                    ? TintOf(HueToArgb(drawHue))
-                                    : TintOf(charColor);
-
+                                // BASELINE: draw the raw grayscale coverage mask
+                                // as-is (white tint = no hue). Color comes back
+                                // as a later increment.
                                 batcher.DrawTinted(
                                     entry.Texture,
                                     new Rectangle(drawX, drawY, drawW, drawH),
                                     entry.UV,
-                                    tint,
+                                    new Vector3(1f, 1f, 1f),
                                     alpha,
                                     depth
                                 );

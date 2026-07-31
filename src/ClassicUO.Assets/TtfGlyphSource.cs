@@ -13,7 +13,10 @@ namespace ClassicUO.Assets
     /// </summary>
     internal sealed class TtfGlyphSource
     {
-        internal const int Oversample = 3;
+        // BASELINE TOGGLE: 1 = raw stb rasterization (no oversample/downsample,
+        // clean output). 3 = 3x oversample + box-downsample (smoother edges).
+        // Reset to raw while we rebuild the TTF render path from the ground up.
+        internal const int Oversample = 1;
 
         private readonly byte[] _ttf;           // retained: stbtt reads from it
         private readonly stbtt_fontinfo _info;
