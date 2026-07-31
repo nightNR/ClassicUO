@@ -25,6 +25,8 @@ namespace ClassicUO.Configuration
     [JsonSerializable(typeof(ClassicUO.Game.UI.Gumps.ChatHistoryEntry), GenerationMode = JsonSourceGenerationMode.Metadata)]
     [JsonSerializable(typeof(ClassicUO.Game.Managers.AliasEntry), GenerationMode = JsonSourceGenerationMode.Metadata)]
     [JsonSerializable(typeof(ClassicUO.Configuration.PluginAnchorGroupDef), GenerationMode = JsonSourceGenerationMode.Metadata)]
+    [JsonSerializable(typeof(System.Collections.Generic.Dictionary<string, FontChoice>), GenerationMode = JsonSourceGenerationMode.Metadata)]
+    [JsonSerializable(typeof(FontChoice), GenerationMode = JsonSourceGenerationMode.Metadata)]
     sealed partial class ProfileJsonContext : JsonSerializerContext
     {
         sealed class SnakeCaseNamingPolicy : JsonNamingPolicy
@@ -72,6 +74,27 @@ namespace ClassicUO.Configuration
 
         // fonts and speech
         public byte ChatFont { get; set; } = 1;
+        public Dictionary<string, FontChoice> LocationFonts { get; set; } = new();
+
+        /// <summary>
+        /// Resolve a UI location's font to a (slot, unicode) draw pair. A Classic
+        /// choice (or unknown/failed TTF) returns the location's classic fallback.
+        /// </summary>
+        public (byte slot, bool unicode) ResolveFont(string locationId)
+        {
+            FontLocationCatalog.TryGet(locationId, out LocationDef def);
+
+            if (LocationFonts != null
+                && LocationFonts.TryGetValue(locationId, out FontChoice choice)
+                && !string.IsNullOrEmpty(choice.Face)
+                && ClassicUO.Resources.AtlasFontRegistry.TryResolve(choice.Face, choice.Size, out byte slot))
+            {
+                return (slot, true);
+            }
+
+            return (def.ClassicFont, def.ClassicUnicode);
+        }
+
         public int SpeechDelay { get; set; } = 100;
         public bool ScaleSpeechDelay { get; set; } = true;
         public bool SaveJournalToFile { get; set; } = true;

@@ -49,6 +49,28 @@ namespace ClassicUO.Configuration
             CurrentProfile.CharacterName = charactername;
 
             ValidateFields(CurrentProfile);
+
+            // New per-profile atlas state, then migrate legacy ChatFont/TooltipFont
+            // slot bytes into LocationFonts (once — only if not already present).
+            ClassicUO.Resources.AtlasFontRegistry.Reset();
+            MigrateLegacyFont(CurrentProfile, FontLocation.Chat, CurrentProfile.ChatFont);
+            MigrateLegacyFont(CurrentProfile, FontLocation.Tooltip, CurrentProfile.TooltipFont);
+        }
+
+        private static void MigrateLegacyFont(Profile p, string location, byte legacySlot)
+        {
+            p.LocationFonts ??= new System.Collections.Generic.Dictionary<string, FontChoice>();
+            if (p.LocationFonts.ContainsKey(location))
+            {
+                return; // already migrated / user-set
+            }
+
+            (string face, byte size)? mapped = ClassicUO.Resources.AtlasFontRegistry.LegacySlotToFaceSize(legacySlot);
+            if (mapped.HasValue)
+            {
+                p.LocationFonts[location] = new FontChoice { Face = mapped.Value.face, Size = mapped.Value.size };
+            }
+            // else: legacy classic slot (< 20) -> leave absent => Classic fallback.
         }
 
         public static void SetProfileAsDefault(Profile profile)
