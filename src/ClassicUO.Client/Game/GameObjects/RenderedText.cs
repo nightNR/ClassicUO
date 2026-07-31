@@ -656,10 +656,11 @@ namespace ClassicUO.Game
                     GlyphAtlasEntry entry;
                     if (isTtf)
                     {
-                        // BASELINE: raw glyph mask — no black border, no solid
-                        // outline, no baked color. Clean rasterizer output only.
+                        // INCREMENT 3 (border): real black-border flag baked into
+                        // the mask (stays black under the draw-time tint). Solid
+                        // outline still off; color applied at draw; oversample off.
                         entry = atlas.GetEntry(
-                            charFont, si, IsUnicode, false, false, charItalic
+                            charFont, si, IsUnicode, charBorder, false, charItalic
                         );
                     }
                     else if (charColor != 0)
