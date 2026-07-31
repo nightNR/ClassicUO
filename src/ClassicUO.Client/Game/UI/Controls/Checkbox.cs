@@ -24,7 +24,8 @@ namespace ClassicUO.Game.UI.Controls
             byte font = 0,
             ushort color = 0,
             bool isunicode = true,
-            int maxWidth = 0
+            int maxWidth = 0,
+            FontStyle style = 0
         )
         {
             _inactive = inactive;
@@ -42,7 +43,7 @@ namespace ClassicUO.Game.UI.Controls
 
             Width = gumpInfoInactive.UV.Width;
 
-            _text = RenderedText.Create(text, color, font, isunicode, maxWidth: maxWidth);
+            _text = RenderedText.Create(text, color, font, isunicode, style, maxWidth: maxWidth);
 
             Width += _text.Width;
 

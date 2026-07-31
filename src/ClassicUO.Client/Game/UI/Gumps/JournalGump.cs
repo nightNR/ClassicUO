@@ -45,6 +45,10 @@ namespace ClassicUO.Game.UI.Gumps
             // the four filter checkboxes below), so a per-location TTF choice or
             // the classic font-6 fallback drives them all consistently.
             (byte font, bool fontUni) = ProfileManager.CurrentProfile.ResolveFont(FontLocation.JournalControls);
+            // TTF glyph fills are only opaque/saturated when drawn over the black-border
+            // pre-pass, which is how every other in-game TTF text (chat, tooltip, journal
+            // entries) renders. Match that for TTF; keep the classic ASCII look border-free.
+            FontStyle journalCtrlStyle = fontUni ? FontStyle.BlackBorder : 0;
 
             string str = ResGumps.DarkMode;
             int width = fontUni
@@ -62,7 +66,8 @@ namespace ClassicUO.Game.UI.Gumps
                     str,
                     font,
                     0x0288,
-                    fontUni
+                    fontUni,
+                    style: journalCtrlStyle
                 )
                 {
                     X = _background.Width - width - 2,
@@ -109,7 +114,8 @@ namespace ClassicUO.Game.UI.Gumps
                 "System",
                 font,
                 0x0386,
-                fontUni
+                fontUni,
+                style: journalCtrlStyle
             )
             {
                 X = cx,
@@ -124,7 +130,8 @@ namespace ClassicUO.Game.UI.Gumps
                 "Objects",
                 font,
                 0x0386,
-                fontUni
+                fontUni,
+                style: journalCtrlStyle
             )
             {
                 X = cx + dist,
@@ -139,7 +146,8 @@ namespace ClassicUO.Game.UI.Gumps
                 "Client",
                 font,
                 0x0386,
-                fontUni
+                fontUni,
+                style: journalCtrlStyle
             )
             {
                 X = cx + dist * 2,
@@ -154,7 +162,8 @@ namespace ClassicUO.Game.UI.Gumps
                 "Guild",
                 font,
                 0x0386,
-                fontUni
+                fontUni,
+                style: journalCtrlStyle
             )
             {
                 X = cx + dist * 3,
