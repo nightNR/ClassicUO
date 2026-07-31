@@ -45,31 +45,6 @@ namespace ClassicUO.UnitTests
         }
 
         [Fact]
-        public void StrengthenCoverage_PreservesEndpoints()
-        {
-            Assert.Equal(0, FontsLoader.StrengthenCoverage(0));
-            Assert.Equal(255, FontsLoader.StrengthenCoverage(255));
-        }
-
-        [Fact]
-        public void StrengthenCoverage_LiftsMidtones()
-        {
-            // sub-1 gamma boosts partial coverage (never below the input).
-            Assert.True(FontsLoader.StrengthenCoverage(128) >= 128);
-            Assert.True(FontsLoader.StrengthenCoverage(64) >= 64);
-        }
-
-        [Fact]
-        public void StrengthenCoverage_InteriorForcedOpaque()
-        {
-            // The regression this fixes: mid coverage (the ~100-199 band that
-            // thin-stroke TTF interiors land in at 14-22px) must saturate to
-            // fully opaque, or colored fills render see-through.
-            Assert.Equal(255, FontsLoader.StrengthenCoverage(96));
-            Assert.Equal(255, FontsLoader.StrengthenCoverage(150));
-        }
-
-        [Fact]
         public void WeightCoverage_PreservesEndpoints()
         {
             Assert.Equal(0, FontsLoader.WeightCoverage(0));

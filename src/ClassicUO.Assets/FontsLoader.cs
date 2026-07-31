@@ -440,60 +440,12 @@ namespace ClassicUO.Assets
             return BlendChannel(0) | BlendChannel(8) | BlendChannel(16) | BlendChannel(24);
         }
 
-        // Perceptual boost for anti-aliased coverage. TTF atlas glyphs baked at
-        // small pixel sizes (14-22) have thin, heavily-antialiased strokes whose
-        // partial coverage makes text look faint beside the hard-edged classic
-        // 1bpp fonts. Lifting mid-coverage with a sub-1 gamma thickens/darkens the
-        // strokes while keeping the smooth edge intact (no thresholding, so no
-        // jaggies). 1.0f disables it; lower = bolder. Endpoints (0 and 255) are
-        // preserved so fully-transparent and fully-covered pixels never shift.
-        internal const float CoverageGamma = 0.70f;
-
-        // Coverage at or above this is treated as glyph interior and forced fully
-        // opaque, so stroke interiors are never see-through under premultiplied
-        // blend. Below it, a gamma ramp preserves smooth anti-aliased edges.
-        // Lower = more solid (thicker, less AA); higher = softer (thinner, more AA).
-        // NOTE: 3x oversampling (TtfGlyphSource) smooths edges but does NOT make
-        // thin-stroke interiors opaque at 14-22px (interiors land at ~100-199
-        // coverage), so this solidify pass is still required, not superseded.
-        internal const byte CoverageSolidAt = 96;
-
-        internal static byte StrengthenCoverage(byte coverage)
-        {
-            if (coverage == 0)
-            {
-                return 0;
-            }
-
-            // Interior: saturate to fully opaque so the fill isn't patchy/faint.
-            if (coverage >= CoverageSolidAt)
-            {
-                return 255;
-            }
-
-            // Edge: gamma-lift toward the solid threshold, keeping a smooth ramp
-            // (continuous at CoverageSolidAt, which maps to ~255) so edges stay
-            // anti-aliased instead of hard/jagged.
-            float t = coverage / (float)CoverageSolidAt;
-            int v = (int)(System.MathF.Pow(t, CoverageGamma) * 255f + 0.5f);
-
-            if (v < 1)
-            {
-                v = 1;
-            }
-            else if (v > 255)
-            {
-                v = 255;
-            }
-
-            return (byte)v;
-        }
-
-        // INCREMENT (weight): gentle stem-darkening for the raw TTF coverage.
-        // A sub-1 gamma lifts partial coverage so thin strokes read heavier/bolder
-        // WITHOUT a hard threshold (unlike StrengthenCoverage), so edges stay fully
-        // anti-aliased and no interior is punched to a hard 255 — no artifacts,
-        // just a bit more weight. Endpoints (0, 255) preserved. TUNE HERE:
+        // Gentle stem-darkening for the raw TTF coverage. Thin, heavily-antialiased
+        // strokes at small pixel sizes (14-22) read faint next to the hard-edged
+        // classic 1bpp fonts. A sub-1 gamma lifts partial coverage so strokes read
+        // heavier/bolder WITHOUT a hard threshold, so edges stay fully anti-aliased
+        // and no interior is punched to a hard 255 — no artifacts, just a bit more
+        // weight. Endpoints (0, 255) preserved. TUNE HERE:
         // 1.0f = off (raw), 0.85f ~ subtle, 0.70f = clearly bolder. Lower = heavier.
         internal const float CoverageWeightGamma = 0.80f;
 
