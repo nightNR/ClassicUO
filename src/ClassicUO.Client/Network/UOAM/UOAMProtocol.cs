@@ -2,10 +2,21 @@
 
 using System;
 using System.Buffers.Binary;
+using System.Collections.Generic;
 using System.Text;
 
 namespace ClassicUO.Network.UOAM
 {
+    internal enum UOAMResponseKind
+    {
+        Unknown,
+        HandshakeAck,
+        Ack,
+        NoChat,
+        ChatData,
+        PlayerList
+    }
+
     // Wire format reverse-engineered from E:\Projects\uoamhub\src\uoamhub.c (handle_packet,
     // process_position_update, handle_query_list, handle_poll). See
     // docs/superpowers/specs/2026-08-06-uoam-integration-design.md for the full derivation.
@@ -102,6 +113,96 @@ namespace ClassicUO.Network.UOAM
             }
 
             length = BinaryPrimitives.ReadUInt32LittleEndian(buffer.Slice(8, 4));
+            return true;
+        }
+
+        public static UOAMResponseKind Classify(ReadOnlySpan<byte> data)
+        {
+            if (data.Length < 16)
+            {
+                return UOAMResponseKind.Unknown;
+            }
+
+            if (data[2] == 0x0c)
+            {
+                return UOAMResponseKind.HandshakeAck;
+            }
+
+            if (data.Length < 24)
+            {
+                return UOAMResponseKind.Unknown;
+            }
+
+            uint marker16 = BinaryPrimitives.ReadUInt32LittleEndian(data.Slice(16, 4));
+            uint marker20 = BinaryPrimitives.ReadUInt32LittleEndian(data.Slice(20, 4));
+
+            if (marker16 == 0x00000004 && marker20 == 0x00000000)
+            {
+                return UOAMResponseKind.Ack;
+            }
+
+            if (marker16 == 0x00000014 && marker20 == 0x00000001)
+            {
+                return UOAMResponseKind.NoChat;
+            }
+
+            if (marker16 == 0xFFFFFFFF && marker20 == 0x00000001)
+            {
+                return UOAMResponseKind.ChatData;
+            }
+
+            if (marker16 == 0xFFFFFFFF && marker20 == 0x00000000)
+            {
+                return UOAMResponseKind.PlayerList;
+            }
+
+            return UOAMResponseKind.Unknown;
+        }
+
+        public static bool TryParsePlayerList(ReadOnlySpan<byte> data, List<UOAMPlayerInfo> results)
+        {
+            if (Classify(data) != UOAMResponseKind.PlayerList || data.Length < 36)
+            {
+                return false;
+            }
+
+            uint count = BinaryPrimitives.ReadUInt32LittleEndian(data.Slice(24, 4));
+            int offset = 36;
+
+            for (uint i = 0; i < count && offset + UOAMPlayerInfoCodec.Size <= data.Length; i++)
+            {
+                if (UOAMPlayerInfoCodec.TryDecode(data.Slice(offset, UOAMPlayerInfoCodec.Size), out UOAMPlayerInfo info))
+                {
+                    results.Add(info);
+                }
+
+                offset += UOAMPlayerInfoCodec.Size;
+            }
+
+            return true;
+        }
+
+        public static bool TryParseChatData(ReadOnlySpan<byte> data, out byte subtype, out string text)
+        {
+            subtype = 0;
+            text = null;
+
+            if (Classify(data) != UOAMResponseKind.ChatData || data.Length < 25)
+            {
+                return false;
+            }
+
+            subtype = data[24];
+
+            if (subtype != 0x01)
+            {
+                return true; // font/color or unknown sub-sub-type: no text to extract
+            }
+
+            ReadOnlySpan<byte> payload = data.Slice(25, data.Length - 25 - 5); // strip 5-byte trailer
+            int nul = payload.IndexOf((byte)0);
+            text = Encoding.ASCII.GetString(nul >= 0 ? payload.Slice(0, nul) : payload);
+
             return true;
         }
     }
