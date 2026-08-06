@@ -401,6 +401,19 @@ namespace ClassicUO.Game.UI.Gumps
 
             Add
             (
+                new NiceButton
+                (
+                    10,
+                    10 + 30 * i++,
+                    140,
+                    25,
+                    ButtonAction.SwitchPage,
+                    "UOAM"
+                ) { ButtonParameter = 16 }
+            );
+
+            Add
+            (
                 new Line
                 (
                     160,
@@ -477,6 +490,7 @@ namespace ClassicUO.Game.UI.Gumps
             BuildAliases();
             BuildStatusbarColors();
             BuildStatusBars();
+            BuildUOAM();
 
             ChangePage(1);
         }
@@ -3725,6 +3739,103 @@ namespace ClassicUO.Game.UI.Gumps
             Add(rightArea, PAGE);
         }
 
+        private Checkbox _uoamAutoConnect, _uoamAutoOpenChat;
+        private InputField _uoamPlayerName, _uoamServerIP, _uoamServerPort, _uoamPassword;
+        private NiceButton _uoamConnectButton;
+        private DataBox _uoamAliasDataBox;
+
+        private void BuildUOAM()
+        {
+            const int PAGE = 16;
+
+            ScrollArea rightArea = new ScrollArea(190, 20, WIDTH - 210, 420, true);
+
+            int y = 5;
+
+            _uoamPlayerName = AddInputField(rightArea, 5, y, 200, 20, "Player name", set_down: true);
+            _uoamPlayerName.SetText(_currentProfile.UOAMPlayerName);
+            y = _uoamPlayerName.Y + _uoamPlayerName.Height + 8;
+
+            _uoamServerIP = AddInputField(rightArea, 5, y, 200, 20, "Server IP", set_down: true);
+            _uoamServerIP.SetText(_currentProfile.UOAMServerIP);
+            y = _uoamServerIP.Y + _uoamServerIP.Height + 8;
+
+            _uoamServerPort = AddInputField(rightArea, 5, y, 100, 20, "Server port", set_down: true, numbersOnly: true);
+            _uoamServerPort.SetText(_currentProfile.UOAMServerPort.ToString());
+            y = _uoamServerPort.Y + _uoamServerPort.Height + 8;
+
+            _uoamPassword = AddInputField(rightArea, 5, y, 200, 20, "Password", set_down: true);
+            _uoamPassword.SetText(_currentProfile.UOAMPassword);
+            y = _uoamPassword.Y + _uoamPassword.Height + 8;
+
+            _uoamAutoConnect = AddCheckBox(rightArea, "Auto-connect", _currentProfile.UOAMAutoConnect, 5, y);
+            y += _uoamAutoConnect.Height + 4;
+
+            _uoamAutoOpenChat = AddCheckBox(rightArea, "Auto-open chat", _currentProfile.UOAMAutoOpenChat, 5, y);
+            y += _uoamAutoOpenChat.Height + 8;
+
+            _uoamConnectButton = new NiceButton(5, y, 120, 25, ButtonAction.Activate, World.UOAM.IsConnected ? "Disconnect" : "Connect") { ButtonParameter = 999 };
+            _uoamConnectButton.MouseUp += (s, e) =>
+            {
+                if (World.UOAM.IsConnected)
+                {
+                    World.UOAM.Disconnect();
+                }
+                else
+                {
+                    ApplyUOAMProfileFields();
+                    World.UOAM.Connect();
+                }
+
+                _uoamConnectButton.TextLabel.Text = World.UOAM.IsConnected ? "Disconnect" : "Connect";
+            };
+            rightArea.Add(_uoamConnectButton);
+            y += _uoamConnectButton.Height + 12;
+
+            AddLabel(rightArea, "Name aliases (UOAM name -> character name):", 5, y);
+            y += 16 + 4;
+
+            NiceButton addAliasButton = new NiceButton(5, y, 100, 22, ButtonAction.Activate, "+ Add") { ButtonParameter = 999 };
+            rightArea.Add(addAliasButton);
+            y += addAliasButton.Height + 4;
+
+            _uoamAliasDataBox = new DataBox(0, y, 0, 0) { WantUpdateSize = true };
+
+            void AddAliasRow(string uoamName, string charName)
+            {
+                var row = new UOAMAliasRow(uoamName, charName) { Y = _uoamAliasDataBox.Children.Count * 26 };
+                _uoamAliasDataBox.Add(row);
+            }
+
+            foreach (var kvp in UOAMNameAliasSerializer.Parse(_currentProfile.UOAMNameAliases))
+            {
+                AddAliasRow(kvp.Key, kvp.Value);
+            }
+
+            addAliasButton.MouseUp += (s, e) =>
+            {
+                AddAliasRow(string.Empty, string.Empty);
+                _uoamAliasDataBox.ReArrangeChildren();
+            };
+
+            rightArea.Add(_uoamAliasDataBox);
+
+            Add(rightArea, PAGE);
+        }
+
+        private void ApplyUOAMProfileFields()
+        {
+            _currentProfile.UOAMPlayerName = _uoamPlayerName.Text;
+            _currentProfile.UOAMServerIP = _uoamServerIP.Text;
+
+            if (ushort.TryParse(_uoamServerPort.Text, out ushort port))
+            {
+                _currentProfile.UOAMServerPort = port;
+            }
+
+            _currentProfile.UOAMPassword = _uoamPassword.Text;
+        }
+
         private void BuildInfoBar()
         {
             const int PAGE = 10;
@@ -4596,6 +4707,21 @@ namespace ClassicUO.Game.UI.Gumps
 
             Client.Game.Audio.UpdateCurrentMusicVolume();
             Client.Game.Audio.UpdateCurrentSoundsVolume();
+
+            // UOAM
+            ApplyUOAMProfileFields();
+            _currentProfile.UOAMAutoConnect = _uoamAutoConnect.IsChecked;
+            _currentProfile.UOAMAutoOpenChat = _uoamAutoOpenChat.IsChecked;
+
+            var uoamAliases = new Dictionary<string, string>();
+            foreach (var child in _uoamAliasDataBox.Children)
+            {
+                if (child is UOAMAliasRow row && !string.IsNullOrWhiteSpace(row.UoamName) && !string.IsNullOrWhiteSpace(row.CharName))
+                {
+                    uoamAliases[row.UoamName.Trim()] = row.CharName.Trim();
+                }
+            }
+            _currentProfile.UOAMNameAliases = UOAMNameAliasSerializer.Serialize(uoamAliases);
 
             if (!_currentProfile.EnableMusic)
             {
