@@ -10,6 +10,7 @@ using ClassicUO.Game.UI.Controls;
 using ClassicUO.Input;
 using ClassicUO.IO;
 using ClassicUO.Network.Encryption;
+using ClassicUO.Network.UOAM;
 using ClassicUO.Renderer;
 using ClassicUO.Resources;
 using ClassicUO.Utility;
@@ -82,6 +83,7 @@ namespace ClassicUO.Game.UI.Gumps
         private bool _showMobiles = true;
         private bool _showMultis = true;
         private bool _showPartyMembers = true;
+        private bool _showUOAMPlayers = true;
         private bool _showPlayerBar = true;
         private bool _showPlayerName = true;
         private int _zoomIndex = 4;
@@ -184,6 +186,7 @@ namespace ClassicUO.Game.UI.Gumps
 
             _flipMap = ProfileManager.CurrentProfile.WorldMapFlipMap;
             _showPartyMembers = ProfileManager.CurrentProfile.WorldMapShowParty;
+            _showUOAMPlayers = ProfileManager.CurrentProfile.WorldMapShowUOAMPlayers;
 
             World.WMapManager.SetEnable(_showPartyMembers);
 
@@ -228,6 +231,7 @@ namespace ClassicUO.Game.UI.Gumps
             ProfileManager.CurrentProfile.WorldMapTopMost = TopMost;
             ProfileManager.CurrentProfile.WorldMapFreeView = FreeView;
             ProfileManager.CurrentProfile.WorldMapShowParty = _showPartyMembers;
+            ProfileManager.CurrentProfile.WorldMapShowUOAMPlayers = _showUOAMPlayers;
 
             ProfileManager.CurrentProfile.WorldMapZoomIndex = _zoomIndex;
 
@@ -307,6 +311,13 @@ namespace ClassicUO.Game.UI.Gumps
                 },
                 true,
                 _showPartyMembers
+            );
+
+            _options["show_uoam_players"] = new ContextMenuItemEntry(
+                "Show UOAM players",
+                () => { _showUOAMPlayers = !_showUOAMPlayers; SaveSettings(); },
+                true,
+                _showUOAMPlayers
             );
 
             _options["show_mobiles"] = new ContextMenuItemEntry(ResGumps.ShowMobiles, () => { _showMobiles = !_showMobiles; SaveSettings(); }, true, _showMobiles);
@@ -515,6 +526,7 @@ namespace ClassicUO.Game.UI.Gumps
 
             ContextMenu.Add("", null);
             ContextMenu.Add(_options["show_party_members"]);
+            ContextMenu.Add(_options["show_uoam_players"]);
             ContextMenu.Add(_options["show_mobiles"]);
             ContextMenu.Add(_options["show_multis"]);
             ContextMenu.Add(_options["show_coordinates"]);
@@ -2278,6 +2290,45 @@ namespace ClassicUO.Game.UI.Gumps
                             }
                         }
                     }
+                }
+            }
+
+            if (_showUOAMPlayers && World.UOAM != null)
+            {
+                var uoamAliases = UOAMNameAliasSerializer.Parse(ProfileManager.CurrentProfile.UOAMNameAliases);
+
+                foreach (var kvp in World.UOAM.Players.Players)
+                {
+                    UOAMPlayerInfo uoamPlayer = kvp.Value;
+                    uoamAliases.TryGetValue(uoamPlayer.Name, out string aliasedName);
+
+                    if (UOAMPlayerManager.IsDuplicateOfPartyOrGuild(uoamPlayer, aliasedName, World.WMapManager, toleranceTiles: 8))
+                    {
+                        continue;
+                    }
+
+                    bool sameFacet = uoamPlayer.Map == _map.Index;
+
+                    WMapEntity uoamEntity = new WMapEntity(unchecked((uint)uoamPlayer.Name.GetHashCode()))
+                    {
+                        Name = uoamPlayer.Name,
+                        Map = uoamPlayer.Map,
+                        X = sameFacet ? uoamPlayer.X : 0,
+                        Y = sameFacet ? uoamPlayer.Y : 0,
+                        IsGuild = false
+                    };
+
+                    DrawWMEntity
+                    (
+                        batcher,
+                        uoamEntity,
+                        gX,
+                        gY,
+                        halfWidth,
+                        halfHeight,
+                        Zoom,
+                        layerDepth
+                    );
                 }
             }
 
