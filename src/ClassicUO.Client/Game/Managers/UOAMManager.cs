@@ -2,6 +2,7 @@
 
 using System;
 using ClassicUO.Configuration;
+using ClassicUO.Game.UI.Gumps;
 using ClassicUO.Network.UOAM;
 
 namespace ClassicUO.Game.Managers
@@ -24,7 +25,15 @@ namespace ClassicUO.Game.Managers
 
             _client.PlayerListReceived += list => Players.UpdateFromList(list);
             _client.ChatTextReceived += text => ChatTextReceived?.Invoke(text);
-            _client.Connected += () => GameActions.Print(_world, "UOAM: connected", 0x2B);
+            _client.Connected += () =>
+            {
+                GameActions.Print(_world, "UOAM: connected", 0x2B);
+
+                if (ProfileManager.CurrentProfile != null && ProfileManager.CurrentProfile.UOAMAutoOpenChat && UIManager.GetGump<UOAMChatGump>() == null)
+                {
+                    UIManager.Add(new UOAMChatGump(_world));
+                }
+            };
             _client.Disconnected += () =>
             {
                 Players.Clear();
