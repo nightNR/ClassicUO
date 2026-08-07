@@ -12,7 +12,9 @@ namespace ClassicUO.Game.Managers
         private const uint PositionIntervalMs = 2000;
         private const uint ChatPollIntervalMs = 1500;
         private const uint ListQueryIntervalMs = 3000;
-        private const uint ReconnectDelayMs = 5000;
+        private const uint ReconnectBaseDelayMs = 5000;
+        private const uint ReconnectMaxDelayMs = 60000;
+        private const int MaxReconnectAttempts = 5;
 
         private readonly World _world;
         private readonly UOAMClient _client = new UOAMClient();
@@ -20,6 +22,7 @@ namespace ClassicUO.Game.Managers
         private bool _manualDisconnect;
         private uint _nextPositionSend, _nextChatPoll, _nextListQuery;
         private uint _reconnectAt;
+        private int _reconnectAttempt;
 
         public UOAMManager(World world)
         {
@@ -31,6 +34,7 @@ namespace ClassicUO.Game.Managers
             _client.Connected += () =>
             {
                 GameActions.Print(_world, "UOAM: connected", 0x2B);
+                _reconnectAttempt = 0;
 
                 if (ProfileManager.CurrentProfile != null && ProfileManager.CurrentProfile.UOAMAutoOpenChat && UIManager.GetGump<UOAMChatGump>() == null)
                 {
@@ -44,16 +48,27 @@ namespace ClassicUO.Game.Managers
                 if (_manualDisconnect)
                 {
                     GameActions.Print(_world, "UOAM: disconnected", 0x2B);
+
+                    return;
                 }
-                else
+
+                // Connection dropped unexpectedly (idle timeout, network blip, the
+                // server actively closing it, ...) - retry with exponential backoff
+                // instead of either sitting silently disconnected or hammering the
+                // server with immediate reconnects (which can itself look like abuse
+                // and get further attempts rejected outright).
+                _reconnectAttempt++;
+
+                if (_reconnectAttempt > MaxReconnectAttempts)
                 {
-                    // Connection dropped unexpectedly (idle timeout, network blip, the
-                    // game window losing focus and throttling the update loop long
-                    // enough for the server's own idle timeout to fire, ...) - retry
-                    // instead of silently sitting disconnected until the player notices.
-                    GameActions.Print(_world, "UOAM: connection lost, retrying...", 0x2B);
-                    _reconnectAt = Time.Ticks + ReconnectDelayMs;
+                    GameActions.Print(_world, $"UOAM: connection lost, giving up after {MaxReconnectAttempts} attempts - reconnect manually", 0x2B);
+
+                    return;
                 }
+
+                uint delay = (uint)Math.Min(ReconnectBaseDelayMs * (1u << (_reconnectAttempt - 1)), ReconnectMaxDelayMs);
+                GameActions.Print(_world, $"UOAM: connection lost, retrying in {delay / 1000}s (attempt {_reconnectAttempt}/{MaxReconnectAttempts})...", 0x2B);
+                _reconnectAt = Time.Ticks + delay;
             };
         }
 
@@ -68,6 +83,15 @@ namespace ClassicUO.Game.Managers
         public event Action<string, string> ChatTextReceived;
 
         public void Connect()
+        {
+            // A fresh (manual, or autoconnect-on-login) request always gets a full set
+            // of retries, independent of however many backoff attempts a previous
+            // connection's failure sequence had already used up.
+            _reconnectAttempt = 0;
+            ConnectInternal();
+        }
+
+        private void ConnectInternal()
         {
             Profile profile = ProfileManager.CurrentProfile;
 
@@ -95,6 +119,7 @@ namespace ClassicUO.Game.Managers
 
             _manualDisconnect = true;
             _reconnectAt = 0;
+            _reconnectAttempt = 0;
             _client.Disconnect();
             Players.Clear();
             TrackedPlayerName = null;
@@ -145,7 +170,7 @@ namespace ClassicUO.Game.Managers
             if (_reconnectAt != 0 && Time.Ticks >= _reconnectAt && !_client.IsConnected && !_client.IsConnecting)
             {
                 _reconnectAt = 0;
-                Connect();
+                ConnectInternal();
             }
 
             _client.Update();
