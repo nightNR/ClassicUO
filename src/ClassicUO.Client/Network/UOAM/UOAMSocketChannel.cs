@@ -65,7 +65,11 @@ namespace ClassicUO.Network.UOAM
 
             int generation = ++_connectGeneration;
 
-            SocketWrapper socket = new TcpSocketWrapper();
+            // Abortive close (RST) - see TcpSocketWrapper's constructor comment. A real
+            // UOAM client always RSTs on disconnect; matching that gets us evicted from
+            // the hub's player list as promptly as it is, instead of lingering after a
+            // graceful FIN.
+            SocketWrapper socket = new TcpSocketWrapper(abortiveClose: true);
             socket.OnConnected += (_, _) => { if (generation == _connectGeneration) _pendingConnectSuccess = true; };
             socket.OnDisconnected += (_, _) => { if (generation == _connectGeneration) _pendingConnectFailure = true; };
             socket.OnError += (_, e) =>

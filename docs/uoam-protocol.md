@@ -402,6 +402,25 @@ originally noticed - the OS doesn't surface the server's FIN as a local error
 until the next write) lets the reconnect/backoff timer start a couple of
 seconds sooner. See `UOAMSocketChannel.Fault()`.
 
+## Disconnect (no explicit logout packet)
+
+There is no application-layer "I'm leaving" packet. Confirmed live
+(`UOAM9.pcapng`, 2026-08-07, two real UOAM.exe instances, each disconnected via
+its own UI button and then the app closed): every one of a client's sockets
+gets an ordinary `RST` (`0x0014` TCP flags), all fired within the same
+millisecond, with nothing but normal traffic (position updates, chat polls)
+right up to it - no special packet precedes the reset. A real client
+apparently never performs a graceful TCP close (`FIN`) at all, not even via
+its own explicit disconnect button.
+
+This client originally closed gracefully (`FIN`) on disconnect, which appeared
+to make the hub linger on removing it from other clients' player lists longer
+than a real client's abrupt `RST` does. `UOAMSocketChannel` now opens its
+`TcpSocketWrapper` with `abortiveClose: true` (`Socket.LingerState =
+new LingerOption(true, 0)`), so `Disconnect()`/`Dispose()` sends `RST` instead
+of `FIN`, matching the real client's behavior. Only the UOAM connections do
+this - the main game server connection is unaffected.
+
 ## Panic
 
 Never captured — out of scope. See `docs/superpowers/specs/2026-08-06-uoam-integration-design.md`
