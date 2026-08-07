@@ -208,6 +208,24 @@ namespace ClassicUO.UnitTests.Network.UOAM
             Assert.Equal(UOAMResponseKind.Ack, UOAMProtocol.Classify(CapturedChatRegisterAck));
         }
 
+        // Ground truth (UOAM7.pcapng, 2026-08-07): a real DCE/RPC fault on a fresh
+        // primary connection, echoing the position update's sequence number (3) and
+        // carrying NCA status 0x1c01000b instead of the query-list response. Seen
+        // reconnecting under the same player name shortly after a previous session
+        // that had fully registered - the server tore the connection down with a FIN
+        // immediately after sending this.
+        private static readonly byte[] CapturedFault =
+        {
+            0x05, 0x00, 0x03, 0x03, 0x10, 0x00, 0x00, 0x00, 0x20, 0x00, 0x00, 0x00, 0x03, 0x00, 0x00, 0x00,
+            0x20, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0b, 0x00, 0x01, 0x1c, 0x00, 0x00, 0x00, 0x00
+        };
+
+        [Fact]
+        public void Classify_RecognizesCapturedFault()
+        {
+            Assert.Equal(UOAMResponseKind.Fault, UOAMProtocol.Classify(CapturedFault));
+        }
+
         [Fact]
         public void BuildChatRegister_MatchesCapturedRealClientRequest()
         {

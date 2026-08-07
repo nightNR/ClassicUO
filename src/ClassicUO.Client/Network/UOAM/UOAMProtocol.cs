@@ -14,7 +14,8 @@ namespace ClassicUO.Network.UOAM
         Ack,
         NoChat,
         ChatData,
-        PlayerList
+        PlayerList,
+        Fault
     }
 
     // Wire format verified against a real hub session capture (map.knuckleheads.dk:2000,
@@ -339,6 +340,20 @@ namespace ClassicUO.Network.UOAM
             if (data[2] == 0x0c)
             {
                 return UOAMResponseKind.HandshakeAck;
+            }
+
+            // A DCE/RPC fault PDU (ptype 3) - covers both the chat-on-primary-socket
+            // fault (docs/uoam-protocol.md "Two connections") and a second, distinct
+            // fault seen live on a fresh primary connection carrying a genuine NCA status
+            // code at offset 24-27 (e.g. 0x1c01000b) when reconnecting under the same
+            // player name too soon after a previous session fully registered -
+            // server-side session churn, not a malformed request (byte-identical requests
+            // succeed moments later/earlier in the same capture). Either way, the
+            // connection is done for; the caller should treat it like a disconnect
+            // instead of waiting for a subsequent Send() to fail.
+            if (data[2] == 0x03)
+            {
+                return UOAMResponseKind.Fault;
             }
 
             if (data[2] != 0x02 || data.Length < 24)

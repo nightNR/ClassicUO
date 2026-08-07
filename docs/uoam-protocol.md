@@ -7,7 +7,12 @@ real client always opens two sockets (this document previously only accounted
 for one), and every chat-family request this client sent on the primary
 connection got an explicit RPC fault, no matter how byte-perfect, until it
 started opening and binding a second connection the same way. See "Two
-connections" below. Panic is **not** covered — never captured, still unknown.
+connections" below. Separately, the server can also fault a *fresh* primary
+connection outright if it's reconnecting under the same player name too soon
+after a previous session fully registered - see "Faults" below; this looks
+like server-side session-cleanup timing, not a client bug, and is only
+mitigated (not fixed) by backing off before retrying. Panic is **not**
+covered — never captured, still unknown.
 
 This document supersedes `src/uoamhub/*.c` as the source of truth for the client
 implementation in `src/ClassicUO.Client/Network/UOAM/`. `uoamhub` is a from-scratch
@@ -47,6 +52,7 @@ Packet types seen:
 | `0x0f` | S→C | response to `0x0e` |
 | `0x00` | C→S | data (position update / query-list / chat poll / chat send) |
 | `0x02` | S→C | data response (ack / no-chat / player-list / chat-data) |
+| `0x03` | S→C | DCE/RPC fault (see "Faults" below) |
 
 These type values line up with DCE/RPC PDU type numbers (11=bind, 12=bind_ack,
 13=bind_nak, 0=request, 2=response) — the protocol is built on an RPC/NDR-style
@@ -348,6 +354,53 @@ same meaning either way. Only once length rules out 28 does marker20 matter:
 | 44 | 1 | NoChat |
 | anything else | 0 | PlayerList |
 | anything else | 1 | ChatData |
+
+## Faults (type `0x03`, S→C)
+
+A genuine DCE/RPC fault PDU. Two distinct causes have been observed live, both
+classified the same way (`UOAMResponseKind.Fault`) since either means the
+connection is over:
+
+1. **Chat sent on the primary connection** (see "Two connections" above) -
+   every chat-family request (poll/register/send) faults when sent on the
+   wrong socket, byte-for-byte-identical bytes notwithstanding.
+2. **Reconnecting under the same player name too soon** after a previous
+   session fully registered with the server. Captured live (`UOAM7.pcapng`,
+   2026-08-07): a fresh primary connection's handshake, mystery packet, and
+   position update all succeeded normally, but the very next request (query
+   list) got this back instead of a player list:
+
+   ```
+   05 00 03 03 10 00 00 00 20 00 00 00 03 00 00 00
+   20 00 00 00 00 00 00 00 0b 00 01 1c 00 00 00 00
+   ```
+
+   offset 24-27 is an NCA-style status code (`0x1c01000b` here - high word
+   `0x1c01` is the standard "Win32 error mapped into NCA status space" prefix,
+   low word `0x000b` = Win32 `ERROR_BAD_FORMAT`). The server then closes the
+   connection with a FIN a few milliseconds later. In the same capture, a
+   short-lived connection that itself faulted immediately was followed 8
+   seconds later by a full, stable reconnect under the same name - but a
+   *fully-registered* 38-second session (during which chat worked, messages
+   were sent) was followed by two more reconnect attempts, 8 and 16 seconds
+   after its own graceful disconnect, that both faulted the same way. This
+   suggests the server takes longer to release a player-name slot after a
+   session that actually registered than after one that never got that far -
+   exact cooldown unconfirmed, but it's longer than ~16 seconds.
+
+   This is server-side state, not a malformed request - the exact same
+   request bytes succeed in other connections in the same capture. There is
+   no known client-side fix beyond backing off before retrying under the same
+   name; `UOAMManager`'s existing exponential-backoff reconnect (see
+   `SustainedConnectionMs` in `UOAMManager.cs`) already does this for
+   *automatic* reconnects, but a **manual** disconnect+reconnect bypasses it
+   entirely and can hit this immediately.
+
+Detecting a fault as soon as it arrives (rather than waiting for a subsequent
+`Send()` to throw `IOException`/`SocketException`, which is how this was
+originally noticed - the OS doesn't surface the server's FIN as a local error
+until the next write) lets the reconnect/backoff timer start a couple of
+seconds sooner. See `UOAMSocketChannel.Fault()`.
 
 ## Panic
 

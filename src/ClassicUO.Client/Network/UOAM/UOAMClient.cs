@@ -16,8 +16,8 @@ namespace ClassicUO.Network.UOAM
     internal sealed class UOAMClient
     {
         private readonly byte[] _ipMarker = new byte[4];
-        private readonly UOAMSocketChannel _primary = new UOAMSocketChannel();
-        private readonly UOAMSocketChannel _chat = new UOAMSocketChannel();
+        private readonly UOAMSocketChannel _primary = new UOAMSocketChannel("primary");
+        private readonly UOAMSocketChannel _chat = new UOAMSocketChannel("chat");
 
         private string _connectIp;
         private ushort _connectPort;
@@ -194,6 +194,15 @@ namespace ClassicUO.Network.UOAM
                     PlayerListReceived?.Invoke(players);
                     break;
 
+                case UOAMResponseKind.Fault:
+                    // Server considers this connection dead (see UOAMProtocol.Classify) -
+                    // it will follow up with a FIN/RST shortly if it hasn't already.
+                    // Disconnect proactively instead of waiting for a subsequent Send()
+                    // to throw, so the reconnect/backoff timer starts sooner.
+                    Log.Warn($"UOAM: primary connection faulted (status 0x{ReadFaultStatus(data):x8})");
+                    _primary.Fault();
+                    break;
+
                 case UOAMResponseKind.Ack:
                 case UOAMResponseKind.NoChat:
                 case UOAMResponseKind.ChatData:
@@ -201,6 +210,9 @@ namespace ClassicUO.Network.UOAM
                     break; // nothing to do (chat-shaped responses never arrive on primary)
             }
         }
+
+        private static uint ReadFaultStatus(byte[] data) =>
+            data.Length >= 28 ? System.Buffers.Binary.BinaryPrimitives.ReadUInt32LittleEndian(data.AsSpan(24, 4)) : 0;
 
         private void OnChatFrame(byte[] data)
         {
@@ -215,6 +227,13 @@ namespace ClassicUO.Network.UOAM
                     {
                         ChatTextReceived?.Invoke(senderName, text);
                     }
+                    break;
+
+                case UOAMResponseKind.Fault:
+                    // Chat faulting doesn't need to tear down the primary connection -
+                    // OnChatDisconnected already treats losing chat as non-fatal.
+                    Log.Warn($"UOAM: chat connection faulted (status 0x{ReadFaultStatus(data):x8})");
+                    _chat.Fault();
                     break;
 
                 case UOAMResponseKind.Ack:

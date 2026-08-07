@@ -38,6 +38,7 @@ namespace ClassicUO.Network.UOAM
         private volatile bool _pendingConnectFailure;
         private int _connectGeneration;
         private long _connectDeadline;
+        private readonly string _name;
 
         public bool IsConnected => _socket != null && _socket.IsConnected;
         public bool IsConnecting => _connecting;
@@ -46,6 +47,11 @@ namespace ClassicUO.Network.UOAM
         public event Action Connected;
         public event Action Disconnected;
         public event Action<byte[]> FrameReceived;
+
+        public UOAMSocketChannel(string name)
+        {
+            _name = name;
+        }
 
         public void Connect(string ip, ushort port)
         {
@@ -64,7 +70,7 @@ namespace ClassicUO.Network.UOAM
             socket.OnDisconnected += (_, _) => { if (generation == _connectGeneration) _pendingConnectFailure = true; };
             socket.OnError += (_, e) =>
             {
-                Log.Warn($"UOAM socket error: {e}");
+                Log.Warn($"UOAM[{_name}] socket error: {e}");
                 if (generation == _connectGeneration)
                 {
                     _pendingConnectFailure = true;
@@ -81,7 +87,7 @@ namespace ClassicUO.Network.UOAM
                 }
                 catch (Exception ex)
                 {
-                    Log.Warn($"UOAM connect failed: {ex}");
+                    Log.Warn($"UOAM[{_name}] connect failed: {ex}");
 
                     if (generation == _connectGeneration)
                     {
@@ -105,6 +111,18 @@ namespace ClassicUO.Network.UOAM
             _socket = null;
         }
 
+        // The protocol layer decided this connection is dead (e.g. a DCE/RPC fault
+        // response - see UOAMProtocol.Classify) even though the socket itself hasn't
+        // failed yet. Close it and fire Disconnected, same as a genuine socket failure
+        // would, so callers don't need two different "this connection is over" paths.
+        public void Fault()
+        {
+            _connecting = false;
+            ++_connectGeneration;
+            _socket?.Disconnect();
+            HandleDisconnected();
+        }
+
         public void ExtendConnectDeadline()
         {
             _connectDeadline = Environment.TickCount64 + ConnectTimeoutMs;
@@ -122,7 +140,7 @@ namespace ClassicUO.Network.UOAM
                 // SocketException) - an unhandled one here previously crashed the whole
                 // client, since this runs on the main game loop thread with nothing
                 // above it to catch a stray exception.
-                Log.Warn($"UOAM send failed: {ex}");
+                Log.Warn($"UOAM[{_name}] send failed: {ex}");
                 HandleDisconnected();
             }
         }
@@ -145,7 +163,7 @@ namespace ClassicUO.Network.UOAM
                 }
                 else if (Environment.TickCount64 >= _connectDeadline)
                 {
-                    Log.Warn("UOAM connect timed out");
+                    Log.Warn($"UOAM[{_name}] connect timed out");
                     ++_connectGeneration; // orphan the stuck background attempt, if any
                     _connecting = false;
                     HandleDisconnected();
@@ -176,7 +194,7 @@ namespace ClassicUO.Network.UOAM
             {
                 // NetworkStream.Read wraps socket failures in IOException (not
                 // SocketException) - same crash risk as Send(), see its comment.
-                Log.Warn($"UOAM read failed: {ex}");
+                Log.Warn($"UOAM[{_name}] read failed: {ex}");
                 HandleDisconnected();
                 return;
             }
@@ -194,7 +212,7 @@ namespace ClassicUO.Network.UOAM
         {
             if (_recvLength + length > _recvBuffer.Length)
             {
-                Log.Warn("UOAM recv buffer overflow, dropping connection");
+                Log.Warn($"UOAM[{_name}] recv buffer overflow, dropping connection");
                 Disconnect();
                 return;
             }
