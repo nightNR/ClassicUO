@@ -14,6 +14,14 @@ namespace ClassicUO.Game.Managers
         private const uint ReconnectBaseDelayMs = 5000;
         private const uint ReconnectMaxDelayMs = 60000;
         private const int MaxReconnectAttempts = 5;
+        // A live capture showed the server FIN+RST-ing several reconnect attempts in a
+        // row within ~120ms of the handshake completing, each one still counted as a
+        // "success" by the old code (which reset the backoff to attempt 1 the instant
+        // Connected fired). That made the exponential backoff never actually escalate -
+        // it kept retrying every ~5s indefinitely, which likely looked like abuse to
+        // the server and made things worse. Only reset the backoff once a connection
+        // has stayed up for a real stretch, not merely completed its handshake.
+        private const uint SustainedConnectionMs = 20000;
 
         private readonly World _world;
         private readonly UOAMClient _client = new UOAMClient();
@@ -22,6 +30,7 @@ namespace ClassicUO.Game.Managers
         private uint _nextPositionSend, _nextListQuery;
         private uint _reconnectAt;
         private int _reconnectAttempt;
+        private uint _connectedAt;
 
         public UOAMManager(World world)
         {
@@ -33,7 +42,7 @@ namespace ClassicUO.Game.Managers
             _client.Connected += () =>
             {
                 GameActions.Print(_world, "UOAM: connected", 0x2B);
-                _reconnectAttempt = 0;
+                _connectedAt = Time.Ticks;
 
                 if (ProfileManager.CurrentProfile != null && ProfileManager.CurrentProfile.UOAMAutoOpenChat && UIManager.GetGump<UOAMChatGump>() == null)
                 {
@@ -50,6 +59,16 @@ namespace ClassicUO.Game.Managers
 
                     return;
                 }
+
+                // A connection that stayed up for a real stretch earns a fresh backoff
+                // sequence; one that died almost immediately after connecting (see the
+                // SustainedConnectionMs comment above) does not - it keeps escalating.
+                if (_connectedAt != 0 && Time.Ticks - _connectedAt >= SustainedConnectionMs)
+                {
+                    _reconnectAttempt = 0;
+                }
+
+                _connectedAt = 0;
 
                 // Connection dropped unexpectedly (idle timeout, network blip, the
                 // server actively closing it, ...) - retry with exponential backoff
@@ -105,6 +124,7 @@ namespace ClassicUO.Game.Managers
 
             _manualDisconnect = false;
             _reconnectAt = 0;
+            _connectedAt = 0;
             _nextPositionSend = 0;
             _nextListQuery = 0;
 
@@ -118,6 +138,7 @@ namespace ClassicUO.Game.Managers
             _manualDisconnect = true;
             _reconnectAt = 0;
             _reconnectAttempt = 0;
+            _connectedAt = 0;
             _client.Disconnect();
             Players.Clear();
             TrackedPlayerName = null;
