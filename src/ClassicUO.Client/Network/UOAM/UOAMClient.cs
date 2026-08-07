@@ -2,6 +2,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Net;
 using System.Net.Sockets;
 using System.Threading.Tasks;
@@ -190,8 +191,12 @@ namespace ClassicUO.Network.UOAM
             {
                 _socket?.Send(packet, 0, packet.Length);
             }
-            catch (SocketException ex)
+            catch (Exception ex) when (ex is SocketException or IOException or ObjectDisposedException)
             {
+                // NetworkStream.Write wraps socket failures in IOException (not
+                // SocketException) - an unhandled one here previously crashed the whole
+                // client, since this runs on the main game loop thread with nothing
+                // above it to catch a stray exception.
                 Log.Warn($"UOAM send failed: {ex}");
                 HandleDisconnected();
             }
@@ -230,16 +235,27 @@ namespace ClassicUO.Network.UOAM
 
             int read;
 
-            do
+            try
             {
-                read = _socket.Read(_readScratch);
-
-                if (read > 0)
+                do
                 {
-                    AppendToRecvBuffer(_readScratch, read);
+                    read = _socket.Read(_readScratch);
+
+                    if (read > 0)
+                    {
+                        AppendToRecvBuffer(_readScratch, read);
+                    }
                 }
+                while (read == _readScratch.Length);
             }
-            while (read == _readScratch.Length);
+            catch (Exception ex) when (ex is SocketException or IOException or ObjectDisposedException)
+            {
+                // NetworkStream.Read wraps socket failures in IOException (not
+                // SocketException) - same crash risk as Send(), see its comment.
+                Log.Warn($"UOAM read failed: {ex}");
+                HandleDisconnected();
+                return;
+            }
 
             ProcessBufferedPackets();
         }
