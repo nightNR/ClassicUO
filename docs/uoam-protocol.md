@@ -1,28 +1,13 @@
 # UOAM hub wire protocol (reverse-engineered)
 
-Status: **position/map visibility works, chat does not.** Handshake, position
-update, and query-list are verified end-to-end live against a real hub
-(`map.knuckleheads.dk:2000`, 2026-08-07) — a sent position round-tripped
-byte-exact through a subsequent query-list response, repeatedly, across many
-live test connections.
-
-Chat (poll and send) is **not working** despite extensive reverse-engineering
-and multiple live verification attempts. Every chat-family request this client
-sends gets rejected with an explicit RPC fault (response byte 2 = `0x03`,
-byte 3 = `0x23` instead of the usual `0x03`) — even when the bytes sent are a
-byte-for-byte replay of a real client's request that is *known* to have
-succeeded in the packet capture it was taken from. A dedicated "chat
-registration" packet (see below) that a real client sends once per connection
-was discovered, byte-verified against a capture, and implemented — sending it
-did **not** fix the fault either. The leading hypothesis is that this protocol
-is genuine DCE/RPC (see the framing section below) and chat requires a second,
-properly-negotiated presentation context from the bind exchange that this
-client's hand-crafted bytes don't actually establish, even though they satisfy
-whatever the server checks for position/list. Confirming that would need either
-a real DCE/RPC spec-level analysis of the bind PDU's context list, or reverse
-engineering the real UOAM.exe client's calls directly (e.g. decompilation) -
-both out of scope for how this was investigated (packet-capture diffing).
-Panic is **also not** covered — never captured, still unknown.
+Status: **position/map visibility and chat both work**, live-verified against a
+real hub (`map.knuckleheads.dk:2000`, 2026-08-07). The key discovery: **chat
+requires its own dedicated, separately-handshaken second TCP connection** - a
+real client always opens two sockets (this document previously only accounted
+for one), and every chat-family request this client sent on the primary
+connection got an explicit RPC fault, no matter how byte-perfect, until it
+started opening and binding a second connection the same way. See "Two
+connections" below. Panic is **not** covered — never captured, still unknown.
 
 This document supersedes `src/uoamhub/*.c` as the source of truth for the client
 implementation in `src/ClassicUO.Client/Network/UOAM/`. `uoamhub` is a from-scratch
@@ -107,25 +92,79 @@ got `0x0d`).
 ## Mandatory post-handshake packet (type `0x0e`)
 
 A real client always sends this immediately after the handshake ack, before any
-position/list/chat traffic. Skipping it against a real server (not `uoamhub`)
-leaves the connection in a state where subsequent data packets appear to be
-silently dropped — this was the second symptom (connect "succeeded" per the
-handshake but nothing else ever worked).
+position/list traffic. Skipping it against a real server (not `uoamhub`) leaves
+the connection in a state where subsequent data packets appear to be silently
+dropped — this was the second symptom (connect "succeeded" per the handshake
+but nothing else ever worked).
 
-Fixed 72-byte template, two dynamic fields patched in:
+Fixed 72-byte template, one dynamic field patched in:
 
 ```
 05 00 0e 03 10 00 00 00 48 00 00 00 <seq:4>    d0 16 d0 16
 <clientId:4>                        01 00 00 00 01 00 01 00
-<activity GUID: 16 bytes, random>
+a2 a0 6e d7 f0 2c b9 46 a8 7b e4 22 77 bc 1e f2   <- ChatInterfaceGuid, fixed
 01 00 00 00 04 5d 88 8a eb 1c c9 11 9f e8 08 00
 2b 10 48 60 02 00 00 00
 ```
 
-`clientId` = the id from the handshake ack. The 16-byte GUID at offset 32-47 is
-high-entropy/random in every capture (unlike GUID A above) — generate a fresh
-random GUID per connection. The `0x0f` response to this is not parsed; nothing
-downstream depends on it.
+`clientId` = the id from the handshake ack. The 16-byte GUID at offset 32-47
+was originally assumed to be a random per-call "activity id" (every capture
+showed different, high-entropy-looking bytes... except it turned out to
+actually be the *same* fixed value every time, once compared across enough
+independent captures - see "Two connections" below for what it actually is).
+The `0x0f` response to this is not parsed; nothing downstream depends on it -
+this packet on the primary connection appears to be little more than a
+capability probe; the interface it names only becomes usable via its own
+connection, per below.
+
+## Two connections - chat needs its own dedicated socket
+
+**This is the single most important fact about this protocol that isn't
+obvious from a short capture.** A real client always opens a *second* TCP
+connection to the same server, bound to the *first* connection via its own
+handshake, and uses it **exclusively for chat** (register/poll/send). Every
+chat-family request sent on the primary connection gets an explicit RPC fault
+response (see "Response discriminator" - byte 2 = `0x03`, byte 3 = `0x23`
+instead of the usual `0x03`), *even when the bytes are a byte-for-byte replay
+of a real client's own request that is known to have succeeded* in the capture
+it was taken from. Position/list work fine on the primary connection alone;
+chat does not work there at all, regardless of how correct the bytes are.
+
+This was missed for a long time because a single-socket capture (just the
+primary connection) looks completely self-contained - nothing about it
+signals "there should be another connection". It was only found by capturing
+**two real UOAM clients running side by side** and noticing each one actually
+holds *three* TCP connections open for the whole session, not one - two of
+which are for position/list-shaped operations and a third, distinctly-sized
+one, is chat.
+
+The second connection's handshake is the same 72-byte shape as the `0x0e`
+"mystery" packet above, but:
+
+- packet type is `0x0b` (a real handshake, not `0x0e`)
+- offset 20-23 is **not** this connection's own client id - it's the
+  **primary connection's** assigned client id (`uoamhub.c`'s documented
+  "secondary connection" / `master_id` concept, confirmed live)
+- the GUID at offset 32-47 is `ChatInterfaceGuid` (the same fixed value as the
+  `0x0e` packet above) - this is the chat interface's actual abstract-syntax
+  UUID, not a random per-call id as first assumed
+
+```
+05 00 0b 03 10 00 00 00 48 00 00 00 <seq:4>    d0 16 d0 16
+<primary's clientId:4>              01 00 00 00 01 00 01 00
+a2 a0 6e d7 f0 2c b9 46 a8 7b e4 22 77 bc 1e f2   <- ChatInterfaceGuid
+01 00 00 00 04 5d 88 8a eb 1c c9 11 9f e8 08 00
+2b 10 48 60 02 00 00 00
+```
+
+The response is a normal handshake ack (type `0x0c`) on this second
+connection. Once acked, chat register/poll/send (see below) all work
+correctly when sent on *this* connection - live-verified: a chat poll sent
+here gets a normal 44-byte "NoChat" response, not a fault.
+
+`seq` on this connection is local to it (a fresh TCP connection, its own
+sequence space) - it does not need to continue from the primary connection's
+counter.
 
 ## Data packets (type `0x00`, C→S)
 
@@ -233,18 +272,15 @@ is still an ordinary subtype-1 text send; it has nothing to do with the actual
 font/color-announce packet type, which is a structurally different, larger
 payload this client never constructs).
 
-**Despite the byte-exact match, this does not work live** - see the Status
-section at the top of this document. Every live attempt to send this packet
-(including replaying the exact captured bytes verbatim, unmodified) gets an
-RPC fault response instead of the ack a real client gets for the identical
-bytes in its own capture.
+Works live, sent on the dedicated chat socket (see "Two connections" above) -
+sending it on the primary socket still faults, same as poll.
 
-### Chat registration (subtype 2) - discovered, implemented, insufficient
+### Chat registration (subtype 2) - discovered, not needed
 
-A real client sends one more packet type this document didn't originally
-cover: right after its *first* position update (before ever polling or
-sending chat), it sends a "registration" packet using the same major/minor
-(1/0) as chat send, but subtype **2** instead of 1 (text) or 3 (font/color):
+A real client also sends one more packet type this document didn't originally
+cover: right after its *first* position update on the primary connection, it
+sends a "registration" packet using the same major/minor (1/0) as chat send,
+but subtype **2** instead of 1 (text) or 3 (font/color):
 
 ```
 prefix(48) + 4 zero bytes + subtype(4, = 2) + 0x00020000 marker(4)
@@ -258,14 +294,16 @@ from. The server's ack to a real client's registration is a plain 28-byte Ack
 with offset20-23 = 1 (see the discriminator table below) - not a fault.
 
 This was found by capturing a **fresh, cold-start** real client session
-(Wireshark started before the client connected) and finding a packet type with
-no prior explanation. It looked like the obvious missing piece explaining why
-every chat operation faulted for this client. **It is not sufficient on its
-own**: implementing and sending it (byte-verified identical to the captured
-request, live-tested against the real server with the exact same player name
-used in the working capture) still gets the same RPC fault, on the
-registration packet itself. See the Status section for the current leading
-theory (unnegotiated second DCE/RPC presentation context).
+(Wireshark started before the client connected) and misread at the time as
+the missing piece explaining chat faults - implementing and sending it
+(byte-verified identical to the captured request) still faulted on its own,
+which is what led to digging further and finding the real cause: chat needs
+its own dedicated, separately-handshaken socket (see above). Once that socket
+exists, chat poll/send work on it directly, with no registration packet at
+all - `UOAMClient` does not send this packet. It's documented here only
+because a real client still sends it (on the primary socket, redundantly, as
+far as this client's behavior is concerned) and a future reader diffing
+captures will otherwise wonder what it is.
 
 ## NDR-ish strings
 

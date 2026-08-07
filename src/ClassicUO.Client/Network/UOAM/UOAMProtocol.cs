@@ -55,14 +55,47 @@ namespace ClassicUO.Network.UOAM
         // this ("no idea what this is, but we respond something") without ever explaining
         // what it's for; skipping it against a real (non-uoamhub) server leaves the
         // connection in a state where subsequent data packets get silently dropped.
-        // Offset 20-23 (the assigned client/session id from the handshake ack) and the
-        // random-looking GUID at offset 32-47 (a per-call RPC activity id, not a fixed
-        // protocol constant - real captures show high-entropy bytes there) are patched in.
+        // Offset 20-23 (the assigned client/session id from the handshake ack) is
+        // patched in. The GUID at offset 32-47 was originally assumed to be a random
+        // per-call RPC activity id (real captures showed high-entropy-looking bytes),
+        // but turned out to be a FIXED constant - see ChatInterfaceGuid below, found by
+        // comparing multiple independent captures where it never varied. It is in fact
+        // the abstract-syntax UUID of a *second, separate RPC interface* (chat), and
+        // this 0x0e packet on the primary socket is apparently just a capability probe -
+        // the interface only becomes actually usable via its own dedicated secondary
+        // TCP connection, bound with its own type-0x0b handshake. See
+        // BuildChatSocketHandshake and docs/uoam-protocol.md.
+        private static readonly byte[] ChatInterfaceGuid =
+        {
+            0xa2, 0xa0, 0x6e, 0xd7, 0xf0, 0x2c, 0xb9, 0x46, 0xa8, 0x7b, 0xe4, 0x22, 0x77, 0xbc, 0x1e, 0xf2
+        };
+
         private static readonly byte[] MysteryPacketTemplate =
         {
             0x05, 0x00, 0x0e, 0x03, 0x10, 0x00, 0x00, 0x00, 0x48, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
             0xd0, 0x16, 0xd0, 0x16, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x00, 0x01, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0xa2, 0xa0, 0x6e, 0xd7, 0xf0, 0x2c, 0xb9, 0x46, 0xa8, 0x7b, 0xe4, 0x22, 0x77, 0xbc, 0x1e, 0xf2,
+            0x01, 0x00, 0x00, 0x00, 0x04, 0x5d, 0x88, 0x8a, 0xeb, 0x1c, 0xc9, 0x11, 0x9f, 0xe8, 0x08, 0x00,
+            0x2b, 0x10, 0x48, 0x60, 0x02, 0x00, 0x00, 0x00
+        };
+
+        // A real client opens a SECOND TCP connection dedicated entirely to chat
+        // (poll/register/send) and binds it with this 72-byte handshake (type 0x0b,
+        // same shape as the primary connection's handshake but shorter - no repeated
+        // context entry - and using ChatInterfaceGuid as its abstract syntax instead of
+        // the position/list interface's GUID). masterId is the *primary* connection's
+        // assigned client id from its own handshake ack, echoed here so the server can
+        // associate the two sockets with the same logical client (mirrors uoamhub.c's
+        // documented "secondary connection" / master_id concept). Discovered from a
+        // capture with two real UOAM clients running side by side (UOAM6): every chat
+        // operation on the primary socket alone - byte-identical to real captured
+        // requests, including this project's own dedicated chat-registration packet -
+        // got an RPC fault; only requests sent on a connection bound this way succeeded.
+        private static readonly byte[] ChatSocketHandshakeTemplate =
+        {
+            0x05, 0x00, 0x0b, 0x03, 0x10, 0x00, 0x00, 0x00, 0x48, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0xd0, 0x16, 0xd0, 0x16, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x00, 0x01, 0x00,
+            0xa2, 0xa0, 0x6e, 0xd7, 0xf0, 0x2c, 0xb9, 0x46, 0xa8, 0x7b, 0xe4, 0x22, 0x77, 0xbc, 0x1e, 0xf2,
             0x01, 0x00, 0x00, 0x00, 0x04, 0x5d, 0x88, 0x8a, 0xeb, 0x1c, 0xc9, 0x11, 0x9f, 0xe8, 0x08, 0x00,
             0x2b, 0x10, 0x48, 0x60, 0x02, 0x00, 0x00, 0x00
         };
@@ -128,17 +161,21 @@ namespace ClassicUO.Network.UOAM
             return packet;
         }
 
-        public static byte[] BuildMysteryFollowup(uint sequence, uint clientId, ReadOnlySpan<byte> activityGuid)
+        public static byte[] BuildMysteryFollowup(uint sequence, uint clientId)
         {
             byte[] packet = (byte[])MysteryPacketTemplate.Clone();
             BinaryPrimitives.WriteUInt32LittleEndian(packet.AsSpan(12, 4), sequence);
             BinaryPrimitives.WriteUInt32LittleEndian(packet.AsSpan(20, 4), clientId);
+            return packet;
+        }
 
-            if (activityGuid.Length == 16)
-            {
-                activityGuid.CopyTo(packet.AsSpan(32, 16));
-            }
-
+        // sequence here is local to the new chat socket (a fresh connection, fresh
+        // sequence space) - masterId is the primary connection's assigned client id.
+        public static byte[] BuildChatSocketHandshake(uint sequence, uint masterId)
+        {
+            byte[] packet = (byte[])ChatSocketHandshakeTemplate.Clone();
+            BinaryPrimitives.WriteUInt32LittleEndian(packet.AsSpan(12, 4), sequence);
+            BinaryPrimitives.WriteUInt32LittleEndian(packet.AsSpan(20, 4), masterId);
             return packet;
         }
 

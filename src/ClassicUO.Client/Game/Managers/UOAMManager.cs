@@ -10,6 +10,7 @@ namespace ClassicUO.Game.Managers
     internal sealed class UOAMManager
     {
         private const uint PositionIntervalMs = 2000;
+        private const uint ChatPollIntervalMs = 1500;
         private const uint ListQueryIntervalMs = 3000;
         private const uint ReconnectBaseDelayMs = 5000;
         private const uint ReconnectMaxDelayMs = 60000;
@@ -27,7 +28,7 @@ namespace ClassicUO.Game.Managers
         private readonly UOAMClient _client = new UOAMClient();
         private bool _wasInGame;
         private bool _manualDisconnect;
-        private uint _nextPositionSend, _nextListQuery;
+        private uint _nextPositionSend, _nextChatPoll, _nextListQuery;
         private uint _reconnectAt;
         private int _reconnectAttempt;
         private uint _connectedAt;
@@ -126,6 +127,7 @@ namespace ClassicUO.Game.Managers
             _reconnectAt = 0;
             _connectedAt = 0;
             _nextPositionSend = 0;
+            _nextChatPoll = 0;
             _nextListQuery = 0;
 
             _client.Connect(profile.UOAMServerIP, profile.UOAMServerPort);
@@ -214,18 +216,17 @@ namespace ClassicUO.Game.Managers
                 _client.SendPositionUpdate(profile.UOAMPassword, profile.UOAMPlayerName, _world.Player.X, _world.Player.Y, _world.Player.Z, _world.MapIndex);
             }
 
-            // Chat (registration, poll, and send) is currently known-broken - every
-            // chat-family request this client sends gets an RPC fault from the server,
-            // even byte-identical replays of requests that succeeded in a real client's
-            // own capture (see docs/uoam-protocol.md's Status section). Automatic chat
-            // polling used to fire unconditionally every ChatPollIntervalMs for the
-            // entire session regardless of whether chat was even in use, hammering the
-            // server with a guaranteed fault every 1.5s during ordinary position-only
-            // play - and disconnects kept happening during plain in-game use even after
-            // the facet-switch and backoff fixes, which this may well explain.
-            // Deliberately not calling _client.SendChatPoll here until the underlying
-            // RPC issue is understood; re-enabling it without fixing that first would
-            // resume the same nonstop-fault spam.
+            // Chat lives on its own dedicated connection (UOAMClient opens and
+            // handshakes it automatically once the primary connection is up - see
+            // docs/uoam-protocol.md). Only poll once that secondary connection has
+            // actually finished its own handshake; polling before then would just be
+            // silently dropped by UOAMClient anyway (IsChatReady guards it there too),
+            // but there's no point resetting the timer until it can actually succeed.
+            if (_client.IsChatReady && now >= _nextChatPoll)
+            {
+                _nextChatPoll = now + ChatPollIntervalMs;
+                _client.SendChatPoll(profile.UOAMPassword, profile.UOAMPlayerName);
+            }
 
             if (now >= _nextListQuery)
             {
