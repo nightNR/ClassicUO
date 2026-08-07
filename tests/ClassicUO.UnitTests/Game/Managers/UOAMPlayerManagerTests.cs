@@ -106,5 +106,41 @@ namespace ClassicUO.UnitTests.Game.Managers
 
             Assert.True(result);
         }
+
+        [Fact]
+        public void IsSelf_ReturnsTrue_WhenAliasedNameMatchesLocalPlayerAndPositionCloseEnough()
+        {
+            bool result = UOAMPlayerManager.IsSelf(
+                MakePlayer("UOAMNick", 102, 199), aliasedName: "MyCharName", localPlayerName: "MyCharName", localPlayerX: 100, localPlayerY: 200, toleranceTiles: 5);
+
+            Assert.True(result);
+        }
+
+        [Fact]
+        public void IsSelf_ReturnsTrue_WhenRawNameMatchesLocalPlayer_NoAlias()
+        {
+            bool result = UOAMPlayerManager.IsSelf(
+                MakePlayer("MyCharName", 100, 200), aliasedName: null, localPlayerName: "MyCharName", localPlayerX: 100, localPlayerY: 200, toleranceTiles: 5);
+
+            Assert.True(result);
+        }
+
+        [Fact]
+        public void IsSelf_ReturnsFalse_WhenNameDoesNotMatch()
+        {
+            bool result = UOAMPlayerManager.IsSelf(
+                MakePlayer("SomeoneElse", 100, 200), aliasedName: null, localPlayerName: "MyCharName", localPlayerX: 100, localPlayerY: 200, toleranceTiles: 5);
+
+            Assert.False(result);
+        }
+
+        [Fact]
+        public void IsSelf_ReturnsFalse_WhenPositionOutsideTolerance()
+        {
+            bool result = UOAMPlayerManager.IsSelf(
+                MakePlayer("MyCharName", 300, 400), aliasedName: null, localPlayerName: "MyCharName", localPlayerX: 100, localPlayerY: 200, toleranceTiles: 5);
+
+            Assert.False(result);
+        }
     }
 }

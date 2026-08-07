@@ -524,6 +524,21 @@ namespace ClassicUO.Game.UI.Gumps
                 )
             );
 
+            uoamEntry.Add
+            (
+                new ContextMenuItemEntry
+                (
+                    "Open Chat",
+                    () =>
+                    {
+                        if (UIManager.GetGump<UOAMChatGump>() == null)
+                        {
+                            UIManager.Add(new UOAMChatGump(World));
+                        }
+                    }
+                )
+            );
+
             uoamEntry.Add(new ContextMenuItemEntry(""));
 
             if (World.UOAM.Players.Players.Count == 0)
@@ -2358,6 +2373,11 @@ namespace ClassicUO.Game.UI.Gumps
                 {
                     UOAMPlayerInfo uoamPlayer = kvp.Value;
                     uoamAliases.TryGetValue(uoamPlayer.Name, out string aliasedName);
+
+                    if (World.Player != null && UOAMPlayerManager.IsSelf(uoamPlayer, aliasedName, World.Player.Name, World.Player.X, World.Player.Y, toleranceTiles: 8))
+                    {
+                        continue;
+                    }
 
                     if (UOAMPlayerManager.IsDuplicateOfPartyOrGuild(uoamPlayer, aliasedName, World.WMapManager, toleranceTiles: 8))
                     {

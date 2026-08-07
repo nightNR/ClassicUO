@@ -1519,6 +1519,14 @@ namespace ClassicUO.Game.Managers
 
                     break;
 
+                case MacroType.UOAMOpenChat:
+                    if (UIManager.GetGump<UOAMChatGump>() == null)
+                    {
+                        UIManager.Add(new UOAMChatGump(_world));
+                    }
+
+                    break;
+
                 case MacroType.Aura:
                     // hold to draw
                     break;
@@ -2363,7 +2371,8 @@ namespace ClassicUO.Game.Managers
         LookAtMouse,
         UseCounterBarSlot,
         UOAMConnect,
-        UOAMDisconnect
+        UOAMDisconnect,
+        UOAMOpenChat
     }
 
     internal enum MacroSubType

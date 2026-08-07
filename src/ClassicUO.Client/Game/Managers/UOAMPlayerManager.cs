@@ -59,5 +59,28 @@ namespace ClassicUO.Game.Managers
 
             return false;
         }
+
+        // The local player is never a WMapEntity (those only hold party/guild members),
+        // so IsDuplicateOfPartyOrGuild alone never suppresses a UOAM marker for "myself" -
+        // e.g. when the UOAM login name differs from the character name and an alias maps
+        // one to the other, seeing your own dot drawn a second time via UOAM. Check the
+        // local player explicitly instead of folding it into the party/guild check, since
+        // it isn't one.
+        public static bool IsSelf(UOAMPlayerInfo uoamPlayer, string aliasedName, string localPlayerName, int localPlayerX, int localPlayerY, int toleranceTiles)
+        {
+            string nameToMatch = string.IsNullOrEmpty(aliasedName) ? uoamPlayer.Name : aliasedName;
+
+            if (string.IsNullOrEmpty(nameToMatch) || string.IsNullOrEmpty(localPlayerName))
+            {
+                return false;
+            }
+
+            if (!string.Equals(localPlayerName, nameToMatch, StringComparison.OrdinalIgnoreCase))
+            {
+                return false;
+            }
+
+            return Math.Abs(localPlayerX - uoamPlayer.X) <= toleranceTiles && Math.Abs(localPlayerY - uoamPlayer.Y) <= toleranceTiles;
+        }
     }
 }

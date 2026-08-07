@@ -108,7 +108,13 @@ namespace ClassicUO.Game.UI.Gumps
                 _entries.RemoveFromFront().Destroy();
             }
 
-            RenderedText rtext = RenderedText.Create(text, 0, 1, true, FontStyle.Indention | FontStyle.BlackBorder, maxWidth: Width);
+            // hue 0 renders as solid black in this engine's font pipeline - 0xFFFF is the
+            // "no tint / default readable color" convention used elsewhere (e.g.
+            // NiceButton's default hue). The wire protocol does carry a font/color
+            // announcement per sender, but this client doesn't parse or track it yet
+            // (see docs/uoam-protocol.md); once it does, this hardcoded value should
+            // become per-sender.
+            RenderedText rtext = RenderedText.Create(text, 0xFFFF, 1, true, FontStyle.Indention | FontStyle.BlackBorder, maxWidth: Width);
             _entries.AddToBack(rtext);
 
             _scrollBar.MaxValue += rtext.Height;
