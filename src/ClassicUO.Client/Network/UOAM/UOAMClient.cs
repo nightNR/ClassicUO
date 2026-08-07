@@ -14,6 +14,8 @@ namespace ClassicUO.Network.UOAM
         private const int ReadScratchSize = 4096;
         private const int RecvBufferSize = 16384;
 
+        private const long ConnectTimeoutMs = 8000;
+
         private readonly byte[] _readScratch = new byte[ReadScratchSize];
         private readonly byte[] _recvBuffer = new byte[RecvBufferSize];
         private int _recvLength;
@@ -21,14 +23,19 @@ namespace ClassicUO.Network.UOAM
         private uint _sequence;
         private bool _handshakeAcked;
 
-        // TcpSocketWrapper.Connect() blocks synchronously on the OS connect timeout.
+        // TcpSocketWrapper.Connect() blocks synchronously with no timeout (can hang far
+        // longer than any reasonable UI wait, e.g. an unreachable/black-holed address).
         // Called from a UI button handler that would otherwise freeze the whole game
         // loop, so the actual connect attempt runs on a background thread and this
         // client only observes it (via these volatile flags) from Update(), which
-        // always runs on the main thread.
+        // always runs on the main thread. `_connectGeneration` guards against a stale
+        // background attempt (abandoned via timeout or a fresh Connect() call) still
+        // writing results after a newer attempt has already started.
         private volatile bool _connecting;
         private volatile bool _pendingConnectSuccess;
         private volatile bool _pendingConnectFailure;
+        private int _connectGeneration;
+        private long _connectDeadline;
 
         public bool IsConnected => _handshakeAcked && _socket != null && _socket.IsConnected;
         public bool IsConnecting => _connecting;
@@ -48,14 +55,20 @@ namespace ClassicUO.Network.UOAM
             _pendingConnectSuccess = false;
             _pendingConnectFailure = false;
             _connecting = true;
+            _connectDeadline = Environment.TickCount64 + ConnectTimeoutMs;
+
+            int generation = ++_connectGeneration;
 
             SocketWrapper socket = new TcpSocketWrapper();
-            socket.OnConnected += (_, _) => _pendingConnectSuccess = true;
-            socket.OnDisconnected += (_, _) => _pendingConnectFailure = true;
+            socket.OnConnected += (_, _) => { if (generation == _connectGeneration) _pendingConnectSuccess = true; };
+            socket.OnDisconnected += (_, _) => { if (generation == _connectGeneration) _pendingConnectFailure = true; };
             socket.OnError += (_, e) =>
             {
                 Log.Warn($"UOAM socket error: {e}");
-                _pendingConnectFailure = true;
+                if (generation == _connectGeneration)
+                {
+                    _pendingConnectFailure = true;
+                }
             };
 
             _socket = socket;
@@ -69,7 +82,11 @@ namespace ClassicUO.Network.UOAM
                 catch (Exception ex)
                 {
                     Log.Warn($"UOAM connect failed: {ex}");
-                    _pendingConnectFailure = true;
+
+                    if (generation == _connectGeneration)
+                    {
+                        _pendingConnectFailure = true;
+                    }
                 }
             });
         }
@@ -77,6 +94,7 @@ namespace ClassicUO.Network.UOAM
         public void Disconnect()
         {
             _connecting = false;
+            ++_connectGeneration; // orphan any in-flight background connect attempt
 
             if (_socket == null)
             {
@@ -90,6 +108,7 @@ namespace ClassicUO.Network.UOAM
 
         private void HandleDisconnected()
         {
+            _connecting = false;
             _socket = null;
             _handshakeAcked = false;
             Disconnected?.Invoke();
@@ -159,14 +178,21 @@ namespace ClassicUO.Network.UOAM
             {
                 if (_pendingConnectSuccess)
                 {
-                    _connecting = false;
                     _pendingConnectSuccess = false;
+                    _connectDeadline = Environment.TickCount64 + ConnectTimeoutMs; // give the handshake ack its own window
                     SendHandshake();
                 }
                 else if (_pendingConnectFailure)
                 {
                     _connecting = false;
                     _pendingConnectFailure = false;
+                    HandleDisconnected();
+                }
+                else if (Environment.TickCount64 >= _connectDeadline)
+                {
+                    Log.Warn("UOAM connect timed out");
+                    ++_connectGeneration; // orphan the stuck background attempt, if any
+                    _connecting = false;
                     HandleDisconnected();
                 }
             }
@@ -235,6 +261,7 @@ namespace ClassicUO.Network.UOAM
             switch (UOAMProtocol.Classify(data))
             {
                 case UOAMResponseKind.HandshakeAck:
+                    _connecting = false;
                     _handshakeAcked = true;
                     Connected?.Invoke();
                     break;

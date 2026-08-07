@@ -73,9 +73,16 @@ namespace ClassicUO.Game.Managers
 
         public void Disconnect()
         {
+            bool wasActive = _client.IsConnected || _client.IsConnecting;
+
             _client.Disconnect();
             Players.Clear();
             TrackedPlayerName = null;
+
+            if (wasActive)
+            {
+                GameActions.Print(_world, "UOAM: disconnected", 0x2B);
+            }
         }
 
         public void Update()
