@@ -402,23 +402,43 @@ originally noticed - the OS doesn't surface the server's FIN as a local error
 until the next write) lets the reconnect/backoff timer start a couple of
 seconds sooner. See `UOAMSocketChannel.Fault()`.
 
-## Disconnect (no explicit logout packet)
+## Disconnect (no explicit logout packet, and the connection isn't what expires you)
 
 There is no application-layer "I'm leaving" packet. Confirmed live
 (`UOAM9.pcapng`, 2026-08-07, two real UOAM.exe instances, each disconnected via
 its own UI button and then the app closed): every one of a client's sockets
-gets an ordinary `RST` (`0x0014` TCP flags), all fired within the same
-millisecond, with nothing but normal traffic (position updates, chat polls)
-right up to it - no special packet precedes the reset. A real client
-apparently never performs a graceful TCP close (`FIN`) at all, not even via
-its own explicit disconnect button.
+eventually gets an ordinary `RST` (`0x0014` TCP flags), all fired within the
+same millisecond, with nothing but normal traffic right up to it - no special
+packet precedes the reset. But (`UOAM10.pcapng`, 2026-08-07) that `RST` only
+happens when the **app is closed** - clicking the real client's own
+"disconnect" button does **not** close the TCP connection at all. It just
+stops sending position updates and leaves the socket sitting there idle;
+the player still disappears from other clients' lists within about 5
+seconds. The hub is evidently doing **staleness-based expiry** (no position
+update in ~5s ⇒ drop from the list), not connection-based expiry - the TCP
+connection's state doesn't factor into it, for a real client anyway.
 
-This client originally closed gracefully (`FIN`) on disconnect, which appeared
-to make the hub linger on removing it from other clients' player lists longer
-than a real client's abrupt `RST` does. `UOAMSocketChannel` now opens its
-`TcpSocketWrapper` with `abortiveClose: true` (`Socket.LingerState =
-new LingerOption(true, 0)`), so `Disconnect()`/`Dispose()` sends `RST` instead
-of `FIN`, matching the real client's behavior. Only the UOAM connections do
+This client originally closed its connection outright on disconnect (first
+gracefully via `FIN`, later abortively via `RST` - see below). Both were
+*slower* to clear than a real client's idle-but-still-connected approach:
+closing the connection appears to route the hub through a different,
+much slower (~1 minute) cleanup path than the ~5s staleness check active
+connections get, and while that stale entry lingered, an immediate reconnect
+under the same name got faulted as a duplicate (see "Faults" above).
+`UOAMManager.Disconnect()` now mimics the real client instead: on a manual
+disconnect it stops sending immediately but leaves the socket connected for
+`DisconnectLingerMs` (8s, comfortably past the observed ~5s staleness window)
+before actually tearing it down - the same idle-expiry path a real client
+uses, not a closed-connection cleanup path.
+
+The `RST`-vs-`FIN` question above is now largely moot for *this* case (idle
+expiry doesn't care how the connection eventually closes), but
+`UOAMSocketChannel` still opens its `TcpSocketWrapper` with
+`abortiveClose: true` for the case that does still close outright - actual
+process exit - on the theory that matching the real client's own behavior
+there (always `RST`, confirmed in `UOAM9.pcapng`) is more likely to be
+handled correctly by the hub than diverging from it, even without positive
+evidence either way for that specific path. Only the UOAM connections do
 this - the main game server connection is unaffected.
 
 ## Panic

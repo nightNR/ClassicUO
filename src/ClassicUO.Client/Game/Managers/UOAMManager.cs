@@ -24,10 +24,25 @@ namespace ClassicUO.Game.Managers
         // has stayed up for a real stretch, not merely completed its handshake.
         private const uint SustainedConnectionMs = 20000;
 
+        // A real UOAM client's own "disconnect" button does not close its TCP
+        // connection at all - it just stops sending position updates and lets the
+        // hub's own staleness check drop it from other clients' player lists, which a
+        // live capture showed takes about 5 seconds. Closing the connection outright
+        // on disconnect (what this client used to do) was observed to make the hub
+        // take up to a minute to release the player-name slot instead - apparently a
+        // slower cleanup path than idle expiry - which then made an immediate
+        // reconnect under the same name fault (see docs/uoam-protocol.md "Faults").
+        // Mimic the real client: stop sending immediately, but only actually tear
+        // down the socket after this much idle time, long enough for the hub's own
+        // TTL to have already dropped us everywhere else.
+        private const uint DisconnectLingerMs = 8000;
+
         private readonly World _world;
         private readonly UOAMClient _client = new UOAMClient();
         private bool _wasInGame;
         private bool _manualDisconnect;
+        private bool _lingering;
+        private uint _lingerUntil;
         private uint _nextPositionSend, _nextChatPoll, _nextListQuery;
         private uint _reconnectAt;
         private int _reconnectAttempt;
@@ -95,7 +110,7 @@ namespace ClassicUO.Game.Managers
 
         public string TrackedPlayerName { get; set; }
 
-        public bool IsConnected => _client.IsConnected;
+        public bool IsConnected => !_lingering && _client.IsConnected;
 
         public bool IsConnecting => _client.IsConnecting;
 
@@ -124,26 +139,43 @@ namespace ClassicUO.Game.Managers
             GameActions.Print(_world, $"UOAM: connecting to {profile.UOAMServerIP}:{profile.UOAMServerPort}...", 0x2B);
 
             _manualDisconnect = false;
+            _lingering = false;
             _reconnectAt = 0;
             _connectedAt = 0;
             _nextPositionSend = 0;
             _nextChatPoll = 0;
             _nextListQuery = 0;
 
+            // UOAMClient.Connect() tears down any existing connection first (including
+            // one still lingering from a recent Disconnect()), so no separate teardown
+            // is needed here even if we're reconnecting before the linger finished.
             _client.Connect(profile.UOAMServerIP, profile.UOAMServerPort);
         }
 
         public void Disconnect()
         {
-            bool wasActive = _client.IsConnected || _client.IsConnecting;
+            bool wasActive = IsConnected || _client.IsConnecting;
 
             _manualDisconnect = true;
             _reconnectAt = 0;
             _reconnectAttempt = 0;
             _connectedAt = 0;
-            _client.Disconnect();
             Players.Clear();
             TrackedPlayerName = null;
+
+            if (_client.IsConnected)
+            {
+                // See DisconnectLingerMs above - stop advertising ourselves now, but
+                // leave the socket open for a few seconds so the hub's own idle-based
+                // cleanup (not our TCP close) is what removes us from other clients'
+                // player lists.
+                _lingering = true;
+                _lingerUntil = Time.Ticks + DisconnectLingerMs;
+            }
+            else
+            {
+                _client.Disconnect();
+            }
 
             if (wasActive)
             {
@@ -173,6 +205,23 @@ namespace ClassicUO.Game.Managers
             }
 
             _wasInGame = inGame;
+
+            if (_lingering)
+            {
+                // Keep pumping so any late incoming data (or a fault) is drained rather
+                // than left buffered, but send nothing further - see DisconnectLingerMs.
+                // Runs even while reallyLoggedOut, since Disconnect() (called from
+                // World.Clear() on a real logout) starts the same linger.
+                _client.Update();
+
+                if (Time.Ticks >= _lingerUntil)
+                {
+                    _lingering = false;
+                    _client.Disconnect();
+                }
+
+                return;
+            }
 
             if (reallyLoggedOut)
             {
@@ -239,7 +288,7 @@ namespace ClassicUO.Game.Managers
         {
             Profile profile = ProfileManager.CurrentProfile;
 
-            if (profile == null || !_client.IsConnected)
+            if (profile == null || !IsConnected)
             {
                 return;
             }
