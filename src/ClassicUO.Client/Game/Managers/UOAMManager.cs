@@ -109,19 +109,36 @@ namespace ClassicUO.Game.Managers
         {
             bool inGame = _world.InGame;
 
+            // World.MapIndex's setter briefly nils out World.Map while switching facets
+            // (recall, moongate, ...), which makes InGame (Player != null && Map != null)
+            // go false for a frame or two even though the player never actually logged
+            // out. Use Player == null - not InGame - as the "really logged out" signal
+            // here, so a facet change mid-session doesn't tear down the UOAM connection.
+            // World.Clear() already calls Disconnect() explicitly on the real logout path.
+            bool reallyLoggedOut = _world.Player == null;
+
             if (inGame && !_wasInGame && ProfileManager.CurrentProfile != null && ProfileManager.CurrentProfile.UOAMAutoConnect)
             {
                 Connect();
             }
-            else if (!inGame && _wasInGame)
+            else if (reallyLoggedOut && _wasInGame)
             {
                 Disconnect();
             }
 
             _wasInGame = inGame;
 
+            if (reallyLoggedOut)
+            {
+                return;
+            }
+
             if (!inGame)
             {
+                // Transient (e.g. mid-facet-switch): skip this tick's sends but keep the
+                // connection and pump the socket so incoming data isn't left buffered.
+                _client.Update();
+
                 return;
             }
 
