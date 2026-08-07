@@ -1,0 +1,280 @@
+# UOAM hub wire protocol (reverse-engineered)
+
+Status: verified end-to-end against a real, live hub (`map.knuckleheads.dk:2000`,
+2026-08-07) — handshake, position update, and query-list round-tripped correctly
+(sent position echoed back exactly through a subsequent query-list response) and
+chat send/receive was verified against two independent packet captures of a real
+UOAM client (including one with an actual typed chat message). Panic is **not**
+covered — never captured, still unknown.
+
+This document supersedes `src/uoamhub/*.c` as the source of truth for the client
+implementation in `src/ClassicUO.Client/Network/UOAM/`. `uoamhub` is a from-scratch
+*server* reimplementation; it only ever had to emit a handful of canned response
+templates, never construct a valid client request. Its source explains the
+response side reasonably well but says nothing about the real handshake or the
+extra fields real "data" packets carry — those were only recoverable by capturing
+an actual UOAM client's traffic (Wireshark, `tcp.port==2000`) and diffing/decoding
+it byte-by-byte, cross-checked with `tshark -x`.
+
+## Framing
+
+Every packet, both directions:
+
+```
+offset 0      0x05                    magic
+offset 1      0x00                    magic
+offset 2      packet type (see below)
+offset 3      0x03                    magic
+offset 4      0x10                    magic
+offset 5-7    0x00 0x00 0x00
+offset 8-11   uint32 LE  total packet length (including this header)
+offset 12-15  uint32 LE  sequence number (client picks it; server echoes it back)
+```
+
+A single `recv()` may return more than one packet back-to-back; split by reading
+the length field at offset 8 repeatedly.
+
+Packet types seen:
+
+| Type (offset 2) | Direction | Meaning |
+|---|---|---|
+| `0x0b` | C→S | handshake (RPC bind) |
+| `0x0c` | S→C | handshake ack (RPC bind_ack) |
+| `0x0d` | S→C | handshake **nak** (bind_nak) — sent back if the handshake packet isn't byte-correct |
+| `0x0e` | C→S | mandatory post-handshake "mystery" packet, purpose unconfirmed |
+| `0x0f` | S→C | response to `0x0e` |
+| `0x00` | C→S | data (position update / query-list / chat poll / chat send) |
+| `0x02` | S→C | data response (ack / no-chat / player-list / chat-data) |
+
+These type values line up with DCE/RPC PDU type numbers (11=bind, 12=bind_ack,
+13=bind_nak, 0=request, 2=response) — the protocol is built on an RPC/NDR-style
+wire format (it embeds the well-known NDR transfer-syntax UUID
+`8a885d04-1ceb-11c9-9fe8-08002b104860`), but it is **not** standard DCE/RPC framing
+end to end — the outer header above is custom, only the embedded string/struct
+encoding borrows NDR conventions (see "NDR-ish strings" below).
+
+## Handshake (type `0x0b` → `0x0c`)
+
+The request is a **fixed 116-byte byte template** — verified byte-identical across
+two independent captures (different sessions, different local ports). Only the
+sequence field (offset 12-15) varies; every other byte, including two embedded
+GUIDs, is a protocol constant:
+
+```
+05 00 0b 03 10 00 00 00 74 00 00 00 <seq:4>     00 00 00 00
+d0 16 d0 16 00 00 00 00 02 00 00 00 00 00 01 00
+10 66 15 9e 5c 7b d2 11 b8 cf 00 80 c7 97 1b e1   <- GUID A (interface UUID, fixed)
+01 00 00 00 04 5d 88 8a eb 1c c9 11 9f e8 08 00
+2b 10 48 60 02 00 00 00 01 00 01 00 10 66 15 9e
+5c 7b d2 11 b8 cf 00 80 c7 97 1b e1 01 00 00 00   <- GUID A repeated
+2c 1c b7 6c 12 98 40 45 03 00 00 00 00 00 00 00
+01 00 00 00
+```
+
+GUID A = `10 66 15 9e 5c 7b d2 11 b8 cf 00 80 c7 97 1b e1` appears twice, identical
+in both captures → a fixed interface identifier, not per-session data. Offset
+20-23 is the "master client id" (0 = primary connection; a secondary connection —
+UOAM historically opens two TCP sockets per client — would echo the primary's
+assigned id here instead, mirrored in `uoamhub.c`'s `master_id` concept. Not
+implemented client-side; this client only opens one socket).
+
+The ack response (`0x0c`) is 84 bytes and matches `uoamhub.c`'s
+`packet_handshake_response` template closely: offset 20-23 = assigned
+client/session id (uint32 LE — needed for the next packet), offset 24-31 =
+listening port as ASCII (`"2000\0"`), rest is fixed/embeds the NDR GUID again. A
+malformed handshake gets back type `0x0d` (bind_nak) instead, and the connection
+is then unusable — this was the original symptom that led to the full
+re-investigation (a naive 24-byte handshake without the RPC bind structure always
+got `0x0d`).
+
+## Mandatory post-handshake packet (type `0x0e`)
+
+A real client always sends this immediately after the handshake ack, before any
+position/list/chat traffic. Skipping it against a real server (not `uoamhub`)
+leaves the connection in a state where subsequent data packets appear to be
+silently dropped — this was the second symptom (connect "succeeded" per the
+handshake but nothing else ever worked).
+
+Fixed 72-byte template, two dynamic fields patched in:
+
+```
+05 00 0e 03 10 00 00 00 48 00 00 00 <seq:4>    d0 16 d0 16
+<clientId:4>                        01 00 00 00 01 00 01 00
+<activity GUID: 16 bytes, random>
+01 00 00 00 04 5d 88 8a eb 1c c9 11 9f e8 08 00
+2b 10 48 60 02 00 00 00
+```
+
+`clientId` = the id from the handshake ack. The 16-byte GUID at offset 32-47 is
+high-entropy/random in every capture (unlike GUID A above) — generate a fresh
+random GUID per connection. The `0x0f` response to this is not parsed; nothing
+downstream depends on it.
+
+## Data packets (type `0x00`, C→S)
+
+Common prefix, 48 bytes:
+
+```
+offset 0-15    header (see Framing)
+offset 16-19   uint32 LE = totalLength - 24     (redundant "stub length", always this — both directions, every packet type below)
+offset 20-21   uint16 LE major
+offset 22-23   uint16 LE minor
+offset 24-43   password, ASCII, NUL-padded, 20 bytes
+offset 44-47   4-byte marker (see below)
+```
+
+major/minor per operation:
+
+| Operation | major | minor |
+|---|---|---|
+| Position update | 0 | 1 |
+| Query list | 0 | 2 |
+| Chat poll | 1 | 1 |
+| Chat send (text or font/color) | 1 | 0 |
+
+**The offset 44-47 marker** matches `uoamhub.c`'s `struct player_info.ip[4]`
+position exactly (documented there as "the internal client's IP address, not
+affected by NAT"). A real client sends its actual local IPv4 address there (e.g.
+`0a 08 00 04` = `10.8.0.4` in one capture). The server does not appear to validate
+it (`uoamhub.c` never reads it); this client sends the real local IP read from the
+connected socket, falling back to zero if unavailable, to match real-client
+behavior as closely as possible without relying on unverified server tolerance.
+
+### Position update (140 bytes total)
+
+Prefix (48) + a 92-byte block: `name[64]` (ASCII, NUL-terminated/padded) +
+`reserved[12]` (always zero) + `position[16]`.
+
+**Position field layout — the one place this deviates structurally from
+`uoamhub.c`'s documented `struct` (which implies four same-sized fields in
+x,y,z,map order):**
+
+```
+position[16]:
+  byte 0-2    zero/reserved
+  byte 3      Z  (signed, 1 byte)
+  byte 4-7    X  (uint32 LE — only the low 16 bits are ever meaningfully nonzero)
+  byte 8-11   Y  (uint32 LE)
+  byte 12-15  Map/facet (uint32 LE, 0 = Felucca)
+```
+
+Verified: a captured real client's position (X=2882, Y=742, Z=102, Map=0) decodes
+correctly with this layout, and a position sent by this project's own client
+(X=1234, Y=5678, Z=5) round-tripped byte-exact through the live server's
+query-list response.
+
+### Query list (48 bytes total, no payload beyond the common prefix)
+
+Response (`0x02`, "PlayerList"): 36-byte header + N × 92-byte player blocks (same
+`name/reserved/position` shape as above) + 4-byte zero trailer.
+
+```
+offset 0-23    standard response header incl. offset16-19 length field
+offset 24-27   uint32 LE player count
+offset 28-31   uint32 LE = 1 (constant, unexplained, matches uoamhub.c's template)
+offset 32-35   uint32 LE player count (duplicated)
+offset 36..    N × 92-byte player blocks
+offset (36+92N)..+4   4 zero bytes (trailer)
+```
+
+### Chat poll (75 bytes total for an 11-byte name, i.e. `password.Length` doesn't
+affect size — size depends only on the player name length)
+
+Prefix (48) + 4-byte constant `00 00 02 00` + player name as an
+[NDR-ish string](#ndr-ish-strings) (unpadded, since it's the last field).
+
+Response when nothing is pending ("NoChat"): fixed **44 bytes** total — note this
+is *not* the 28 bytes `uoamhub.c`'s `packet_no_chat` constant implies; the real
+server's no-chat response is a different, larger size.
+
+Response when a message is pending ("ChatData"), verified against a real
+"Ahoj svet.. pisem sem aby som napisal" message:
+
+```
+offset 0-23   standard response header
+offset 24-27  uint32 LE subtype (1 = text, 3 = font/color)
+offset 28-31  uint32 LE = 0x00020000 (constant)
+offset 32..   sender name, NDR-ish string, padded to a 4-byte boundary
+offset ..     message text, NDR-ish string, guarded by a 0x00020004 marker
+                instead of the usual zero "offset" field (unexplained but
+                consistent across every capture), unpadded (last field)
+```
+
+Font/color payloads (subtype 3) carry extra fields after the message text (RGB
+color bytes, then a font-name string) that this client does not send or parse.
+
+### Chat send (variable length)
+
+Prefix (48) + 4 zero bytes + `uint32 LE subtype` (1 = text) + 4-byte constant
+`00 00 02 00` + sender name as an NDR-ish string (**padded** to a 4-byte
+boundary, since another field follows) + message text as an NDR-ish string
+guarded by the `0x00020004` marker (unpadded, last field).
+
+Verified byte-exact against 4 different real captured messages (including one
+sent while testing that happened to describe changing font/color — that message
+is still an ordinary subtype-1 text send; it has nothing to do with the actual
+font/color-announce packet type, which is a structurally different, larger
+payload this client never constructs).
+
+## NDR-ish strings
+
+Every embedded string (player name, chat text) uses the same three-`uint32`
+prefix as a classic DCE/RPC NDR conformant-varying string:
+
+```
+uint32 LE  max_count      (chars including NUL)
+uint32 LE  offset         (always 0 in every capture)
+uint32 LE  actual_count   (same as max_count in every capture)
+<max_count> bytes: ASCII chars + NUL terminator
+```
+
+Except the *message text* field in chat send/receive, whose middle `uint32` is
+the constant `0x00020004` instead of `0`. Genuinely unexplained; every capture
+across two independent sessions agrees on this value, so it's treated as a fixed
+protocol constant rather than a real "offset".
+
+Padding: if another field follows an NDR-ish string in the same packet, the
+string block (12-byte header + `max_count` bytes) is padded with zero bytes up to
+the next 4-byte boundary. If the string is the *last* field in the packet, no
+trailing padding is added (the packet just ends there — this is why real packet
+lengths are frequently *not* multiples of 4).
+
+## Response discriminator (type `0x02` packets)
+
+`uoamhub.c`'s `respond()` unconditionally overwrites offset 16-19 of every
+type-`0x02` response with `(total_length - 24)` — **this field can never be used
+to distinguish response subtypes**, despite `uoamhub.c`'s static template arrays
+appearing to hardcode different "marker" values there (`0x04`, `0x14`,
+`0xffffffff`) before that overwrite runs. That appearance is what caused the
+first implementation of this client's `Classify()` to be wrong from the start.
+
+The actual discriminator is offset 20-23 (`marker20`) combined with total length:
+
+| marker20 | length | Meaning |
+|---|---|---|
+| 0 | 28 | Ack |
+| 0 | anything else (≥ 40) | PlayerList |
+| 1 | 44 | NoChat |
+| 1 | anything else (≥ ~61) | ChatData |
+
+## Panic
+
+Never captured — out of scope. See `docs/superpowers/specs/2026-08-06-uoam-integration-design.md`
+for the earlier (still valid) reasoning on why this was deferred: the panic flag's
+exact bit/offset within a `player_info` block is unconfirmed, and guessing here
+would be worse than not implementing it, since a wrong guess silently corrupts
+position data other clients read.
+
+## Source of the captures
+
+Two independent Wireshark captures against `map.knuckleheads.dk:2000` (a live,
+real hub — not `uoamhub`), using a real UOAM client:
+
+1. `uoam.pcap` (classic pcap) — handshake, position update loop, query-list, one
+   font/color announce, no chat text.
+2. `UOAM2.pcapng` (pcapng) — same session shape, plus 4 real chat text sends
+   (used to derive/verify the chat send and chat-poll-response formats).
+
+Both parsed with small custom Python scripts (no `scapy`/`dpkt`/tshark dependency
+assumed, though `tshark -x` was used once to cross-check the manual byte parsing
+against packet #100 of `UOAM2.pcapng` and matched exactly).

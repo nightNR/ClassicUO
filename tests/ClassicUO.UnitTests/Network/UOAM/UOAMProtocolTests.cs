@@ -17,144 +17,184 @@ namespace ClassicUO.UnitTests.Network.UOAM
         private static ushort ReadU16(byte[] data, int offset) =>
             BinaryPrimitives.ReadUInt16LittleEndian(data.AsSpan(offset, 2));
 
-        [Fact]
-        public void BuildHandshake_Produces24ByteHandshakePacket()
+        // Ground truth captured from a real hub session (map.knuckleheads.dk:2000,
+        // 2026-08-07): the client's actual primary-connection handshake request.
+        private static readonly byte[] CapturedHandshakeRequest =
         {
-            byte[] packet = UOAMProtocol.BuildHandshake(7);
+            0x05, 0x00, 0x0b, 0x03, 0x10, 0x00, 0x00, 0x00, 0x74, 0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00,
+            0xd0, 0x16, 0xd0, 0x16, 0x00, 0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00,
+            0x10, 0x66, 0x15, 0x9e, 0x5c, 0x7b, 0xd2, 0x11, 0xb8, 0xcf, 0x00, 0x80, 0xc7, 0x97, 0x1b, 0xe1,
+            0x01, 0x00, 0x00, 0x00, 0x04, 0x5d, 0x88, 0x8a, 0xeb, 0x1c, 0xc9, 0x11, 0x9f, 0xe8, 0x08, 0x00,
+            0x2b, 0x10, 0x48, 0x60, 0x02, 0x00, 0x00, 0x00, 0x01, 0x00, 0x01, 0x00, 0x10, 0x66, 0x15, 0x9e,
+            0x5c, 0x7b, 0xd2, 0x11, 0xb8, 0xcf, 0x00, 0x80, 0xc7, 0x97, 0x1b, 0xe1, 0x01, 0x00, 0x00, 0x00,
+            0x2c, 0x1c, 0xb7, 0x6c, 0x12, 0x98, 0x40, 0x45, 0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x01, 0x00, 0x00, 0x00
+        };
 
-            Assert.Equal(24, packet.Length);
-            Assert.Equal(0x05, packet[0]);
-            Assert.Equal(0x00, packet[1]);
-            Assert.Equal(0x0b, packet[2]);
-            Assert.Equal(0x03, packet[3]);
-            Assert.Equal(0x10, packet[4]);
-            Assert.Equal(24u, ReadU32(packet, 8));
-            Assert.Equal(7u, ReadU32(packet, 12));
-            Assert.Equal(0u, ReadU32(packet, 20)); // masterId = 0 (primary connection)
+        // Ground truth: the server's handshake ack for the packet above (sequence 2 echoed,
+        // client id 0x00008774 assigned, listening port "2000" embedded as ASCII).
+        private static readonly byte[] CapturedHandshakeAck =
+        {
+            0x05, 0x00, 0x0c, 0x03, 0x10, 0x00, 0x00, 0x00, 0x54, 0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00,
+            0xd0, 0x16, 0xd0, 0x16, 0x74, 0x87, 0x00, 0x00, 0x05, 0x00, 0x32, 0x30, 0x30, 0x30, 0x00, 0x00,
+            0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x04, 0x5d, 0x88, 0x8a, 0xeb, 0x1c, 0xc9, 0x11,
+            0x9f, 0xe8, 0x08, 0x00, 0x2b, 0x10, 0x48, 0x60, 0x02, 0x00, 0x00, 0x00, 0x03, 0x00, 0x03, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00
+        };
+
+        // Ground truth: a real client's position update, password "mrtki251", name
+        // "Night-Test", decoded position X=2882 Y=742 Z=102 Map=0.
+        private static readonly byte[] CapturedPositionUpdate =
+        {
+            0x05, 0x00, 0x00, 0x03, 0x10, 0x00, 0x00, 0x00, 0x8c, 0x00, 0x00, 0x00, 0x09, 0x00, 0x00, 0x00,
+            0x74, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x6d, 0x72, 0x74, 0x6b, 0x69, 0x32, 0x35, 0x31,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0a, 0x08, 0x00, 0x04,
+            0x4e, 0x69, 0x67, 0x68, 0x74, 0x2d, 0x54, 0x65, 0x73, 0x74, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x66,
+            0x42, 0x0b, 0x00, 0x00, 0xe6, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
+        };
+
+        // Ground truth: a real client's query-list request, password "mrtki251".
+        private static readonly byte[] CapturedQueryListRequest =
+        {
+            0x05, 0x00, 0x00, 0x03, 0x10, 0x00, 0x00, 0x00, 0x30, 0x00, 0x00, 0x00, 0x0d, 0x00, 0x00, 0x00,
+            0x18, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0x00, 0x6d, 0x72, 0x74, 0x6b, 0x69, 0x32, 0x35, 0x31,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0a, 0x08, 0x00, 0x04
+        };
+
+        // Ground truth: the server's response to a query-list request with exactly one
+        // player ("Night-Test", same position as CapturedPositionUpdate).
+        private static readonly byte[] CapturedQueryListResponse =
+        {
+            0x05, 0x00, 0x02, 0x03, 0x10, 0x00, 0x00, 0x00, 0x84, 0x00, 0x00, 0x00, 0x05, 0x00, 0x00, 0x00,
+            0x6c, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00,
+            0x01, 0x00, 0x00, 0x00, 0x4e, 0x69, 0x67, 0x68, 0x74, 0x2d, 0x54, 0x65, 0x73, 0x74, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x66, 0x42, 0x0b, 0x00, 0x00, 0xe6, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00
+        };
+
+        // Ground truth: the server's ack response to a position update / query-list request.
+        private static readonly byte[] CapturedAck =
+        {
+            0x05, 0x00, 0x02, 0x03, 0x10, 0x00, 0x00, 0x00, 0x1c, 0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00,
+            0x04, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
+        };
+
+        // Ground truth: the server's "no chat pending" response to a chat-poll request.
+        private static readonly byte[] CapturedNoChat =
+        {
+            0x05, 0x00, 0x02, 0x03, 0x10, 0x00, 0x00, 0x00, 0x2c, 0x00, 0x00, 0x00, 0x08, 0x00, 0x00, 0x00,
+            0x14, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
+        };
+
+        [Fact]
+        public void BuildHandshake_MatchesCapturedRealClientRequest_ExceptSequence()
+        {
+            byte[] packet = UOAMProtocol.BuildHandshake(2);
+
+            Assert.Equal(CapturedHandshakeRequest, packet);
         }
 
         [Fact]
-        public void BuildPositionUpdate_Produces140BytePacket_WithCorrectSubtypeAndPassword()
+        public void BuildHandshake_PatchesOnlyTheSequenceField()
         {
-            byte[] packet = UOAMProtocol.BuildPositionUpdate(1, "secret", "Bazinka", 100, 200, 0, 1);
+            byte[] packet = UOAMProtocol.BuildHandshake(99);
 
-            Assert.Equal(140, packet.Length);
-            Assert.Equal(0x00, packet[2]);
-            Assert.Equal(140u, ReadU32(packet, 8));
-            Assert.Equal((ushort)0x0000, ReadU16(packet, 20)); // major
-            Assert.Equal((ushort)0x0010, ReadU16(packet, 22)); // minor
+            Assert.Equal(99u, ReadU32(packet, 12));
 
-            string password = Encoding.ASCII.GetString(packet, 24, 20).TrimEnd('\0');
-            Assert.Equal("secret", password);
+            byte[] expected = (byte[])CapturedHandshakeRequest.Clone();
+            BinaryPrimitives.WriteUInt32LittleEndian(expected.AsSpan(12, 4), 99);
+            Assert.Equal(expected, packet);
+        }
 
-            // ip[4] at offset 44..47 is zero, noip block starts at 48
-            Assert.Equal(0, packet[44]);
-            Assert.Equal(0, packet[45]);
-            Assert.Equal(0, packet[46]);
-            Assert.Equal(0, packet[47]);
+        [Fact]
+        public void TryParseHandshakeAck_ParsesCapturedResponse()
+        {
+            bool ok = UOAMProtocol.TryParseHandshakeAck(CapturedHandshakeAck, out uint clientId);
 
-            bool ok = UOAMPlayerInfoCodec.TryDecode(packet.AsSpan(48, 92), out UOAMPlayerInfo info);
             Assert.True(ok);
-            Assert.Equal("Bazinka", info.Name);
-            Assert.Equal(100, info.X);
-            Assert.Equal(200, info.Y);
+            Assert.Equal(0x00008774u, clientId);
         }
 
         [Fact]
-        public void BuildQueryListRequest_Produces44BytePacket_WithMinorTwo()
+        public void TryParseHandshakeAck_ReturnsFalse_ForNonAckPacket()
         {
-            byte[] packet = UOAMProtocol.BuildQueryListRequest(2, "pw");
-
-            Assert.Equal(44, packet.Length);
-            Assert.Equal((ushort)0x0000, ReadU16(packet, 20));
-            Assert.Equal((ushort)0x0002, ReadU16(packet, 22));
-        }
-
-        [Fact]
-        public void BuildChatPollRequest_Produces44BytePacket_WithMajorMinorOne()
-        {
-            byte[] packet = UOAMProtocol.BuildChatPollRequest(3, "pw");
-
-            Assert.Equal(44, packet.Length);
-            Assert.Equal((ushort)0x0001, ReadU16(packet, 20));
-            Assert.Equal((ushort)0x0001, ReadU16(packet, 22));
-        }
-
-        [Fact]
-        public void BuildChatSendRequest_EncodesSubtypeAndNulTerminatedText()
-        {
-            byte[] packet = UOAMProtocol.BuildChatSendRequest(4, "pw", "hello");
-
-            Assert.Equal((ushort)0x0001, ReadU16(packet, 20)); // major
-            Assert.Equal((ushort)0x0000, ReadU16(packet, 22)); // minor
-            Assert.Equal(0x01, packet[52]); // chat sub-sub-type: text
-            Assert.Equal("hello", Encoding.ASCII.GetString(packet, 53, 5));
-            Assert.Equal(0, packet[53 + 5]); // NUL terminator
-            Assert.Equal((uint)packet.Length, ReadU32(packet, 8));
-        }
-
-        [Fact]
-        public void TryReadFrameLength_ReadsLengthField()
-        {
-            byte[] packet = UOAMProtocol.BuildQueryListRequest(1, "pw");
-
-            bool ok = UOAMProtocol.TryReadFrameLength(packet, out uint length);
-
-            Assert.True(ok);
-            Assert.Equal(44u, length);
-        }
-
-        [Fact]
-        public void TryReadFrameLength_ReturnsFalse_WhenBufferTooShort()
-        {
-            bool ok = UOAMProtocol.TryReadFrameLength(new byte[11], out _);
+            bool ok = UOAMProtocol.TryParseHandshakeAck(CapturedAck, out _);
 
             Assert.False(ok);
         }
 
         [Fact]
-        public void Classify_RecognizesHandshakeAck()
+        public void Classify_RecognizesCapturedHandshakeAck()
         {
-            byte[] data = new byte[16];
-            data[2] = 0x0c;
-
-            Assert.Equal(UOAMResponseKind.HandshakeAck, UOAMProtocol.Classify(data));
+            Assert.Equal(UOAMResponseKind.HandshakeAck, UOAMProtocol.Classify(CapturedHandshakeAck));
         }
 
         [Fact]
-        public void Classify_RecognizesAck()
+        public void Classify_RecognizesCapturedAck()
         {
-            byte[] data = BuildResponseHeader(offset16: 0x00000004, offset20: 0x00000000, extraLength: 8);
-
-            Assert.Equal(UOAMResponseKind.Ack, UOAMProtocol.Classify(data));
+            Assert.Equal(UOAMResponseKind.Ack, UOAMProtocol.Classify(CapturedAck));
         }
 
         [Fact]
-        public void Classify_RecognizesNoChat()
+        public void Classify_RecognizesCapturedNoChat()
         {
-            byte[] data = BuildResponseHeader(offset16: 0x00000014, offset20: 0x00000001, extraLength: 8);
-
-            Assert.Equal(UOAMResponseKind.NoChat, UOAMProtocol.Classify(data));
+            Assert.Equal(UOAMResponseKind.NoChat, UOAMProtocol.Classify(CapturedNoChat));
         }
 
         [Fact]
-        public void Classify_RecognizesChatData()
+        public void Classify_RecognizesCapturedPlayerListResponse()
         {
-            byte[] data = BuildResponseHeader(offset16: 0xFFFFFFFF, offset20: 0x00000001, extraLength: 8);
-
-            Assert.Equal(UOAMResponseKind.ChatData, UOAMProtocol.Classify(data));
+            Assert.Equal(UOAMResponseKind.PlayerList, UOAMProtocol.Classify(CapturedQueryListResponse));
         }
 
         [Fact]
-        public void Classify_RecognizesPlayerList()
+        public void BuildPositionUpdate_MatchesCapturedRealClientRequest()
         {
-            byte[] data = BuildResponseHeader(offset16: 0xFFFFFFFF, offset20: 0x00000000, extraLength: 8);
+            byte[] ipMarker = { 0x0a, 0x08, 0x00, 0x04 };
 
-            Assert.Equal(UOAMResponseKind.PlayerList, UOAMProtocol.Classify(data));
+            byte[] packet = UOAMProtocol.BuildPositionUpdate(9, "mrtki251", ipMarker, "Night-Test", 2882, 742, 102, 0);
+
+            Assert.Equal(CapturedPositionUpdate, packet);
         }
 
         [Fact]
-        public void TryParsePlayerList_ParsesTwoPlayers()
+        public void BuildQueryListRequest_MatchesCapturedRealClientRequest()
+        {
+            byte[] ipMarker = { 0x0a, 0x08, 0x00, 0x04 };
+
+            byte[] packet = UOAMProtocol.BuildQueryListRequest(13, "mrtki251", ipMarker);
+
+            Assert.Equal(CapturedQueryListRequest, packet);
+        }
+
+        [Fact]
+        public void TryParsePlayerList_ParsesCapturedSinglePlayerResponse()
+        {
+            var results = new List<UOAMPlayerInfo>();
+
+            bool ok = UOAMProtocol.TryParsePlayerList(CapturedQueryListResponse, results);
+
+            Assert.True(ok);
+            Assert.Single(results);
+            Assert.Equal("Night-Test", results[0].Name);
+            Assert.Equal(2882, results[0].X);
+            Assert.Equal(742, results[0].Y);
+            Assert.Equal(102, results[0].Z);
+            Assert.Equal(0, results[0].Map);
+        }
+
+        [Fact]
+        public void TryParsePlayerList_ParsesTwoSyntheticPlayers()
         {
             var p1 = new byte[92];
             UOAMPlayerInfoCodec.Encode(p1, "Alice", 10, 20, 0, 1);
@@ -162,8 +202,9 @@ namespace ClassicUO.UnitTests.Network.UOAM
             UOAMPlayerInfoCodec.Encode(p2, "Bob", 30, 40, 0, 1);
 
             byte[] data = new byte[36 + 92 + 92 + 4];
-            BinaryPrimitives.WriteUInt32LittleEndian(data.AsSpan(16, 4), 0xFFFFFFFF);
-            BinaryPrimitives.WriteUInt32LittleEndian(data.AsSpan(20, 4), 0x00000000);
+            data[2] = 0x02;
+            BinaryPrimitives.WriteUInt32LittleEndian(data.AsSpan(16, 4), (uint)(data.Length - 24));
+            BinaryPrimitives.WriteUInt32LittleEndian(data.AsSpan(20, 4), 0);
             BinaryPrimitives.WriteUInt32LittleEndian(data.AsSpan(24, 4), 2); // player count
             p1.CopyTo(data, 36);
             p2.CopyTo(data, 36 + 92);
@@ -177,45 +218,68 @@ namespace ClassicUO.UnitTests.Network.UOAM
             Assert.Equal("Bob", results[1].Name);
         }
 
-        [Fact]
-        public void TryParseChatData_ParsesTextMessage()
+        // Ground truth: a real chat-poll response carrying one pending text message,
+        // sender "Night-Test", text "Ahoj svet.. pisem sem aby som napisal".
+        private static readonly byte[] CapturedChatDataResponse =
         {
-            byte[] textBytes = Encoding.ASCII.GetBytes("hi there");
-            byte[] data = new byte[24 + 1 + textBytes.Length + 1 + 5]; // header + subtype + text + NUL + 5 trailer
-            BinaryPrimitives.WriteUInt32LittleEndian(data.AsSpan(16, 4), 0xFFFFFFFF);
-            BinaryPrimitives.WriteUInt32LittleEndian(data.AsSpan(20, 4), 0x00000001);
-            data[24] = 0x01; // text subtype
-            textBytes.CopyTo(data, 25);
+            0x05, 0x00, 0x02, 0x03, 0x10, 0x00, 0x00, 0x00, 0x70, 0x00, 0x00, 0x00, 0x20, 0x00, 0x00, 0x00,
+            0x58, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0x00,
+            0x0b, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0b, 0x00, 0x00, 0x00, 0x4e, 0x69, 0x67, 0x68,
+            0x74, 0x2d, 0x54, 0x65, 0x73, 0x74, 0x00, 0x00, 0x26, 0x00, 0x00, 0x00, 0x04, 0x00, 0x02, 0x00,
+            0x26, 0x00, 0x00, 0x00, 0x41, 0x68, 0x6f, 0x6a, 0x20, 0x73, 0x76, 0x65, 0x74, 0x2e, 0x2e, 0x20,
+            0x70, 0x69, 0x73, 0x65, 0x6d, 0x20, 0x73, 0x65, 0x6d, 0x20, 0x61, 0x62, 0x79, 0x20, 0x73, 0x6f,
+            0x6d, 0x20, 0x6e, 0x61, 0x70, 0x69, 0x73, 0x61, 0x6c, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
+        };
 
-            bool ok = UOAMProtocol.TryParseChatData(data, out byte subtype, out string text);
+        [Fact]
+        public void TryParseChatData_ParsesCapturedTextMessage()
+        {
+            bool ok = UOAMProtocol.TryParseChatData(CapturedChatDataResponse, out byte subtype, out string sender, out string text);
 
             Assert.True(ok);
             Assert.Equal(0x01, subtype);
-            Assert.Equal("hi there", text);
+            Assert.Equal("Night-Test", sender);
+            Assert.Equal("Ahoj svet.. pisem sem aby som napisal", text);
         }
 
         [Fact]
-        public void TryParseChatData_ReturnsNullText_ForFontColorSubtype()
+        public void BuildChatSendRequest_MatchesCapturedRealClientRequest()
         {
-            byte[] data = new byte[24 + 1 + 4 + 5];
-            BinaryPrimitives.WriteUInt32LittleEndian(data.AsSpan(16, 4), 0xFFFFFFFF);
-            BinaryPrimitives.WriteUInt32LittleEndian(data.AsSpan(20, 4), 0x00000001);
-            data[24] = 0x03; // font/color subtype
+            byte[] ipMarker = { 0x0a, 0x08, 0x00, 0x04 };
 
-            bool ok = UOAMProtocol.TryParseChatData(data, out byte subtype, out string text);
+            byte[] packet = UOAMProtocol.BuildChatSendRequest(31, "mrtki251", ipMarker, "Night-Test", "Ahoj svet.. pisem sem aby som napisal");
 
-            Assert.True(ok);
-            Assert.Equal(0x03, subtype);
-            Assert.Null(text);
+            byte[] expected =
+            {
+                0x05, 0x00, 0x00, 0x03, 0x10, 0x00, 0x00, 0x00, 0x86, 0x00, 0x00, 0x00, 0x1f, 0x00, 0x00, 0x00,
+                0x6e, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x6d, 0x72, 0x74, 0x6b, 0x69, 0x32, 0x35, 0x31,
+                0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0a, 0x08, 0x00, 0x04,
+                0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0x00, 0x0b, 0x00, 0x00, 0x00,
+                0x00, 0x00, 0x00, 0x00, 0x0b, 0x00, 0x00, 0x00, 0x4e, 0x69, 0x67, 0x68, 0x74, 0x2d, 0x54, 0x65,
+                0x73, 0x74, 0x00, 0x00, 0x26, 0x00, 0x00, 0x00, 0x04, 0x00, 0x02, 0x00, 0x26, 0x00, 0x00, 0x00,
+                0x41, 0x68, 0x6f, 0x6a, 0x20, 0x73, 0x76, 0x65, 0x74, 0x2e, 0x2e, 0x20, 0x70, 0x69, 0x73, 0x65,
+                0x6d, 0x20, 0x73, 0x65, 0x6d, 0x20, 0x61, 0x62, 0x79, 0x20, 0x73, 0x6f, 0x6d, 0x20, 0x6e, 0x61,
+                0x70, 0x69, 0x73, 0x61, 0x6c, 0x00
+            };
+
+            Assert.Equal(expected, packet);
         }
 
-        private static byte[] BuildResponseHeader(uint offset16, uint offset20, int extraLength)
+        [Fact]
+        public void TryReadFrameLength_ReadsLengthField()
         {
-            byte[] data = new byte[24 + extraLength];
-            data[2] = 0x02;
-            BinaryPrimitives.WriteUInt32LittleEndian(data.AsSpan(16, 4), offset16);
-            BinaryPrimitives.WriteUInt32LittleEndian(data.AsSpan(20, 4), offset20);
-            return data;
+            bool ok = UOAMProtocol.TryReadFrameLength(CapturedQueryListRequest, out uint length);
+
+            Assert.True(ok);
+            Assert.Equal(48u, length);
+        }
+
+        [Fact]
+        public void TryReadFrameLength_ReturnsFalse_WhenBufferTooShort()
+        {
+            bool ok = UOAMProtocol.TryReadFrameLength(new byte[11], out _);
+
+            Assert.False(ok);
         }
     }
 }

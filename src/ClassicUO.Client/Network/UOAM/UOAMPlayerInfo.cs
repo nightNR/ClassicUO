@@ -6,10 +6,11 @@ using System.Text;
 
 namespace ClassicUO.Network.UOAM
 {
-    // The 92-byte "noip" block from uoamhub's `struct noip_player_info`:
-    //   name[64] + reserved[12] + position[16]
-    // Position layout (x, y, z, map as 4x uint32 LE) is ASSUMED — unverified against
-    // a live hub. See docs/superpowers/specs/2026-08-06-uoam-integration-design.md.
+    // The 92-byte "noip" block, name[64] + reserved[12] + position[16].
+    // Position layout verified against a real hub session capture
+    // (map.knuckleheads.dk:2000, 2026-08-07): the 16-byte position field is
+    // [3 zero/reserved bytes][1 signed byte Z][uint32 LE X][uint32 LE Y][uint32 LE Map] -
+    // NOT four same-sized X/Y/Z/Map fields as originally assumed from uoamhub.c alone.
     internal struct UOAMPlayerInfo
     {
         public string Name;
@@ -25,6 +26,10 @@ namespace ClassicUO.Network.UOAM
         private const int NameOffset = 0;
         private const int NameSize = 64;
         private const int PositionOffset = 76;
+        private const int ZOffset = PositionOffset + 3;
+        private const int XOffset = PositionOffset + 4;
+        private const int YOffset = PositionOffset + 8;
+        private const int MapOffset = PositionOffset + 12;
 
         public static void Encode(Span<byte> dest, string name, int x, int y, int z, int map)
         {
@@ -44,10 +49,10 @@ namespace ClassicUO.Network.UOAM
             int written = Encoding.ASCII.GetBytes(name, dest.Slice(NameOffset, NameSize - 1));
             dest[NameOffset + written] = 0; // NUL terminator
 
-            BinaryPrimitives.WriteUInt32LittleEndian(dest.Slice(PositionOffset, 4), unchecked((uint)x));
-            BinaryPrimitives.WriteUInt32LittleEndian(dest.Slice(PositionOffset + 4, 4), unchecked((uint)y));
-            BinaryPrimitives.WriteUInt32LittleEndian(dest.Slice(PositionOffset + 8, 4), unchecked((uint)z));
-            BinaryPrimitives.WriteUInt32LittleEndian(dest.Slice(PositionOffset + 12, 4), unchecked((uint)map));
+            dest[ZOffset] = unchecked((byte)(sbyte)z);
+            BinaryPrimitives.WriteUInt32LittleEndian(dest.Slice(XOffset, 4), unchecked((uint)x));
+            BinaryPrimitives.WriteUInt32LittleEndian(dest.Slice(YOffset, 4), unchecked((uint)y));
+            BinaryPrimitives.WriteUInt32LittleEndian(dest.Slice(MapOffset, 4), unchecked((uint)map));
         }
 
         public static bool TryDecode(ReadOnlySpan<byte> src, out UOAMPlayerInfo info)
@@ -68,10 +73,10 @@ namespace ClassicUO.Network.UOAM
             }
 
             info.Name = Encoding.ASCII.GetString(nameField.Slice(0, nul));
-            info.X = unchecked((int)BinaryPrimitives.ReadUInt32LittleEndian(src.Slice(PositionOffset, 4)));
-            info.Y = unchecked((int)BinaryPrimitives.ReadUInt32LittleEndian(src.Slice(PositionOffset + 4, 4)));
-            info.Z = unchecked((int)BinaryPrimitives.ReadUInt32LittleEndian(src.Slice(PositionOffset + 8, 4)));
-            info.Map = unchecked((int)BinaryPrimitives.ReadUInt32LittleEndian(src.Slice(PositionOffset + 12, 4)));
+            info.Z = unchecked((sbyte)src[ZOffset]);
+            info.X = unchecked((int)BinaryPrimitives.ReadUInt32LittleEndian(src.Slice(XOffset, 4)));
+            info.Y = unchecked((int)BinaryPrimitives.ReadUInt32LittleEndian(src.Slice(YOffset, 4)));
+            info.Map = unchecked((int)BinaryPrimitives.ReadUInt32LittleEndian(src.Slice(MapOffset, 4)));
 
             return true;
         }

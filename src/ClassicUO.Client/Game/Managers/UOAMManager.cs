@@ -24,7 +24,7 @@ namespace ClassicUO.Game.Managers
             Players = new UOAMPlayerManager();
 
             _client.PlayerListReceived += list => Players.UpdateFromList(list);
-            _client.ChatTextReceived += text => ChatTextReceived?.Invoke(text);
+            _client.ChatTextReceived += (sender, text) => ChatTextReceived?.Invoke(sender, text);
             _client.Connected += () =>
             {
                 GameActions.Print(_world, "UOAM: connected", 0x2B);
@@ -49,7 +49,7 @@ namespace ClassicUO.Game.Managers
 
         public bool IsConnecting => _client.IsConnecting;
 
-        public event Action<string> ChatTextReceived;
+        public event Action<string, string> ChatTextReceived;
 
         public void Connect()
         {
@@ -130,7 +130,7 @@ namespace ClassicUO.Game.Managers
             if (now >= _nextChatPoll)
             {
                 _nextChatPoll = now + ChatPollIntervalMs;
-                _client.SendChatPoll(profile.UOAMPassword);
+                _client.SendChatPoll(profile.UOAMPassword, profile.UOAMPlayerName);
             }
 
             if (now >= _nextListQuery)
@@ -149,7 +149,7 @@ namespace ClassicUO.Game.Managers
                 return;
             }
 
-            _client.SendChatText(profile.UOAMPassword, text);
+            _client.SendChatText(profile.UOAMPassword, profile.UOAMPlayerName, text);
         }
     }
 }

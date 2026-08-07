@@ -64,9 +64,9 @@ namespace ClassicUO.Game.UI.Gumps
             _inputBox.SetText(string.Empty);
         }
 
-        private void World_UOAM_ChatTextReceived(string text)
+        private void World_UOAM_ChatTextReceived(string sender, string text)
         {
-            _entries.AddEntry(text);
+            _entries.AddEntry(string.IsNullOrEmpty(sender) ? text : $"{sender}: {text}");
         }
 
         public override void Dispose()

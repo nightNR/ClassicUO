@@ -2,6 +2,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Net;
 using System.Net.Sockets;
 using System.Threading.Tasks;
 using ClassicUO.Network.Socket;
@@ -18,9 +19,11 @@ namespace ClassicUO.Network.UOAM
 
         private readonly byte[] _readScratch = new byte[ReadScratchSize];
         private readonly byte[] _recvBuffer = new byte[RecvBufferSize];
+        private readonly byte[] _ipMarker = new byte[4];
         private int _recvLength;
         private SocketWrapper _socket;
         private uint _sequence;
+        private uint _handshakeClientId;
         private bool _handshakeAcked;
 
         // TcpSocketWrapper.Connect() blocks synchronously with no timeout (can hang far
@@ -43,19 +46,21 @@ namespace ClassicUO.Network.UOAM
         public event Action Connected;
         public event Action Disconnected;
         public event Action<List<UOAMPlayerInfo>> PlayerListReceived;
-        public event Action<string> ChatTextReceived;
+        public event Action<string, string> ChatTextReceived;
 
         public void Connect(string ip, ushort port)
         {
             Disconnect();
 
             _handshakeAcked = false;
+            _handshakeClientId = 0;
             _recvLength = 0;
             _sequence = 0;
             _pendingConnectSuccess = false;
             _pendingConnectFailure = false;
             _connecting = true;
             _connectDeadline = Environment.TickCount64 + ConnectTimeoutMs;
+            Array.Clear(_ipMarker, 0, _ipMarker.Length);
 
             int generation = ++_connectGeneration;
 
@@ -119,6 +124,26 @@ namespace ClassicUO.Network.UOAM
             Send(UOAMProtocol.BuildHandshake(++_sequence));
         }
 
+        private void UpdateLocalIpMarker()
+        {
+            try
+            {
+                if (_socket?.LocalEndPoint is IPEndPoint ep)
+                {
+                    byte[] bytes = ep.Address.MapToIPv4().GetAddressBytes();
+
+                    if (bytes.Length == 4)
+                    {
+                        bytes.CopyTo(_ipMarker, 0);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Log.Warn($"UOAM: failed to read local IP: {ex}");
+            }
+        }
+
         public void SendPositionUpdate(string password, string name, int x, int y, int z, int map)
         {
             if (!IsConnected)
@@ -126,7 +151,7 @@ namespace ClassicUO.Network.UOAM
                 return;
             }
 
-            Send(UOAMProtocol.BuildPositionUpdate(++_sequence, password, name, x, y, z, map));
+            Send(UOAMProtocol.BuildPositionUpdate(++_sequence, password, _ipMarker, name, x, y, z, map));
         }
 
         public void SendQueryList(string password)
@@ -136,27 +161,27 @@ namespace ClassicUO.Network.UOAM
                 return;
             }
 
-            Send(UOAMProtocol.BuildQueryListRequest(++_sequence, password));
+            Send(UOAMProtocol.BuildQueryListRequest(++_sequence, password, _ipMarker));
         }
 
-        public void SendChatPoll(string password)
+        public void SendChatPoll(string password, string playerName)
         {
             if (!IsConnected)
             {
                 return;
             }
 
-            Send(UOAMProtocol.BuildChatPollRequest(++_sequence, password));
+            Send(UOAMProtocol.BuildChatPollRequest(++_sequence, password, _ipMarker, playerName));
         }
 
-        public void SendChatText(string password, string text)
+        public void SendChatText(string password, string playerName, string text)
         {
             if (!IsConnected)
             {
                 return;
             }
 
-            Send(UOAMProtocol.BuildChatSendRequest(++_sequence, password, text));
+            Send(UOAMProtocol.BuildChatSendRequest(++_sequence, password, _ipMarker, playerName, text));
         }
 
         private void Send(byte[] packet)
@@ -179,6 +204,7 @@ namespace ClassicUO.Network.UOAM
                 if (_pendingConnectSuccess)
                 {
                     _pendingConnectSuccess = false;
+                    UpdateLocalIpMarker();
                     _connectDeadline = Environment.TickCount64 + ConnectTimeoutMs; // give the handshake ack its own window
                     SendHandshake();
                 }
@@ -262,6 +288,20 @@ namespace ClassicUO.Network.UOAM
             {
                 case UOAMResponseKind.HandshakeAck:
                     _connecting = false;
+
+                    if (UOAMProtocol.TryParseHandshakeAck(data, out uint clientId))
+                    {
+                        _handshakeClientId = clientId;
+                    }
+
+                    // Real clients always send this immediately after the handshake ack,
+                    // before any position/list/chat traffic - see UOAMProtocol's
+                    // MysteryPacketTemplate comment. A fresh random "activity" GUID per
+                    // connection, matching the high-entropy bytes seen in real captures.
+                    Span<byte> activityGuid = stackalloc byte[16];
+                    Guid.NewGuid().TryWriteBytes(activityGuid);
+                    Send(UOAMProtocol.BuildMysteryFollowup(++_sequence, _handshakeClientId, activityGuid));
+
                     _handshakeAcked = true;
                     Connected?.Invoke();
                     break;
@@ -273,9 +313,9 @@ namespace ClassicUO.Network.UOAM
                     break;
 
                 case UOAMResponseKind.ChatData:
-                    if (UOAMProtocol.TryParseChatData(data, out byte subtype, out string text) && subtype == 0x01 && text != null)
+                    if (UOAMProtocol.TryParseChatData(data, out byte subtype, out string senderName, out string text) && subtype == 0x01 && text != null)
                     {
-                        ChatTextReceived?.Invoke(text);
+                        ChatTextReceived?.Invoke(senderName, text);
                     }
                     break;
 
