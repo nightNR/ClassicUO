@@ -12,11 +12,14 @@ namespace ClassicUO.Game.Managers
         private const uint PositionIntervalMs = 2000;
         private const uint ChatPollIntervalMs = 1500;
         private const uint ListQueryIntervalMs = 3000;
+        private const uint ReconnectDelayMs = 5000;
 
         private readonly World _world;
         private readonly UOAMClient _client = new UOAMClient();
         private bool _wasInGame;
+        private bool _manualDisconnect;
         private uint _nextPositionSend, _nextChatPoll, _nextListQuery;
+        private uint _reconnectAt;
 
         public UOAMManager(World world)
         {
@@ -37,7 +40,20 @@ namespace ClassicUO.Game.Managers
             _client.Disconnected += () =>
             {
                 Players.Clear();
-                GameActions.Print(_world, "UOAM: disconnected", 0x2B);
+
+                if (_manualDisconnect)
+                {
+                    GameActions.Print(_world, "UOAM: disconnected", 0x2B);
+                }
+                else
+                {
+                    // Connection dropped unexpectedly (idle timeout, network blip, the
+                    // game window losing focus and throttling the update loop long
+                    // enough for the server's own idle timeout to fire, ...) - retry
+                    // instead of silently sitting disconnected until the player notices.
+                    GameActions.Print(_world, "UOAM: connection lost, retrying...", 0x2B);
+                    _reconnectAt = Time.Ticks + ReconnectDelayMs;
+                }
             };
         }
 
@@ -64,6 +80,8 @@ namespace ClassicUO.Game.Managers
 
             GameActions.Print(_world, $"UOAM: connecting to {profile.UOAMServerIP}:{profile.UOAMServerPort}...", 0x2B);
 
+            _manualDisconnect = false;
+            _reconnectAt = 0;
             _nextPositionSend = 0;
             _nextChatPoll = 0;
             _nextListQuery = 0;
@@ -75,6 +93,8 @@ namespace ClassicUO.Game.Managers
         {
             bool wasActive = _client.IsConnected || _client.IsConnecting;
 
+            _manualDisconnect = true;
+            _reconnectAt = 0;
             _client.Disconnect();
             Players.Clear();
             TrackedPlayerName = null;
@@ -103,6 +123,12 @@ namespace ClassicUO.Game.Managers
             if (!inGame)
             {
                 return;
+            }
+
+            if (_reconnectAt != 0 && Time.Ticks >= _reconnectAt && !_client.IsConnected && !_client.IsConnecting)
+            {
+                _reconnectAt = 0;
+                Connect();
             }
 
             _client.Update();
