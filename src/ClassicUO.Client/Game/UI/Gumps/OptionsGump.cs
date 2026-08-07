@@ -188,7 +188,9 @@ namespace ClassicUO.Game.UI.Gumps
 
             int i = 0;
 
-            Add
+            ScrollArea tabArea = new ScrollArea(0, 10, 155, HEIGHT - 20, true);
+
+            tabArea.Add
             (
                 new NiceButton
                 (
@@ -201,7 +203,7 @@ namespace ClassicUO.Game.UI.Gumps
                 ) { IsSelected = true, ButtonParameter = 1 }
             );
 
-            Add
+            tabArea.Add
             (
                 new NiceButton
                 (
@@ -214,7 +216,7 @@ namespace ClassicUO.Game.UI.Gumps
                 ) { ButtonParameter = 2 }
             );
 
-            Add
+            tabArea.Add
             (
                 new NiceButton
                 (
@@ -227,7 +229,7 @@ namespace ClassicUO.Game.UI.Gumps
                 ) { ButtonParameter = 3 }
             );
 
-            Add
+            tabArea.Add
             (
                 new NiceButton
                 (
@@ -240,7 +242,7 @@ namespace ClassicUO.Game.UI.Gumps
                 ) { ButtonParameter = 13 }
             );
 
-            Add
+            tabArea.Add
             (
                 new NiceButton
                 (
@@ -253,7 +255,7 @@ namespace ClassicUO.Game.UI.Gumps
                 ) { ButtonParameter = 14 }
             );
 
-            Add
+            tabArea.Add
             (
                 new NiceButton
                 (
@@ -266,7 +268,7 @@ namespace ClassicUO.Game.UI.Gumps
                 ) { ButtonParameter = 15 }
             );
 
-            Add
+            tabArea.Add
             (
                 new NiceButton
                 (
@@ -279,7 +281,7 @@ namespace ClassicUO.Game.UI.Gumps
                 ) { ButtonParameter = 4 }
             );
 
-            Add
+            tabArea.Add
             (
                 new NiceButton
                 (
@@ -292,7 +294,7 @@ namespace ClassicUO.Game.UI.Gumps
                 ) { ButtonParameter = 5 }
             );
 
-            Add
+            tabArea.Add
             (
                 new NiceButton
                 (
@@ -305,7 +307,7 @@ namespace ClassicUO.Game.UI.Gumps
                 ) { ButtonParameter = 6 }
             );
 
-            Add
+            tabArea.Add
             (
                 new NiceButton
                 (
@@ -318,7 +320,7 @@ namespace ClassicUO.Game.UI.Gumps
                 ) { ButtonParameter = 7 }
             );
 
-            Add
+            tabArea.Add
             (
                 new NiceButton
                 (
@@ -331,7 +333,7 @@ namespace ClassicUO.Game.UI.Gumps
                 ) { ButtonParameter = 8 }
             );
 
-            Add
+            tabArea.Add
             (
                 new NiceButton
                 (
@@ -344,7 +346,7 @@ namespace ClassicUO.Game.UI.Gumps
                 ) { ButtonParameter = 9 }
             );
 
-            Add
+            tabArea.Add
             (
                 new NiceButton
                 (
@@ -357,7 +359,7 @@ namespace ClassicUO.Game.UI.Gumps
                 ) { ButtonParameter = 10 }
             );
 
-            Add
+            tabArea.Add
             (
                 new NiceButton
                 (
@@ -370,7 +372,7 @@ namespace ClassicUO.Game.UI.Gumps
                 ) { ButtonParameter = 11 }
             );
 
-            Add
+            tabArea.Add
             (
                 new NiceButton
                 (
@@ -383,7 +385,7 @@ namespace ClassicUO.Game.UI.Gumps
                 ) { ButtonParameter = 12 }
             );
 
-            Add
+            tabArea.Add
             (
                 new NiceButton
                 (
@@ -399,7 +401,7 @@ namespace ClassicUO.Game.UI.Gumps
                 }
             );
 
-            Add
+            tabArea.Add
             (
                 new NiceButton
                 (
@@ -411,6 +413,8 @@ namespace ClassicUO.Game.UI.Gumps
                     "UOAM"
                 ) { ButtonParameter = 16 }
             );
+
+            Add(tabArea);
 
             Add
             (
@@ -3740,7 +3744,8 @@ namespace ClassicUO.Game.UI.Gumps
         }
 
         private Checkbox _uoamAutoConnect, _uoamAutoOpenChat;
-        private InputField _uoamPlayerName, _uoamServerIP, _uoamServerPort, _uoamPassword;
+        private InputField _uoamPlayerName, _uoamServerIP, _uoamServerPort;
+        private PasswordStbTextBox _uoamPasswordBox;
         private NiceButton _uoamConnectButton;
         private DataBox _uoamAliasDataBox;
 
@@ -3752,21 +3757,31 @@ namespace ClassicUO.Game.UI.Gumps
 
             int y = 5;
 
-            _uoamPlayerName = AddInputField(rightArea, 5, y, 200, 20, "Player name", set_down: true);
+            _uoamPlayerName = AddInputField(rightArea, 5, y, 200, TEXTBOX_HEIGHT, "Player name", set_down: true);
             _uoamPlayerName.SetText(_currentProfile.UOAMPlayerName);
             y = _uoamPlayerName.Y + _uoamPlayerName.Height + 8;
 
-            _uoamServerIP = AddInputField(rightArea, 5, y, 200, 20, "Server IP", set_down: true);
+            _uoamServerIP = AddInputField(rightArea, 5, y, 200, TEXTBOX_HEIGHT, "Server IP", set_down: true);
             _uoamServerIP.SetText(_currentProfile.UOAMServerIP);
             y = _uoamServerIP.Y + _uoamServerIP.Height + 8;
 
-            _uoamServerPort = AddInputField(rightArea, 5, y, 100, 20, "Server port", set_down: true, numbersOnly: true);
+            _uoamServerPort = AddInputField(rightArea, 5, y, 100, TEXTBOX_HEIGHT, "Server port", set_down: true, numbersOnly: true);
             _uoamServerPort.SetText(_currentProfile.UOAMServerPort.ToString());
             y = _uoamServerPort.Y + _uoamServerPort.Height + 8;
 
-            _uoamPassword = AddInputField(rightArea, 5, y, 200, 20, "Password", set_down: true);
-            _uoamPassword.SetText(_currentProfile.UOAMPassword);
-            y = _uoamPassword.Y + _uoamPassword.Height + 8;
+            Label uoamPasswordLabel = AddLabel(rightArea, "Password", 5, y);
+            int passwordBoxY = uoamPasswordLabel.Bounds.Bottom + 2;
+            rightArea.Add(new ResizePic(0x0BB8) { X = 5, Y = passwordBoxY, Width = 200, Height = TEXTBOX_HEIGHT });
+            _uoamPasswordBox = new PasswordStbTextBox(FONT, -1, 200 - 8, true, FontStyle.Cropped | FontStyle.BlackBorder, HUE_FONT)
+            {
+                X = 9,
+                Y = passwordBoxY + 4,
+                Width = 200 - 8,
+                Height = TEXTBOX_HEIGHT - 8
+            };
+            _uoamPasswordBox.SetText(_currentProfile.UOAMPassword);
+            rightArea.Add(_uoamPasswordBox);
+            y = passwordBoxY + TEXTBOX_HEIGHT + 8;
 
             _uoamAutoConnect = AddCheckBox(rightArea, "Auto-connect", _currentProfile.UOAMAutoConnect, 5, y);
             y += _uoamAutoConnect.Height + 4;
@@ -3777,7 +3792,7 @@ namespace ClassicUO.Game.UI.Gumps
             _uoamConnectButton = new NiceButton(5, y, 120, 25, ButtonAction.Activate, World.UOAM.IsConnected ? "Disconnect" : "Connect") { ButtonParameter = 999 };
             _uoamConnectButton.MouseUp += (s, e) =>
             {
-                if (World.UOAM.IsConnected)
+                if (World.UOAM.IsConnected || World.UOAM.IsConnecting)
                 {
                     World.UOAM.Disconnect();
                 }
@@ -3787,7 +3802,7 @@ namespace ClassicUO.Game.UI.Gumps
                     World.UOAM.Connect();
                 }
 
-                _uoamConnectButton.TextLabel.Text = World.UOAM.IsConnected ? "Disconnect" : "Connect";
+                _uoamConnectButton.TextLabel.Text = World.UOAM.IsConnected ? "Disconnect" : World.UOAM.IsConnecting ? "Connecting..." : "Connect";
             };
             rightArea.Add(_uoamConnectButton);
             y += _uoamConnectButton.Height + 12;
@@ -3833,7 +3848,7 @@ namespace ClassicUO.Game.UI.Gumps
                 _currentProfile.UOAMServerPort = port;
             }
 
-            _currentProfile.UOAMPassword = _uoamPassword.Text;
+            _currentProfile.UOAMPassword = _uoamPasswordBox.RealText;
         }
 
         private void BuildInfoBar()

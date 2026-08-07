@@ -3,6 +3,7 @@
 using System;
 using System.Collections.Generic;
 using System.Net.Sockets;
+using System.Threading.Tasks;
 using ClassicUO.Network.Socket;
 using ClassicUO.Utility.Logging;
 
@@ -20,7 +21,17 @@ namespace ClassicUO.Network.UOAM
         private uint _sequence;
         private bool _handshakeAcked;
 
+        // TcpSocketWrapper.Connect() blocks synchronously on the OS connect timeout.
+        // Called from a UI button handler that would otherwise freeze the whole game
+        // loop, so the actual connect attempt runs on a background thread and this
+        // client only observes it (via these volatile flags) from Update(), which
+        // always runs on the main thread.
+        private volatile bool _connecting;
+        private volatile bool _pendingConnectSuccess;
+        private volatile bool _pendingConnectFailure;
+
         public bool IsConnected => _handshakeAcked && _socket != null && _socket.IsConnected;
+        public bool IsConnecting => _connecting;
 
         public event Action Connected;
         public event Action Disconnected;
@@ -34,21 +45,39 @@ namespace ClassicUO.Network.UOAM
             _handshakeAcked = false;
             _recvLength = 0;
             _sequence = 0;
+            _pendingConnectSuccess = false;
+            _pendingConnectFailure = false;
+            _connecting = true;
 
-            _socket = new TcpSocketWrapper();
-            _socket.OnConnected += (_, _) => SendHandshake();
-            _socket.OnDisconnected += (_, _) => HandleDisconnected();
-            _socket.OnError += (_, e) =>
+            SocketWrapper socket = new TcpSocketWrapper();
+            socket.OnConnected += (_, _) => _pendingConnectSuccess = true;
+            socket.OnDisconnected += (_, _) => _pendingConnectFailure = true;
+            socket.OnError += (_, e) =>
             {
                 Log.Warn($"UOAM socket error: {e}");
-                HandleDisconnected();
+                _pendingConnectFailure = true;
             };
 
-            _socket.Connect(new Uri($"tcp://{ip}:{port}"));
+            _socket = socket;
+
+            Task.Run(() =>
+            {
+                try
+                {
+                    socket.Connect(new Uri($"tcp://{ip}:{port}"));
+                }
+                catch (Exception ex)
+                {
+                    Log.Warn($"UOAM connect failed: {ex}");
+                    _pendingConnectFailure = true;
+                }
+            });
         }
 
         public void Disconnect()
         {
+            _connecting = false;
+
             if (_socket == null)
             {
                 return;
@@ -126,6 +155,22 @@ namespace ClassicUO.Network.UOAM
 
         public void Update()
         {
+            if (_connecting)
+            {
+                if (_pendingConnectSuccess)
+                {
+                    _connecting = false;
+                    _pendingConnectSuccess = false;
+                    SendHandshake();
+                }
+                else if (_pendingConnectFailure)
+                {
+                    _connecting = false;
+                    _pendingConnectFailure = false;
+                    HandleDisconnected();
+                }
+            }
+
             if (_socket == null || !_socket.IsConnected)
             {
                 return;

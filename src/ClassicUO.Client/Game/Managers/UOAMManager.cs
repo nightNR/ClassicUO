@@ -47,6 +47,8 @@ namespace ClassicUO.Game.Managers
 
         public bool IsConnected => _client.IsConnected;
 
+        public bool IsConnecting => _client.IsConnecting;
+
         public event Action<string> ChatTextReceived;
 
         public void Connect()
@@ -55,8 +57,12 @@ namespace ClassicUO.Game.Managers
 
             if (profile == null || string.IsNullOrEmpty(profile.UOAMServerIP))
             {
+                GameActions.Print(_world, "UOAM: no server IP configured", 0x2B);
+
                 return;
             }
+
+            GameActions.Print(_world, $"UOAM: connecting to {profile.UOAMServerIP}:{profile.UOAMServerPort}...", 0x2B);
 
             _nextPositionSend = 0;
             _nextChatPoll = 0;
