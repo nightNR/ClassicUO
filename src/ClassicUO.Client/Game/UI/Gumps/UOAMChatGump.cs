@@ -59,8 +59,11 @@ namespace ClassicUO.Game.UI.Gumps
                 return;
             }
 
+            // No local echo here - the hub broadcasts a sent message back to its own
+            // sender too (a real client relies on that same echo instead of drawing its
+            // own copy), so echoing locally as well as displaying the server's copy via
+            // World_UOAM_ChatTextReceived showed every sent message twice.
             World.UOAM.SendChatText(text);
-            _entries.AddEntry($"{ProfileManager.CurrentProfile.UOAMPlayerName}: {text}");
             _inputBox.SetText(string.Empty);
         }
 
