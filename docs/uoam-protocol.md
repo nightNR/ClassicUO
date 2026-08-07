@@ -1,18 +1,19 @@
 # UOAM hub wire protocol (reverse-engineered)
 
 Status: **position/map visibility and chat both work**, live-verified against a
-real hub (`map.knuckleheads.dk:2000`, 2026-08-07). The key discovery: **chat
-requires its own dedicated, separately-handshaken second TCP connection** - a
-real client always opens two sockets (this document previously only accounted
-for one), and every chat-family request this client sent on the primary
-connection got an explicit RPC fault, no matter how byte-perfect, until it
-started opening and binding a second connection the same way. See "Two
-connections" below. Separately, the server can also fault a *fresh* primary
-connection outright if it's reconnecting under the same player name too soon
-after a previous session fully registered - see "Faults" below; this looks
-like server-side session-cleanup timing, not a client bug, and is only
-mitigated (not fixed) by backing off before retrying. Panic is **not**
-covered — never captured, still unknown.
+real hub (`map.knuckleheads.dk:2000`, 2026-08-07). A real client opens **three**
+TCP connections per session, not one: two redundant, independent
+position/list connections (see "Redundant position connection") and a third
+dedicated entirely to chat, bound to one of the other two via its own
+handshake (see "Two connections"). Every chat-family request sent on a
+position/list connection gets an explicit RPC fault, no matter how
+byte-perfect. Separately, the server can also fault a *fresh* connection
+outright if it's reconnecting under the same player name too soon after a
+previous session fully registered (see "Faults"), and player-list presence is
+governed by staleness (last-update TTL, ~5s), not by connection state at all
+(see "Disconnect") - see "Notes for a from-scratch server implementation" for
+what these all mean for something re-implementing the hub side. Panic is
+**not** covered — never captured, still unknown.
 
 This document supersedes `src/uoamhub/*.c` as the source of truth for the client
 implementation in `src/ClassicUO.Client/Network/UOAM/`. `uoamhub` is a from-scratch
@@ -81,10 +82,12 @@ d0 16 d0 16 00 00 00 00 02 00 00 00 00 00 01 00
 
 GUID A = `10 66 15 9e 5c 7b d2 11 b8 cf 00 80 c7 97 1b e1` appears twice, identical
 in both captures → a fixed interface identifier, not per-session data. Offset
-20-23 is the "master client id" (0 = primary connection; a secondary connection —
-UOAM historically opens two TCP sockets per client — would echo the primary's
-assigned id here instead, mirrored in `uoamhub.c`'s `master_id` concept. Not
-implemented client-side; this client only opens one socket).
+20-23 is the "master client id" (0 for an independent connection). A real
+client opens *three* TCP connections total, not one - two identical,
+independent position/list connections (each with its own `master_id = 0`
+handshake, see "Redundant position connection" below) plus a chat connection
+bound to one of them via `master_id` (see "Two connections" below). This
+client now opens all three the same way.
 
 The ack response (`0x0c`) is 84 bytes and matches `uoamhub.c`'s
 `packet_handshake_response` template closely: offset 20-23 = assigned
@@ -474,16 +477,84 @@ exact bit/offset within a `player_info` block is unconfirmed, and guessing here
 would be worse than not implementing it, since a wrong guess silently corrupts
 position data other clients read.
 
+## Notes for a from-scratch server implementation
+
+Everything above documents the wire format; this section pulls together the
+*behavioral* findings that matter for a server implementation specifically,
+since `uoamhub.c` gets several of these wrong or doesn't address them at all:
+
+- **Accept 3 connections per logical client, 2 of them identical.** A real
+  client always opens two independent position/list connections (each its own
+  handshake, own client id, own sequence space) sending the *same* position
+  updates and query-list requests in parallel the whole session, plus a third
+  connection dedicated to chat, bound to one of the first two via `master_id`
+  in its handshake (see "Two connections" / "Redundant position connection").
+  Don't treat the second position/list connection as a duplicate login for
+  the same name - it's expected, and rejecting it will make a real client (or
+  this one) fall back to single-connection behavior at best, or fault
+  entirely at worst.
+- **Player-list presence should be TTL/staleness-based, not connection-based.**
+  A real client's own "disconnect" button never closes its TCP connections -
+  it just stops sending position updates, and the player disappears from
+  other clients' lists in ~5 seconds anyway (see "Disconnect"). If a server
+  implementation instead removes players only on TCP close, a client that
+  legitimately drops a connection (network blip, one of its two redundant
+  legs faulting) will vanish immediately even though it's still "logically"
+  connected via its other leg or about to reconnect - the opposite of what a
+  real hub does.
+- **Don't fault a reconnect under the same name just because the name was
+  recently in use.** This is the single biggest live-observed instability:
+  reconnecting under a name whose previous session had fully registered (sent
+  a successful query-list) gets faulted (NCA status `0x1c01000b`, see
+  "Faults") for at least ~16 seconds after that session's own graceful
+  disconnect - way longer than the ~5s staleness window that governs visible
+  presence. If presence is already TTL-based (previous bullet), there's no
+  reason a *new* connection under the same name should be rejected once the
+  old entry has gone stale - and arguably not even before then, since a real
+  client's own redundant-connection design implies the hub is expected to
+  tolerate multiple simultaneous connections claiming the same name/password
+  as perfectly normal, not a conflict.
+- **No logout packet exists or is needed.** Don't design one; rely entirely
+  on staleness + eventual TCP close (which is usually an abortive `RST`, not
+  a graceful `FIN` - see "Disconnect" - so don't rely on a clean FIN/shutdown
+  sequence as a signal either, though on a Berkeley-sockets-derived server
+  both should be detectable as "the peer is gone" regardless).
+- **The mandatory `0x0e` "mystery" packet must get *some* response** (`0x0f`)
+  or a real client stalls after the handshake - its actual semantics are
+  still unconfirmed (see "Mandatory post-handshake packet"), but `uoamhub.c`
+  already gets the "respond with something" part right.
+- **`offset 16-19` on responses is not a meaningful discriminator** - it's
+  just `total_length - 24`, always. Don't design new response types that
+  need to be told apart by that field; use total length and `offset 20-23`
+  instead (see "Response discriminator").
+
 ## Source of the captures
 
-Two independent Wireshark captures against `map.knuckleheads.dk:2000` (a live,
-real hub — not `uoamhub`), using a real UOAM client:
+All against `map.knuckleheads.dk:2000` (a live, real hub — not `uoamhub`),
+using real UOAM.exe clients (one or more, per capture) alongside this
+project's own client where noted:
 
 1. `uoam.pcap` (classic pcap) — handshake, position update loop, query-list, one
    font/color announce, no chat text.
-2. `UOAM2.pcapng` (pcapng) — same session shape, plus 4 real chat text sends
-   (used to derive/verify the chat send and chat-poll-response formats).
+2. `UOAM2.pcapng` — same session shape, plus 4 real chat text sends (chat
+   send/poll-response formats).
+3. `UOAM4.pcapng` — cold-start capture (Wireshark running before the client
+   connected); source of the chat-registration (subtype 2) packet.
+4. `UOAM5.pcapng` / `UOAM6.pcapng` — `UOAM6` captured 2 real UOAM clients and
+   this project's client simultaneously; source of the "chat needs its own
+   dedicated socket" and per-connection `master_id` findings.
+5. `UOAM7.pcapng` — this project's client only, several reconnect attempts
+   under the same name; source of the DCE/RPC fault (`0x1c01000b`) findings.
+6. `UOAM8.pcapng` — mid-session start, one real client's abrupt exit; first
+   (inconclusive) look at disconnect behavior.
+7. `UOAM9.pcapng` — 2 real UOAM.exe instances, each disconnected via its own
+   UI button and then the app closed; source of the "always RST on process
+   exit" and "two identical redundant position connections" findings.
+8. `UOAM10.pcapng` — real UOAM.exe, disconnect button pressed but app left
+   running; source of the "disconnect button doesn't close the connection,
+   staleness expiry does the work" finding.
 
-Both parsed with small custom Python scripts (no `scapy`/`dpkt`/tshark dependency
-assumed, though `tshark -x` was used once to cross-check the manual byte parsing
-against packet #100 of `UOAM2.pcapng` and matched exactly).
+Parsed primarily with `tshark.exe` (`-x` for hex dumps, `-Y` display filters,
+`-z conv,tcp` for connection summaries); earlier captures were also
+cross-checked with small custom Python pcap/pcapng parsers (no `scapy`/`dpkt`
+dependency assumed).
