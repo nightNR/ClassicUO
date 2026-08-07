@@ -165,6 +165,16 @@ namespace ClassicUO.Network.UOAM
             Send(UOAMProtocol.BuildQueryListRequest(++_sequence, password, _ipMarker));
         }
 
+        public void SendChatRegister(string password, string playerName)
+        {
+            if (!IsConnected)
+            {
+                return;
+            }
+
+            Send(UOAMProtocol.BuildChatRegister(++_sequence, password, _ipMarker, playerName));
+        }
+
         public void SendChatPoll(string password, string playerName)
         {
             if (!IsConnected)

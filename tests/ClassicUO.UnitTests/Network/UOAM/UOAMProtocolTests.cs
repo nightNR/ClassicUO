@@ -96,6 +96,30 @@ namespace ClassicUO.UnitTests.Network.UOAM
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
         };
 
+        // Ground truth (UOAM4.pcapng, 2026-08-07): a real client's chat-registration
+        // request (subtype 2), password "mrtki251", name "Night", sent once right after
+        // its first position update.
+        private static readonly byte[] CapturedChatRegister =
+        {
+            0x05, 0x00, 0x00, 0x03, 0x10, 0x00, 0x00, 0x00, 0x58, 0x00, 0x00, 0x00, 0x03, 0x00, 0x00, 0x00,
+            0x40, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x6d, 0x72, 0x74, 0x6b, 0x69, 0x32, 0x35, 0x31,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0a, 0x08, 0x00, 0x04,
+            0x00, 0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0x00, 0x06, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x06, 0x00, 0x00, 0x00, 0x4e, 0x69, 0x67, 0x68, 0x74, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
+        };
+
+        // Ground truth: the server's ack to that chat-registration request - 28 bytes,
+        // same length as a plain position/list ack, but offset20-23 (marker20) is 1
+        // (chat family) instead of 0. Classify() must treat both as Ack: length alone,
+        // not marker20, is what distinguishes an ack from everything else once it's 28
+        // bytes.
+        private static readonly byte[] CapturedChatRegisterAck =
+        {
+            0x05, 0x00, 0x02, 0x03, 0x10, 0x00, 0x00, 0x00, 0x1c, 0x00, 0x00, 0x00, 0x03, 0x00, 0x00, 0x00,
+            0x04, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
+        };
+
         [Fact]
         public void BuildHandshake_MatchesCapturedRealClientRequest_ExceptSequence()
         {
@@ -155,6 +179,22 @@ namespace ClassicUO.UnitTests.Network.UOAM
         public void Classify_RecognizesCapturedPlayerListResponse()
         {
             Assert.Equal(UOAMResponseKind.PlayerList, UOAMProtocol.Classify(CapturedQueryListResponse));
+        }
+
+        [Fact]
+        public void Classify_RecognizesCapturedChatRegisterAck_AsAck()
+        {
+            Assert.Equal(UOAMResponseKind.Ack, UOAMProtocol.Classify(CapturedChatRegisterAck));
+        }
+
+        [Fact]
+        public void BuildChatRegister_MatchesCapturedRealClientRequest()
+        {
+            byte[] ipMarker = { 0x0a, 0x08, 0x00, 0x04 };
+
+            byte[] packet = UOAMProtocol.BuildChatRegister(3, "mrtki251", ipMarker, "Night");
+
+            Assert.Equal(CapturedChatRegister, packet);
         }
 
         [Fact]

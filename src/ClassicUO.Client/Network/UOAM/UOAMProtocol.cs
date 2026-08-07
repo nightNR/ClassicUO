@@ -245,6 +245,41 @@ namespace ClassicUO.Network.UOAM
             return packet;
         }
 
+        // Chat registration - a real client sends this exactly once per connection,
+        // right after its first position update and before ever polling or sending
+        // chat, using the same major/minor (1/0) as chat send/font-color but subtype 2
+        // (not 1=text or 3=font/color). Without it, every subsequent chat poll/send on
+        // that connection gets an RPC fault (packet type 0x03, magic byte 0x23 instead
+        // of the usual 0x03) - verified live: replaying byte-identical real chat-send
+        // bytes on a connection that skipped this step still faults, while the same
+        // bytes succeeded in the connection that registered first. Structure: prefix(48)
+        // + 4 zero bytes + subtype(4, =2) + 0x00020000 marker(4) + the player's own name
+        // as an NDR string (unpadded) + a fixed 10-byte zero trailer. That trailer's
+        // exact byte count is only confirmed for one captured name length (6 bytes
+        // incl. NUL) - if this doesn't generalize to other name lengths, that's the
+        // first thing to re-derive from a fresh capture.
+        public static byte[] BuildChatRegister(uint sequence, string password, ReadOnlySpan<byte> ipMarker, string playerName)
+        {
+            playerName ??= string.Empty;
+            byte[] nameBytes = Encoding.ASCII.GetBytes(playerName);
+            uint nameCount = (uint)nameBytes.Length + 1;
+
+            const int trailerSize = 10;
+            int totalLength = 48 + 4 + 4 + 4 + 12 + (int)nameCount + trailerSize;
+
+            byte[] packet = BuildDataPacketPrefix(totalLength, sequence, 0x0001, 0x0000, password, ipMarker, out int payloadOffset);
+
+            BinaryPrimitives.WriteUInt32LittleEndian(packet.AsSpan(payloadOffset, 4), 0); // unknown, observed fixed
+            BinaryPrimitives.WriteUInt32LittleEndian(packet.AsSpan(payloadOffset + 4, 4), 2); // subtype: chat register
+            BinaryPrimitives.WriteUInt32LittleEndian(packet.AsSpan(payloadOffset + 8, 4), 0x00020000); // unknown constant
+
+            int nameOffset = payloadOffset + 12;
+            WriteNdrString(packet.AsSpan(nameOffset, 12 + nameBytes.Length + 1), playerName);
+            // remaining trailerSize bytes already zero from `new byte[totalLength]`
+
+            return packet;
+        }
+
         public static bool TryReadFrameLength(ReadOnlySpan<byte> buffer, out uint length)
         {
             if (buffer.Length < 12)
@@ -277,18 +312,25 @@ namespace ClassicUO.Network.UOAM
             // offset16-19 is *always* (length-24) for type-0x02 responses (the server's
             // respond() rewrites it unconditionally) so it carries no subtype information.
             // offset20-23 plus total length are what distinguish ack/no-chat/list/chat.
-            // Verified sizes from a real capture: Ack is always exactly 28 bytes, NoChat
-            // is always exactly 44 bytes (NOT 28 - uoamhub.c's 28-byte packet_no_chat
-            // constant does not match this real server), PlayerList is never smaller than
-            // 40 (36-byte header + 4-byte trailer, 0 players), and ChatData is never
-            // smaller than ~61 (24-byte header + subtype + marker + minimal name/text NDR
-            // strings) - so length alone cleanly separates each pair once marker20 narrows
-            // it to "ack-family" (0) vs "chat-family" (1).
+            // Verified sizes from real captures: a plain Ack is always exactly 28 bytes
+            // regardless of marker20 (0 for position/list acks, 1 for chat-register/
+            // chat-send acks - an ack is an ack either way), NoChat is always exactly 44
+            // bytes (NOT 28 - uoamhub.c's 28-byte packet_no_chat constant does not match
+            // this real server), PlayerList is never smaller than 40 (36-byte header +
+            // 4-byte trailer, 0 players), and ChatData is never smaller than ~61
+            // (24-byte header + subtype + marker + minimal name/text NDR strings) - so
+            // length alone cleanly separates each pair once marker20 narrows it to
+            // "position/list family" (0) vs "chat family" (1).
             uint marker20 = BinaryPrimitives.ReadUInt32LittleEndian(data.Slice(20, 4));
+
+            if (data.Length == 28)
+            {
+                return UOAMResponseKind.Ack;
+            }
 
             if (marker20 == 0)
             {
-                return data.Length == 28 ? UOAMResponseKind.Ack : UOAMResponseKind.PlayerList;
+                return UOAMResponseKind.PlayerList;
             }
 
             if (marker20 == 1)

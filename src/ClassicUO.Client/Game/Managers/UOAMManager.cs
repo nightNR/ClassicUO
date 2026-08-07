@@ -23,6 +23,7 @@ namespace ClassicUO.Game.Managers
         private uint _nextPositionSend, _nextChatPoll, _nextListQuery;
         private uint _reconnectAt;
         private int _reconnectAttempt;
+        private bool _chatRegistered;
 
         public UOAMManager(World world)
         {
@@ -109,6 +110,7 @@ namespace ClassicUO.Game.Managers
             _nextPositionSend = 0;
             _nextChatPoll = 0;
             _nextListQuery = 0;
+            _chatRegistered = false;
 
             _client.Connect(profile.UOAMServerIP, profile.UOAMServerPort);
         }
@@ -193,6 +195,16 @@ namespace ClassicUO.Game.Managers
             {
                 _nextPositionSend = now + PositionIntervalMs;
                 _client.SendPositionUpdate(profile.UOAMPassword, profile.UOAMPlayerName, _world.Player.X, _world.Player.Y, _world.Player.Z, _world.MapIndex);
+
+                // A real client sends this exactly once per connection, right after its
+                // first position update and before ever touching chat - without it, the
+                // server RPC-faults every subsequent chat poll/send on the connection.
+                // See UOAMProtocol.BuildChatRegister for how this was found.
+                if (!_chatRegistered)
+                {
+                    _chatRegistered = true;
+                    _client.SendChatRegister(profile.UOAMPassword, profile.UOAMPlayerName);
+                }
             }
 
             if (now >= _nextChatPoll)

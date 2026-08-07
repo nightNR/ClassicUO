@@ -1,11 +1,28 @@
 # UOAM hub wire protocol (reverse-engineered)
 
-Status: verified end-to-end against a real, live hub (`map.knuckleheads.dk:2000`,
-2026-08-07) — handshake, position update, and query-list round-tripped correctly
-(sent position echoed back exactly through a subsequent query-list response) and
-chat send/receive was verified against two independent packet captures of a real
-UOAM client (including one with an actual typed chat message). Panic is **not**
-covered — never captured, still unknown.
+Status: **position/map visibility works, chat does not.** Handshake, position
+update, and query-list are verified end-to-end live against a real hub
+(`map.knuckleheads.dk:2000`, 2026-08-07) — a sent position round-tripped
+byte-exact through a subsequent query-list response, repeatedly, across many
+live test connections.
+
+Chat (poll and send) is **not working** despite extensive reverse-engineering
+and multiple live verification attempts. Every chat-family request this client
+sends gets rejected with an explicit RPC fault (response byte 2 = `0x03`,
+byte 3 = `0x23` instead of the usual `0x03`) — even when the bytes sent are a
+byte-for-byte replay of a real client's request that is *known* to have
+succeeded in the packet capture it was taken from. A dedicated "chat
+registration" packet (see below) that a real client sends once per connection
+was discovered, byte-verified against a capture, and implemented — sending it
+did **not** fix the fault either. The leading hypothesis is that this protocol
+is genuine DCE/RPC (see the framing section below) and chat requires a second,
+properly-negotiated presentation context from the bind exchange that this
+client's hand-crafted bytes don't actually establish, even though they satisfy
+whatever the server checks for position/list. Confirming that would need either
+a real DCE/RPC spec-level analysis of the bind PDU's context list, or reverse
+engineering the real UOAM.exe client's calls directly (e.g. decompilation) -
+both out of scope for how this was investigated (packet-capture diffing).
+Panic is **also not** covered — never captured, still unknown.
 
 This document supersedes `src/uoamhub/*.c` as the source of truth for the client
 implementation in `src/ClassicUO.Client/Network/UOAM/`. `uoamhub` is a from-scratch
@@ -216,6 +233,40 @@ is still an ordinary subtype-1 text send; it has nothing to do with the actual
 font/color-announce packet type, which is a structurally different, larger
 payload this client never constructs).
 
+**Despite the byte-exact match, this does not work live** - see the Status
+section at the top of this document. Every live attempt to send this packet
+(including replaying the exact captured bytes verbatim, unmodified) gets an
+RPC fault response instead of the ack a real client gets for the identical
+bytes in its own capture.
+
+### Chat registration (subtype 2) - discovered, implemented, insufficient
+
+A real client sends one more packet type this document didn't originally
+cover: right after its *first* position update (before ever polling or
+sending chat), it sends a "registration" packet using the same major/minor
+(1/0) as chat send, but subtype **2** instead of 1 (text) or 3 (font/color):
+
+```
+prefix(48) + 4 zero bytes + subtype(4, = 2) + 0x00020000 marker(4)
+  + the player's own name as an unpadded NDR-ish string + a 10-byte zero trailer
+```
+
+The trailer's exact size is confirmed only for one captured name length (5
+chars + NUL = 6); whether it scales with name length or is genuinely fixed at
+10 bytes regardless is unconfirmed - there was only one example to derive it
+from. The server's ack to a real client's registration is a plain 28-byte Ack
+with offset20-23 = 1 (see the discriminator table below) - not a fault.
+
+This was found by capturing a **fresh, cold-start** real client session
+(Wireshark started before the client connected) and finding a packet type with
+no prior explanation. It looked like the obvious missing piece explaining why
+every chat operation faulted for this client. **It is not sufficient on its
+own**: implementing and sending it (byte-verified identical to the captured
+request, live-tested against the real server with the exact same player name
+used in the working capture) still gets the same RPC fault, on the
+registration packet itself. See the Status section for the current leading
+theory (unnegotiated second DCE/RPC presentation context).
+
 ## NDR-ish strings
 
 Every embedded string (player name, chat text) uses the same three-`uint32`
@@ -248,14 +299,17 @@ appearing to hardcode different "marker" values there (`0x04`, `0x14`,
 `0xffffffff`) before that overwrite runs. That appearance is what caused the
 first implementation of this client's `Classify()` to be wrong from the start.
 
-The actual discriminator is offset 20-23 (`marker20`) combined with total length:
+The actual discriminator is total length first, then offset 20-23 (`marker20`):
+a plain Ack is **always exactly 28 bytes regardless of marker20** - a chat
+registration/send ack uses marker20=1, a position/list ack uses marker20=0,
+same meaning either way. Only once length rules out 28 does marker20 matter:
 
-| marker20 | length | Meaning |
+| length | marker20 | Meaning |
 |---|---|---|
-| 0 | 28 | Ack |
-| 0 | anything else (≥ 40) | PlayerList |
-| 1 | 44 | NoChat |
-| 1 | anything else (≥ ~61) | ChatData |
+| 28 | 0 or 1 | Ack |
+| 44 | 1 | NoChat |
+| anything else | 0 | PlayerList |
+| anything else | 1 | ChatData |
 
 ## Panic
 
