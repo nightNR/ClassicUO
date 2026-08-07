@@ -1,34 +1,68 @@
 // SPDX-License-Identifier: BSD-2-Clause
 
 using System;
+using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Net;
 using ClassicUO.Utility.Logging;
 
 namespace ClassicUO.Network.UOAM
 {
-    // Owns two UOAMSocketChannel connections, matching how a real client behaves (see
-    // docs/uoam-protocol.md): a primary connection for position updates and the player
-    // list, and a second, separately-handshaken connection dedicated entirely to chat.
-    // Every chat operation attempted on the primary connection alone - byte-identical to
-    // real captured requests - gets an RPC fault from the server; only requests sent on
-    // a properly bound secondary connection succeed.
+    // Owns three UOAMSocketChannel connections, matching how a real client behaves (see
+    // docs/uoam-protocol.md): two redundant, independently-handshaken connections that
+    // both carry position updates and query-list requests, and a third connection
+    // dedicated entirely to chat. Every chat operation attempted on a position/list
+    // connection - byte-identical to real captured requests - gets an RPC fault from the
+    // server; only requests sent on a properly bound chat connection succeed.
+    //
+    // The two position/list legs are full duplicates of each other (same handshake,
+    // same position updates, same query-list requests, both sent every tick) rather than
+    // one primary plus a cold standby - that's what a real client does (see "Redundant
+    // position connection" in the docs), and it means a single leg faulting or getting
+    // RST'd (which has been observed to happen occasionally, seemingly server-side and
+    // not tied to anything wrong with the request) doesn't interrupt visibility at all -
+    // the other leg keeps the player on everyone's map while the dropped one silently
+    // reopens in the background. The whole session is only considered lost once both
+    // legs are down at once.
     internal sealed class UOAMClient
     {
+        // A leg that just faulted or got reset shouldn't be redialed instantly - give
+        // the server (and the network) a moment, mirroring the spirit of
+        // UOAMManager's reconnect backoff without duplicating its longer schedule here
+        // (this is for transient single-leg blips, not a fully dead session).
+        private const long LegReconnectDelayMs = 3000;
+
+        // One independently-handshaken position/list connection. Two of these run in
+        // parallel - see the class comment.
+        private sealed class Leg
+        {
+            public readonly UOAMSocketChannel Channel;
+            public uint Sequence;
+            public uint HandshakeClientId;
+            public bool HandshakeAcked;
+            public long ReconnectAt;
+
+            public Leg(string name)
+            {
+                Channel = new UOAMSocketChannel(name);
+            }
+
+            public bool IsReady => HandshakeAcked && Channel.IsConnected;
+        }
+
         private readonly byte[] _ipMarker = new byte[4];
-        private readonly UOAMSocketChannel _primary = new UOAMSocketChannel("primary");
+        private readonly Leg _leg1 = new Leg("primary");
+        private readonly Leg _leg2 = new Leg("primary2");
         private readonly UOAMSocketChannel _chat = new UOAMSocketChannel("chat");
 
         private string _connectIp;
         private ushort _connectPort;
-        private uint _primarySequence;
         private uint _chatSequence;
-        private uint _handshakeClientId;
-        private bool _handshakeAcked;
         private bool _chatReady;
+        private bool _chatOpened;
 
-        public bool IsConnected => _handshakeAcked && _primary.IsConnected;
-        public bool IsConnecting => _primary.IsConnecting;
+        public bool IsConnected => _leg1.IsReady || _leg2.IsReady;
+        public bool IsConnecting => _leg1.Channel.IsConnecting || _leg2.Channel.IsConnecting;
         public bool IsChatReady => _chatReady && _chat.IsConnected;
 
         public event Action Connected;
@@ -38,9 +72,13 @@ namespace ClassicUO.Network.UOAM
 
         public UOAMClient()
         {
-            _primary.Connected += OnPrimaryConnected;
-            _primary.Disconnected += OnPrimaryDisconnected;
-            _primary.FrameReceived += OnPrimaryFrame;
+            _leg1.Channel.Connected += () => OnLegConnected(_leg1);
+            _leg1.Channel.Disconnected += () => OnLegDisconnected(_leg1);
+            _leg1.Channel.FrameReceived += data => OnLegFrame(_leg1, data);
+
+            _leg2.Channel.Connected += () => OnLegConnected(_leg2);
+            _leg2.Channel.Disconnected += () => OnLegDisconnected(_leg2);
+            _leg2.Channel.FrameReceived += data => OnLegFrame(_leg2, data);
 
             _chat.Connected += OnChatConnected;
             _chat.Disconnected += OnChatDisconnected;
@@ -53,53 +91,91 @@ namespace ClassicUO.Network.UOAM
 
             _connectIp = ip;
             _connectPort = port;
-            _handshakeAcked = false;
             _chatReady = false;
-            _handshakeClientId = 0;
-            _primarySequence = 0;
+            _chatOpened = false;
+            ResetLeg(_leg1);
+            ResetLeg(_leg2);
             _chatSequence = 0;
             Array.Clear(_ipMarker, 0, _ipMarker.Length);
 
-            _primary.Connect(ip, port);
+            _leg1.Channel.Connect(ip, port);
+            _leg2.Channel.Connect(ip, port);
+        }
+
+        private static void ResetLeg(Leg leg)
+        {
+            leg.Sequence = 0;
+            leg.HandshakeClientId = 0;
+            leg.HandshakeAcked = false;
+            leg.ReconnectAt = 0;
         }
 
         public void Disconnect()
         {
-            _primary.Disconnect();
+            _leg1.Channel.Disconnect();
+            _leg2.Channel.Disconnect();
             _chat.Disconnect();
-            _handshakeAcked = false;
+            _leg1.HandshakeAcked = false;
+            _leg2.HandshakeAcked = false;
             _chatReady = false;
         }
 
         public void Update()
         {
-            _primary.Update();
+            _leg1.Channel.Update();
+            _leg2.Channel.Update();
             _chat.Update();
+
+            long now = Environment.TickCount64;
+            TryReconnectLeg(_leg1, now);
+            TryReconnectLeg(_leg2, now);
         }
 
-        private void OnPrimaryConnected()
+        private void TryReconnectLeg(Leg leg, long now)
+        {
+            if (leg.ReconnectAt != 0 && now >= leg.ReconnectAt && !leg.Channel.IsConnected && !leg.Channel.IsConnecting)
+            {
+                leg.ReconnectAt = 0;
+                leg.Channel.Connect(_connectIp, _connectPort);
+            }
+        }
+
+        private void OnLegConnected(Leg leg)
         {
             UpdateLocalIpMarker();
-            _primary.Send(UOAMProtocol.BuildHandshake(++_primarySequence));
+            leg.Channel.Send(UOAMProtocol.BuildHandshake(++leg.Sequence));
         }
 
-        private void OnPrimaryDisconnected()
+        private void OnLegDisconnected(Leg leg)
         {
-            _handshakeAcked = false;
+            leg.HandshakeAcked = false;
+
+            if (IsConnected)
+            {
+                // The other leg is still up - this is exactly the scenario the second
+                // leg exists for. Quietly redial the one that dropped after a short
+                // delay instead of tearing down the whole session.
+                leg.ReconnectAt = Environment.TickCount64 + LegReconnectDelayMs;
+                return;
+            }
+
+            // Both legs are down - the session really is gone.
             _chatReady = false;
+            _chatOpened = false;
             _chat.Disconnect();
             Disconnected?.Invoke();
         }
 
         private void OnChatConnected()
         {
-            _chat.Send(UOAMProtocol.BuildChatSocketHandshake(++_chatSequence, _handshakeClientId));
+            uint masterId = _leg1.HandshakeAcked ? _leg1.HandshakeClientId : _leg2.HandshakeClientId;
+            _chat.Send(UOAMProtocol.BuildChatSocketHandshake(++_chatSequence, masterId));
         }
 
         private void OnChatDisconnected()
         {
             // Chat is a bonus channel - losing it should not tear down position/list,
-            // which keeps working fine on the primary connection regardless. Just mark
+            // which keeps working fine on the remaining leg(s) regardless. Just mark
             // it not-ready; the caller can decide whether/when to retry the chat socket.
             _chatReady = false;
         }
@@ -108,7 +184,9 @@ namespace ClassicUO.Network.UOAM
         {
             try
             {
-                if (_primary.LocalEndPoint is IPEndPoint ep)
+                EndPoint local = _leg1.Channel.LocalEndPoint ?? _leg2.Channel.LocalEndPoint;
+
+                if (local is IPEndPoint ep)
                 {
                     byte[] bytes = ep.Address.MapToIPv4().GetAddressBytes();
 
@@ -126,22 +204,28 @@ namespace ClassicUO.Network.UOAM
 
         public void SendPositionUpdate(string password, string name, int x, int y, int z, int map)
         {
-            if (!IsConnected)
+            if (_leg1.IsReady)
             {
-                return;
+                _leg1.Channel.Send(UOAMProtocol.BuildPositionUpdate(++_leg1.Sequence, password, _ipMarker, name, x, y, z, map));
             }
 
-            _primary.Send(UOAMProtocol.BuildPositionUpdate(++_primarySequence, password, _ipMarker, name, x, y, z, map));
+            if (_leg2.IsReady)
+            {
+                _leg2.Channel.Send(UOAMProtocol.BuildPositionUpdate(++_leg2.Sequence, password, _ipMarker, name, x, y, z, map));
+            }
         }
 
         public void SendQueryList(string password)
         {
-            if (!IsConnected)
+            if (_leg1.IsReady)
             {
-                return;
+                _leg1.Channel.Send(UOAMProtocol.BuildQueryListRequest(++_leg1.Sequence, password, _ipMarker));
             }
 
-            _primary.Send(UOAMProtocol.BuildQueryListRequest(++_primarySequence, password, _ipMarker));
+            if (_leg2.IsReady)
+            {
+                _leg2.Channel.Send(UOAMProtocol.BuildQueryListRequest(++_leg2.Sequence, password, _ipMarker));
+            }
         }
 
         public void SendChatPoll(string password, string playerName)
@@ -164,28 +248,37 @@ namespace ClassicUO.Network.UOAM
             _chat.Send(UOAMProtocol.BuildChatSendRequest(++_chatSequence, password, _ipMarker, playerName, text));
         }
 
-        private void OnPrimaryFrame(byte[] data)
+        private void OnLegFrame(Leg leg, byte[] data)
         {
             switch (UOAMProtocol.Classify(data))
             {
                 case UOAMResponseKind.HandshakeAck:
+                    bool wasConnected = IsConnected;
+
                     if (UOAMProtocol.TryParseHandshakeAck(data, out uint clientId))
                     {
-                        _handshakeClientId = clientId;
+                        leg.HandshakeClientId = clientId;
                     }
 
                     // Real clients always send this immediately after the handshake ack,
                     // before any position/list traffic - see UOAMProtocol's
                     // MysteryPacketTemplate comment.
-                    _primary.Send(UOAMProtocol.BuildMysteryFollowup(++_primarySequence, _handshakeClientId));
+                    leg.Channel.Send(UOAMProtocol.BuildMysteryFollowup(++leg.Sequence, leg.HandshakeClientId));
 
-                    _handshakeAcked = true;
-                    Connected?.Invoke();
+                    leg.HandshakeAcked = true;
+
+                    if (!wasConnected)
+                    {
+                        Connected?.Invoke();
+                    }
 
                     // Chat only works over its own dedicated, separately-handshaken
-                    // connection - open it now that we have the primary connection's
-                    // client id to bind it to.
-                    _chat.Connect(_connectIp, _connectPort);
+                    // connection - open it once, bound to whichever leg acked first.
+                    if (!_chatOpened)
+                    {
+                        _chatOpened = true;
+                        _chat.Connect(_connectIp, _connectPort);
+                    }
                     break;
 
                 case UOAMResponseKind.PlayerList:
@@ -195,24 +288,25 @@ namespace ClassicUO.Network.UOAM
                     break;
 
                 case UOAMResponseKind.Fault:
-                    // Server considers this connection dead (see UOAMProtocol.Classify) -
-                    // it will follow up with a FIN/RST shortly if it hasn't already.
+                    // Server considers this leg dead (see UOAMProtocol.Classify) - it
+                    // will follow up with a FIN/RST shortly if it hasn't already.
                     // Disconnect proactively instead of waiting for a subsequent Send()
-                    // to throw, so the reconnect/backoff timer starts sooner.
-                    Log.Warn($"UOAM: primary connection faulted (status 0x{ReadFaultStatus(data):x8})");
-                    _primary.Fault();
+                    // to throw, so the other leg (or a redial - see OnLegDisconnected)
+                    // takes over sooner.
+                    Log.Warn($"UOAM[{(leg == _leg1 ? "primary" : "primary2")}] connection faulted (status 0x{ReadFaultStatus(data):x8})");
+                    leg.Channel.Fault();
                     break;
 
                 case UOAMResponseKind.Ack:
                 case UOAMResponseKind.NoChat:
                 case UOAMResponseKind.ChatData:
                 case UOAMResponseKind.Unknown:
-                    break; // nothing to do (chat-shaped responses never arrive on primary)
+                    break; // nothing to do (chat-shaped responses never arrive on a position/list leg)
             }
         }
 
         private static uint ReadFaultStatus(byte[] data) =>
-            data.Length >= 28 ? System.Buffers.Binary.BinaryPrimitives.ReadUInt32LittleEndian(data.AsSpan(24, 4)) : 0;
+            data.Length >= 28 ? BinaryPrimitives.ReadUInt32LittleEndian(data.AsSpan(24, 4)) : 0;
 
         private void OnChatFrame(byte[] data)
         {
@@ -230,8 +324,8 @@ namespace ClassicUO.Network.UOAM
                     break;
 
                 case UOAMResponseKind.Fault:
-                    // Chat faulting doesn't need to tear down the primary connection -
-                    // OnChatDisconnected already treats losing chat as non-fatal.
+                    // Chat faulting doesn't need to tear down position/list, which keep
+                    // working on either leg regardless.
                     Log.Warn($"UOAM: chat connection faulted (status 0x{ReadFaultStatus(data):x8})");
                     _chat.Fault();
                     break;

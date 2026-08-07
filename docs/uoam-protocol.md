@@ -168,6 +168,31 @@ connection. Once acked, chat register/poll/send (see below) all work
 correctly when sent on *this* connection - live-verified: a chat poll sent
 here gets a normal 44-byte "NoChat" response, not a fault.
 
+## Redundant position connection - two identical legs, not one plus a backup
+
+A real client's *other* two connections (the ones that aren't chat, see
+above) aren't a primary-plus-standby pair - both are fully live, independent,
+identically-handshaken position/list connections running the whole session,
+each sending the **same** position updates and query-list requests as the
+other. Confirmed live (`UOAM9.pcapng`, 2026-08-07): two separate TCP streams
+from the same client, each with its own full handshake, its own client id
+from its own handshake ack, and its own sequence-number space, both carrying
+position updates for the same player name with near-identical payloads
+(differing only in the header sequence number) at the same cadence.
+
+This client now mirrors that: `UOAMClient` runs two `Leg`s (`primary` and
+`primary2`), each independently handshaken, and sends every position update
+and query-list request on **both** whenever both are up (`Update()`'s
+`Fault`/RST handling occasionally drops a leg - see "Faults" above - and this
+appeared to happen for no reason attributable to the request itself, so
+running two in parallel gives the player continuous visibility through a
+single-leg blip instead of a visible drop). The session as a whole
+(`UOAMClient.IsConnected`, the public `Connected`/`Disconnected` events) is
+only considered up/down based on **either** leg being ready; losing one leg
+while the other stays up quietly redials the dropped one in the background
+after a few seconds instead of tearing down the session. Chat's masterId
+binds to whichever leg's handshake acked first - not necessarily `primary`.
+
 `seq` on this connection is local to it (a fresh TCP connection, its own
 sequence space) - it does not need to continue from the primary connection's
 counter.
