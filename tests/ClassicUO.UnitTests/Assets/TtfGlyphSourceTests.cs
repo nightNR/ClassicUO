@@ -9,6 +9,7 @@ namespace ClassicUO.UnitTests
 {
     public class TtfGlyphSourceTests
     {
+
         private static string RepoRoot()
         {
             DirectoryInfo dir = new DirectoryInfo(AppContext.BaseDirectory);
