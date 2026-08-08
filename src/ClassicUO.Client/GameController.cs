@@ -797,6 +797,11 @@ namespace ClassicUO
                     Mouse.ButtonPress(buttonType);
                     Mouse.Update();
 
+                    if (buttonType != MouseButtonType.Left && buttonType != MouseButtonType.Right)
+                    {
+                        Plugin.ProcessMouse(sdlEvent->button.button, 0);
+                    }
+
                     uint ticks = Time.Ticks;
 
                     if (lastClickTime + Mouse.MOUSE_DELAY_DOUBLE_CLICK >= ticks)
@@ -821,14 +826,6 @@ namespace ClassicUO
                     }
                     else
                     {
-                        if (
-                            buttonType != MouseButtonType.Left
-                            && buttonType != MouseButtonType.Right
-                        )
-                        {
-                            Plugin.ProcessMouse(sdlEvent->button.button, 0);
-                        }
-
                         if (!Scene.OnMouseDown(buttonType))
                         {
                             UIManager.OnMouseButtonDown(buttonType);
