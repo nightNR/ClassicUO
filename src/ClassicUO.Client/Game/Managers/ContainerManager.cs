@@ -44,6 +44,59 @@ namespace ClassicUO.Game.Managers
             return value;
         }
 
+        // Lazily built from Profile.PinnedContainerSerials on first access — the container
+        // manager can be constructed before the profile finishes loading, so this can't be
+        // built eagerly in the constructor like _data is.
+        private HashSet<uint> _pinned;
+
+        private HashSet<uint> PinnedSet
+        {
+            get
+            {
+                if (_pinned == null)
+                {
+                    _pinned = new HashSet<uint>(
+                        ProfileManager.CurrentProfile?.PinnedContainerSerials ?? new List<uint>()
+                    );
+                }
+
+                return _pinned;
+            }
+        }
+
+        public bool IsPinned(uint serial) => serial != 0 && PinnedSet.Contains(serial);
+
+        public void SetPinned(uint serial, bool pinned)
+        {
+            if (serial == 0)
+            {
+                return;
+            }
+
+            bool changed = pinned ? PinnedSet.Add(serial) : PinnedSet.Remove(serial);
+
+            if (!changed)
+            {
+                return;
+            }
+
+            var profile = ProfileManager.CurrentProfile;
+
+            if (profile == null)
+            {
+                return;
+            }
+
+            if (pinned)
+            {
+                profile.PinnedContainerSerials.Add(serial);
+            }
+            else
+            {
+                profile.PinnedContainerSerials.Remove(serial);
+            }
+        }
+
         public void CalculateContainerPosition(uint serial, ushort g)
         {
             if (UIManager.GetGumpCachePosition(serial, out Point location))
