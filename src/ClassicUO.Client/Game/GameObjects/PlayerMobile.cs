@@ -384,7 +384,7 @@ namespace ClassicUO.Game.GameObjects
         {
             Item bank = FindItemByLayer(Layer.Bank);
 
-            if (bank != null && bank.Opened)
+            if (bank != null && bank.Opened && !World.ContainerManager.IsPinned(bank.Serial))
             {
                 if (!bank.IsEmpty)
                 {
@@ -456,6 +456,11 @@ namespace ClassicUO.Game.GameObjects
                         break;
 
                     case ContainerGump _:
+                        if (World.ContainerManager.IsPinned(gump.LocalSerial))
+                        {
+                            break;
+                        }
+
                         distance = int.MaxValue;
 
                         ent = World.Get(gump.LocalSerial);
