@@ -661,6 +661,15 @@ namespace ClassicUO.Game.UI.Gumps
 
             if (item == null || item.IsDestroyed)
             {
+                if (World.ContainerManager.IsPinned(LocalSerial))
+                {
+                    // Backing item is gone (server destroy+recreate around events like death) —
+                    // stay open with stale contents instead of self-closing; Update() naturally
+                    // resumes once the server re-adds the same serial.
+                    return;
+                }
+
+                PinDebugLog.Write($"ContainerGump.Update: self-dispose serial=0x{LocalSerial:X8} item==null={item == null} destroyed={item?.IsDestroyed} pinned=False");
                 Dispose();
 
                 return;
@@ -903,6 +912,8 @@ namespace ClassicUO.Game.UI.Gumps
 
         public override void Dispose()
         {
+            PinDebugLog.Write($"ContainerGump.Dispose: serial=0x{LocalSerial:X8} pinned={World.ContainerManager.IsPinned(LocalSerial)}\n{Environment.StackTrace}");
+
             Item item = World.Items.Get(LocalSerial);
 
             if (item != null)
