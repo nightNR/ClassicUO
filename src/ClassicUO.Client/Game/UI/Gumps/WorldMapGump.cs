@@ -10,7 +10,6 @@ using ClassicUO.Game.UI.Controls;
 using ClassicUO.Input;
 using ClassicUO.IO;
 using ClassicUO.Network.Encryption;
-using ClassicUO.Network.UOAM;
 using ClassicUO.Renderer;
 using ClassicUO.Resources;
 using ClassicUO.Utility;
@@ -83,7 +82,6 @@ namespace ClassicUO.Game.UI.Gumps
         private bool _showMobiles = true;
         private bool _showMultis = true;
         private bool _showPartyMembers = true;
-        private bool _showUOAMPlayers = true;
         private bool _showPlayerBar = true;
         private bool _showPlayerName = true;
         private int _zoomIndex = 4;
@@ -186,7 +184,6 @@ namespace ClassicUO.Game.UI.Gumps
 
             _flipMap = ProfileManager.CurrentProfile.WorldMapFlipMap;
             _showPartyMembers = ProfileManager.CurrentProfile.WorldMapShowParty;
-            _showUOAMPlayers = ProfileManager.CurrentProfile.WorldMapShowUOAMPlayers;
 
             World.WMapManager.SetEnable(_showPartyMembers);
 
@@ -231,7 +228,6 @@ namespace ClassicUO.Game.UI.Gumps
             ProfileManager.CurrentProfile.WorldMapTopMost = TopMost;
             ProfileManager.CurrentProfile.WorldMapFreeView = FreeView;
             ProfileManager.CurrentProfile.WorldMapShowParty = _showPartyMembers;
-            ProfileManager.CurrentProfile.WorldMapShowUOAMPlayers = _showUOAMPlayers;
 
             ProfileManager.CurrentProfile.WorldMapZoomIndex = _zoomIndex;
 
@@ -311,13 +307,6 @@ namespace ClassicUO.Game.UI.Gumps
                 },
                 true,
                 _showPartyMembers
-            );
-
-            _options["show_uoam_players"] = new ContextMenuItemEntry(
-                "Show UOAM players",
-                () => { _showUOAMPlayers = !_showUOAMPlayers; SaveSettings(); },
-                true,
-                _showUOAMPlayers
             );
 
             _options["show_mobiles"] = new ContextMenuItemEntry(ResGumps.ShowMobiles, () => { _showMobiles = !_showMobiles; SaveSettings(); }, true, _showMobiles);
@@ -503,73 +492,6 @@ namespace ClassicUO.Game.UI.Gumps
 
             BuildContextMenuForZones(ContextMenu);
 
-            ContextMenuItemEntry uoamEntry = new ContextMenuItemEntry("UOAM Players");
-
-            uoamEntry.Add
-            (
-                new ContextMenuItemEntry
-                (
-                    World.UOAM.IsConnected ? "Disconnect" : "Connect",
-                    () =>
-                    {
-                        if (World.UOAM.IsConnected)
-                        {
-                            World.UOAM.Disconnect();
-                        }
-                        else
-                        {
-                            World.UOAM.Connect();
-                        }
-                    }
-                )
-            );
-
-            uoamEntry.Add
-            (
-                new ContextMenuItemEntry
-                (
-                    "Open Chat",
-                    () =>
-                    {
-                        if (UIManager.GetGump<UOAMChatGump>() == null)
-                        {
-                            UIManager.Add(new UOAMChatGump(World));
-                        }
-                    }
-                )
-            );
-
-            uoamEntry.Add(new ContextMenuItemEntry(""));
-
-            if (World.UOAM.Players.Players.Count == 0)
-            {
-                uoamEntry.Add(new ContextMenuItemEntry("(no players)"));
-            }
-            else
-            {
-                foreach (var uoamKvp in World.UOAM.Players.Players)
-                {
-                    string playerName = uoamKvp.Key;
-                    bool isTracked = World.UOAM.TrackedPlayerName == playerName;
-
-                    uoamEntry.Add
-                    (
-                        new ContextMenuItemEntry
-                        (
-                            playerName,
-                            () =>
-                            {
-                                World.UOAM.TrackedPlayerName = isTracked ? null : playerName;
-                            },
-                            true,
-                            isTracked
-                        )
-                    );
-                }
-            }
-
-            ContextMenu.Add(uoamEntry);
-
             ContextMenuItemEntry namesHpBarEntry = new ContextMenuItemEntry(ResGumps.NamesHealthbars);
             namesHpBarEntry.Add(_options["show_your_name"]);
             namesHpBarEntry.Add(_options["show_your_healthbar"]);
@@ -593,7 +515,6 @@ namespace ClassicUO.Game.UI.Gumps
 
             ContextMenu.Add("", null);
             ContextMenu.Add(_options["show_party_members"]);
-            ContextMenu.Add(_options["show_uoam_players"]);
             ContextMenu.Add(_options["show_mobiles"]);
             ContextMenu.Add(_options["show_multis"]);
             ContextMenu.Add(_options["show_coordinates"]);
@@ -1983,12 +1904,7 @@ namespace ClassicUO.Game.UI.Gumps
                 return false;
             }
 
-            if (!string.IsNullOrEmpty(World.UOAM.TrackedPlayerName) && World.UOAM.Players.Players.TryGetValue(World.UOAM.TrackedPlayerName, out UOAMPlayerInfo trackedPlayer))
-            {
-                _center.X = trackedPlayer.Map == _map.Index ? trackedPlayer.X : 0;
-                _center.Y = trackedPlayer.Map == _map.Index ? trackedPlayer.Y : 0;
-            }
-            else if (!_isScrolling && !_freeView)
+            if (!_isScrolling && !_freeView)
             {
                 _center.X = World.Player.X;
                 _center.Y = World.Player.Y;
@@ -2362,50 +2278,6 @@ namespace ClassicUO.Game.UI.Gumps
                             }
                         }
                     }
-                }
-            }
-
-            if (_showUOAMPlayers && World.UOAM != null)
-            {
-                var uoamAliases = UOAMNameAliasSerializer.Parse(ProfileManager.CurrentProfile.UOAMNameAliases);
-
-                foreach (var kvp in World.UOAM.Players.Players)
-                {
-                    UOAMPlayerInfo uoamPlayer = kvp.Value;
-                    uoamAliases.TryGetValue(uoamPlayer.Name, out string aliasedName);
-
-                    if (World.Player != null && UOAMPlayerManager.IsSelf(uoamPlayer, aliasedName, World.Player.Name, World.Player.X, World.Player.Y, toleranceTiles: 8))
-                    {
-                        continue;
-                    }
-
-                    if (UOAMPlayerManager.IsDuplicateOfPartyOrGuild(uoamPlayer, aliasedName, World.WMapManager, toleranceTiles: 8))
-                    {
-                        continue;
-                    }
-
-                    bool sameFacet = uoamPlayer.Map == _map.Index;
-
-                    WMapEntity uoamEntity = new WMapEntity(unchecked((uint)uoamPlayer.Name.GetHashCode()))
-                    {
-                        Name = uoamPlayer.Name,
-                        Map = uoamPlayer.Map,
-                        X = sameFacet ? uoamPlayer.X : 0,
-                        Y = sameFacet ? uoamPlayer.Y : 0,
-                        IsGuild = false
-                    };
-
-                    DrawWMEntity
-                    (
-                        batcher,
-                        uoamEntity,
-                        gX,
-                        gY,
-                        halfWidth,
-                        halfHeight,
-                        Zoom,
-                        layerDepth
-                    );
                 }
             }
 
@@ -3265,9 +3137,6 @@ namespace ClassicUO.Game.UI.Gumps
                 // Remember where the context menu was opened so "Walk To" targets
                 // that tile (the mouse moves onto the menu before the item fires).
                 CanvasToWorld(x, y, out _contextMenuWorld.X, out _contextMenuWorld.Y);
-
-                // Rebuild so the "UOAM Players" submenu reflects the current player list.
-                BuildContextMenu();
             }
 
             var allowTarget = _allowPositionalTarget && World.TargetManager.IsTargeting && World.TargetManager.TargetingState == CursorTarget.Position;

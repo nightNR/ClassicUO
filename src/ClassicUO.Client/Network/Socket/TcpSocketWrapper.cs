@@ -7,25 +7,12 @@ namespace ClassicUO.Network.Socket;
 
 sealed class TcpSocketWrapper : SocketWrapper
 {
-    private readonly bool _abortiveClose;
     private TcpClient _socket;
 
     public override bool IsConnected => _socket?.Client?.Connected ?? false;
 
     public override EndPoint LocalEndPoint => _socket?.Client?.LocalEndPoint;
 
-    // Normal Close()/Dispose() performs a graceful shutdown (FIN) unless there's
-    // unread data queued. Some servers only evict a session promptly on an abortive
-    // close (RST) - a real UOAM client, for instance, was observed via packet capture
-    // to always RST on disconnect (both via its own UI button and on process exit,
-    // never a clean FIN), and matching that gets this client evicted from the hub's
-    // player list as promptly as a real client instead of lingering. Only the UOAM
-    // hub connection opts into this - the main game server connection keeps the
-    // default graceful close.
-    public TcpSocketWrapper(bool abortiveClose = false)
-    {
-        _abortiveClose = abortiveClose;
-    }
 
     public override void Connect(Uri uri)
     {
@@ -34,11 +21,6 @@ sealed class TcpSocketWrapper : SocketWrapper
 
         _socket = new TcpClient();
         _socket.NoDelay = true;
-
-        if (_abortiveClose)
-        {
-            _socket.LingerState = new LingerOption(true, 0);
-        }
 
         try
         {

@@ -188,9 +188,7 @@ namespace ClassicUO.Game.UI.Gumps
 
             int i = 0;
 
-            ScrollArea tabArea = new ScrollArea(0, 10, 155, HEIGHT - 20, true);
-
-            tabArea.Add
+            Add
             (
                 new NiceButton
                 (
@@ -203,7 +201,7 @@ namespace ClassicUO.Game.UI.Gumps
                 ) { IsSelected = true, ButtonParameter = 1 }
             );
 
-            tabArea.Add
+            Add
             (
                 new NiceButton
                 (
@@ -216,7 +214,7 @@ namespace ClassicUO.Game.UI.Gumps
                 ) { ButtonParameter = 2 }
             );
 
-            tabArea.Add
+            Add
             (
                 new NiceButton
                 (
@@ -229,7 +227,7 @@ namespace ClassicUO.Game.UI.Gumps
                 ) { ButtonParameter = 3 }
             );
 
-            tabArea.Add
+            Add
             (
                 new NiceButton
                 (
@@ -242,7 +240,7 @@ namespace ClassicUO.Game.UI.Gumps
                 ) { ButtonParameter = 13 }
             );
 
-            tabArea.Add
+            Add
             (
                 new NiceButton
                 (
@@ -255,7 +253,7 @@ namespace ClassicUO.Game.UI.Gumps
                 ) { ButtonParameter = 14 }
             );
 
-            tabArea.Add
+            Add
             (
                 new NiceButton
                 (
@@ -268,7 +266,7 @@ namespace ClassicUO.Game.UI.Gumps
                 ) { ButtonParameter = 15 }
             );
 
-            tabArea.Add
+            Add
             (
                 new NiceButton
                 (
@@ -281,7 +279,7 @@ namespace ClassicUO.Game.UI.Gumps
                 ) { ButtonParameter = 4 }
             );
 
-            tabArea.Add
+            Add
             (
                 new NiceButton
                 (
@@ -294,7 +292,7 @@ namespace ClassicUO.Game.UI.Gumps
                 ) { ButtonParameter = 5 }
             );
 
-            tabArea.Add
+            Add
             (
                 new NiceButton
                 (
@@ -307,7 +305,7 @@ namespace ClassicUO.Game.UI.Gumps
                 ) { ButtonParameter = 6 }
             );
 
-            tabArea.Add
+            Add
             (
                 new NiceButton
                 (
@@ -320,7 +318,7 @@ namespace ClassicUO.Game.UI.Gumps
                 ) { ButtonParameter = 7 }
             );
 
-            tabArea.Add
+            Add
             (
                 new NiceButton
                 (
@@ -333,7 +331,7 @@ namespace ClassicUO.Game.UI.Gumps
                 ) { ButtonParameter = 8 }
             );
 
-            tabArea.Add
+            Add
             (
                 new NiceButton
                 (
@@ -346,7 +344,7 @@ namespace ClassicUO.Game.UI.Gumps
                 ) { ButtonParameter = 9 }
             );
 
-            tabArea.Add
+            Add
             (
                 new NiceButton
                 (
@@ -359,7 +357,7 @@ namespace ClassicUO.Game.UI.Gumps
                 ) { ButtonParameter = 10 }
             );
 
-            tabArea.Add
+            Add
             (
                 new NiceButton
                 (
@@ -372,7 +370,7 @@ namespace ClassicUO.Game.UI.Gumps
                 ) { ButtonParameter = 11 }
             );
 
-            tabArea.Add
+            Add
             (
                 new NiceButton
                 (
@@ -385,7 +383,7 @@ namespace ClassicUO.Game.UI.Gumps
                 ) { ButtonParameter = 12 }
             );
 
-            tabArea.Add
+            Add
             (
                 new NiceButton
                 (
@@ -400,21 +398,6 @@ namespace ClassicUO.Game.UI.Gumps
                     ButtonParameter = (int)Buttons.OpenIgnoreList
                 }
             );
-
-            tabArea.Add
-            (
-                new NiceButton
-                (
-                    10,
-                    10 + 30 * i++,
-                    140,
-                    25,
-                    ButtonAction.SwitchPage,
-                    "UOAM"
-                ) { ButtonParameter = 16 }
-            );
-
-            Add(tabArea);
 
             Add
             (
@@ -494,7 +477,6 @@ namespace ClassicUO.Game.UI.Gumps
             BuildAliases();
             BuildStatusbarColors();
             BuildStatusBars();
-            BuildUOAM();
 
             ChangePage(1);
         }
@@ -3743,114 +3725,6 @@ namespace ClassicUO.Game.UI.Gumps
             Add(rightArea, PAGE);
         }
 
-        private Checkbox _uoamAutoConnect, _uoamAutoOpenChat;
-        private InputField _uoamPlayerName, _uoamServerIP, _uoamServerPort;
-        private PasswordStbTextBox _uoamPasswordBox;
-        private NiceButton _uoamConnectButton;
-        private DataBox _uoamAliasDataBox;
-
-        private void BuildUOAM()
-        {
-            const int PAGE = 16;
-
-            ScrollArea rightArea = new ScrollArea(190, 20, WIDTH - 210, 420, true);
-
-            int y = 5;
-
-            _uoamPlayerName = AddInputField(rightArea, 5, y, 200, TEXTBOX_HEIGHT, "Player name", set_down: true);
-            _uoamPlayerName.SetText(_currentProfile.UOAMPlayerName);
-            y = _uoamPlayerName.Y + _uoamPlayerName.Height + 8;
-
-            _uoamServerIP = AddInputField(rightArea, 5, y, 200, TEXTBOX_HEIGHT, "Server IP", set_down: true);
-            _uoamServerIP.SetText(_currentProfile.UOAMServerIP);
-            y = _uoamServerIP.Y + _uoamServerIP.Height + 8;
-
-            _uoamServerPort = AddInputField(rightArea, 5, y, 100, TEXTBOX_HEIGHT, "Server port", set_down: true, numbersOnly: true);
-            _uoamServerPort.SetText(_currentProfile.UOAMServerPort.ToString());
-            y = _uoamServerPort.Y + _uoamServerPort.Height + 8;
-
-            Label uoamPasswordLabel = AddLabel(rightArea, "Password", 5, y);
-            int passwordBoxY = uoamPasswordLabel.Bounds.Bottom + 2;
-            rightArea.Add(new ResizePic(0x0BB8) { X = 5, Y = passwordBoxY, Width = 200, Height = TEXTBOX_HEIGHT });
-            _uoamPasswordBox = new PasswordStbTextBox(FONT, -1, 200 - 8, true, FontStyle.Cropped | FontStyle.BlackBorder, HUE_FONT)
-            {
-                X = 9,
-                Y = passwordBoxY + 4,
-                Width = 200 - 8,
-                Height = TEXTBOX_HEIGHT - 8
-            };
-            _uoamPasswordBox.SetText(_currentProfile.UOAMPassword);
-            rightArea.Add(_uoamPasswordBox);
-            y = passwordBoxY + TEXTBOX_HEIGHT + 8;
-
-            _uoamAutoConnect = AddCheckBox(rightArea, "Auto-connect", _currentProfile.UOAMAutoConnect, 5, y);
-            y += _uoamAutoConnect.Height + 4;
-
-            _uoamAutoOpenChat = AddCheckBox(rightArea, "Auto-open chat", _currentProfile.UOAMAutoOpenChat, 5, y);
-            y += _uoamAutoOpenChat.Height + 8;
-
-            _uoamConnectButton = new NiceButton(5, y, 120, 25, ButtonAction.Activate, World.UOAM.IsConnected ? "Disconnect" : "Connect") { ButtonParameter = 999 };
-            _uoamConnectButton.MouseUp += (s, e) =>
-            {
-                if (World.UOAM.IsConnected || World.UOAM.IsConnecting)
-                {
-                    World.UOAM.Disconnect();
-                }
-                else
-                {
-                    ApplyUOAMProfileFields();
-                    World.UOAM.Connect();
-                }
-
-                _uoamConnectButton.TextLabel.Text = World.UOAM.IsConnected ? "Disconnect" : World.UOAM.IsConnecting ? "Connecting..." : "Connect";
-            };
-            rightArea.Add(_uoamConnectButton);
-            y += _uoamConnectButton.Height + 12;
-
-            AddLabel(rightArea, "Name aliases (UOAM name -> character name):", 5, y);
-            y += 16 + 4;
-
-            NiceButton addAliasButton = new NiceButton(5, y, 100, 22, ButtonAction.Activate, "+ Add") { ButtonParameter = 999 };
-            rightArea.Add(addAliasButton);
-            y += addAliasButton.Height + 4;
-
-            _uoamAliasDataBox = new DataBox(0, y, 0, 0) { WantUpdateSize = true };
-
-            void AddAliasRow(string uoamName, string charName)
-            {
-                var row = new UOAMAliasRow(uoamName, charName) { Y = _uoamAliasDataBox.Children.Count * 26 };
-                _uoamAliasDataBox.Add(row);
-            }
-
-            foreach (var kvp in UOAMNameAliasSerializer.Parse(_currentProfile.UOAMNameAliases))
-            {
-                AddAliasRow(kvp.Key, kvp.Value);
-            }
-
-            addAliasButton.MouseUp += (s, e) =>
-            {
-                AddAliasRow(string.Empty, string.Empty);
-                _uoamAliasDataBox.ReArrangeChildren();
-            };
-
-            rightArea.Add(_uoamAliasDataBox);
-
-            Add(rightArea, PAGE);
-        }
-
-        private void ApplyUOAMProfileFields()
-        {
-            _currentProfile.UOAMPlayerName = _uoamPlayerName.Text;
-            _currentProfile.UOAMServerIP = _uoamServerIP.Text;
-
-            if (ushort.TryParse(_uoamServerPort.Text, out ushort port))
-            {
-                _currentProfile.UOAMServerPort = port;
-            }
-
-            _currentProfile.UOAMPassword = _uoamPasswordBox.RealText;
-        }
-
         private void BuildInfoBar()
         {
             const int PAGE = 10;
@@ -4722,21 +4596,6 @@ namespace ClassicUO.Game.UI.Gumps
 
             Client.Game.Audio.UpdateCurrentMusicVolume();
             Client.Game.Audio.UpdateCurrentSoundsVolume();
-
-            // UOAM
-            ApplyUOAMProfileFields();
-            _currentProfile.UOAMAutoConnect = _uoamAutoConnect.IsChecked;
-            _currentProfile.UOAMAutoOpenChat = _uoamAutoOpenChat.IsChecked;
-
-            var uoamAliases = new Dictionary<string, string>();
-            foreach (var child in _uoamAliasDataBox.Children)
-            {
-                if (child is UOAMAliasRow row && !string.IsNullOrWhiteSpace(row.UoamName) && !string.IsNullOrWhiteSpace(row.CharName))
-                {
-                    uoamAliases[row.UoamName.Trim()] = row.CharName.Trim();
-                }
-            }
-            _currentProfile.UOAMNameAliases = UOAMNameAliasSerializer.Serialize(uoamAliases);
 
             if (!_currentProfile.EnableMusic)
             {

@@ -413,16 +413,6 @@ namespace ClassicUO.Configuration
         public bool WorldMapShowPath { get; set; } = true;
         public bool ShowDPSWithDamageNumbers { get; set; } = true;
 
-        // UOAM integration
-        public string UOAMPlayerName { get; set; } = string.Empty;
-        public string UOAMServerIP { get; set; } = string.Empty;
-        public ushort UOAMServerPort { get; set; } = 2000;
-        public string UOAMPassword { get; set; } = string.Empty;
-        public bool UOAMAutoConnect { get; set; }
-        public bool UOAMAutoOpenChat { get; set; }
-        public string UOAMNameAliases { get; set; } = string.Empty;
-        public bool WorldMapShowUOAMPlayers { get; set; } = true;
-
         public static uint GumpsVersion { get; private set; }
 
         //Alternate Journal

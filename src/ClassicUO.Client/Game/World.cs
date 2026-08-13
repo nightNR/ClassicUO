@@ -52,7 +52,6 @@ namespace ClassicUO.Game
             Weather = new Weather(this);
             InfoBars = new InfoBarManager(this);
             StatusbarColorManager = new StatusbarColorManager(this);
-            UOAM = new UOAMManager(this);
         }
 
         public Point RangeSize;
@@ -62,8 +61,6 @@ namespace ClassicUO.Game
         public HouseCustomizationManager CustomHouseManager;
 
         public WorldMapEntityManager WMapManager { get; }
-
-        public UOAMManager UOAM { get; }
 
         public ActiveSpellIconsManager ActiveSpellIcons = new ActiveSpellIconsManager();
 
@@ -290,7 +287,6 @@ namespace ClassicUO.Game
 
         public void Update()
         {
-            UOAM.Update();
             Managers.PluginTimersManager.Update(this, Time.Ticks);
             Managers.PluginHighlights.Update(this, Time.Ticks);
             if (Player != null)
@@ -848,7 +844,6 @@ namespace ClassicUO.Game
             CorpseManager.Clear();
             OPL.Clear();
             WMapManager.Clear();
-            UOAM.Disconnect();
             HouseManager?.Clear();
 
             Season = Season.Summer;
