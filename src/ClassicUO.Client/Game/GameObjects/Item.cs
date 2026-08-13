@@ -187,8 +187,6 @@ namespace ClassicUO.Game.GameObjects
 
             if (Opened)
             {
-                PinDebugLog.Write($"Item.Destroy: serial=0x{Serial:X8} pinned={World.ContainerManager.IsPinned(Serial)}");
-
                 if (!World.ContainerManager.IsPinned(Serial))
                 {
                     UIManager.GetGump<ContainerGump>(Serial)?.Dispose();
