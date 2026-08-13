@@ -1042,6 +1042,13 @@ namespace ClassicUO.Network
                 return;
             }
 
+            if (entity is Item && world.ContainerManager.IsPinned(serial))
+            {
+                PinDebugLog.Write($"DeleteObject: skip removal of pinned serial=0x{serial:X8}");
+
+                return;
+            }
+
             bool updateAbilities = false;
 
             if (entity is Item it)
