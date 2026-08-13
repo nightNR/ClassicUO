@@ -1,5 +1,6 @@
 ﻿// SPDX-License-Identifier: BSD-2-Clause
 
+using ClassicUO.Assets;
 using ClassicUO.Configuration;
 using ClassicUO.Game.Data;
 using ClassicUO.Game.GameObjects;
@@ -204,6 +205,7 @@ namespace ClassicUO.Game.UI.Gumps
             }
 
             AddToggleButtonIfNeeded();
+            AddPinButton();
         }
 
         private void BuildStandardBranch(Item item)
@@ -291,6 +293,53 @@ namespace ClassicUO.Game.UI.Gumps
             btn.MouseUp += ToggleButtonOnMouseUp;
 
             Add(btn);
+        }
+
+        private void AddPinButton()
+        {
+            bool hasGridToggle =
+                ProfileManager.CurrentProfile != null
+                && ProfileManager.CurrentProfile.ContainerViewMode == 2;
+
+            bool pinned = World.ContainerManager.IsPinned(LocalSerial);
+
+            NiceButton btn = new NiceButton(
+                hasGridToggle ? Width - 44 : Width - 22,
+                2,
+                20,
+                20,
+                ButtonAction.Activate,
+                "P",
+                0,
+                TEXT_ALIGN_TYPE.TS_CENTER,
+                pinned ? (ushort)0x0044 : (ushort)0xFFFF
+            )
+            {
+                IsSelectable = false
+            };
+
+            btn.SetTooltip(
+                pinned
+                    ? "Container is protected from auto-close — click to unpin"
+                    : "Keep this container open — click to pin"
+            );
+
+            btn.MouseUp += PinButtonOnMouseUp;
+
+            Add(btn);
+        }
+
+        private void PinButtonOnMouseUp(object sender, MouseEventArgs e)
+        {
+            if (e.Button != MouseButtonType.Left)
+            {
+                return;
+            }
+
+            bool pinned = World.ContainerManager.IsPinned(LocalSerial);
+            World.ContainerManager.SetPinned(LocalSerial, !pinned);
+
+            RequestUpdateContents();
         }
 
         private void ToggleButtonOnMouseUp(object sender, MouseEventArgs e)
