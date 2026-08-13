@@ -18,6 +18,14 @@ namespace ClassicUO.Utility.Platforms
     internal sealed class UoAssist
     {
         private readonly CustomWindow _customWindow;
+
+        // Some UOAssist-protocol tools (e.g. uoam_Orion.exe) only enable their
+        // "query position" command after finding a window whose *class name*
+        // matches the real UO client ("Ultima Online Third Dawn" / "Ultima Online"),
+        // as a separate "is the game actually running" check independent of the
+        // UOASSIST-TP-MSG-WND IPC window above. This decoy window exists purely
+        // to satisfy that FindWindowA probe - it never needs to handle messages.
+        private readonly CustomWindow _gameWindowMarker;
         private readonly World _world;
 
         public UoAssist(World world)
@@ -34,10 +42,27 @@ namespace ClassicUO.Utility.Platforms
             try
             {
                 if (Client.Game?.Window != null)
+                {
                     _customWindow = new CustomWindow(Client.Game.Window.Handle, world, "UOASSIST-TP-MSG-WND");
+
+                    try
+                    {
+                        _gameWindowMarker = new CustomWindow(Client.Game.Window.Handle, world, "Ultima Online Third Dawn");
+                    }
+                    catch (Exception e)
+                    {
+                        Log.Error($"UOAssist game-window marker creation failed: {e}");
+                    }
+                }
+                else
+                {
+                    Log.Warn("UOAssist IPC window not created: Client.Game.Window is null at UoAssist construction time.");
+                }
             }
-            catch
-            { }
+            catch (Exception e)
+            {
+                Log.Error($"UOAssist IPC window creation failed: {e}");
+            }
         }
 
         public void SignalMapChanged(int newMap)
@@ -234,11 +259,20 @@ namespace ClassicUO.Utility.Platforms
                 {
                     case UOAMessage.REGISTER:
 
-                        if (_wndRegs.ContainsKey(wParam))
+                        if (lParam == 0)
                         {
+                            // Explicit unhook request.
                             _wndRegs.Remove(wParam);
 
                             return 2;
+                        }
+
+                        if (_wndRegs.ContainsKey(wParam))
+                        {
+                            // Already registered (some clients re-hook from multiple
+                            // internal contexts using the same window handle) -
+                            // idempotent success, do NOT toggle it off.
+                            return 1;
                         }
 
                         _wndRegs.Add(wParam, new WndRegEnt(wParam, lParam == 1 ? 1 : 0));
