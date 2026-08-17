@@ -372,6 +372,9 @@
   <data name="ShowStatValuesOnBars" xml:space="preserve">
     <value>Show stat values on bars</value>
   </data>
+  <data name="ShowDistanceOnHealthBar" xml:space="preserve">
+    <value>Show distance in statusbar</value>
+  </data>
   <data name="UseCustomHPBars" xml:space="preserve">
     <value>Use custom healthbars gump</value>
   </data>

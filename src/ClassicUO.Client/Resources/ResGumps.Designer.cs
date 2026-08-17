@@ -3863,7 +3863,7 @@ namespace ClassicUO.Resources {
                 return ResourceManager.GetString("ShowHousesContent", resourceCulture);
             }
         }
-        
+
         /// <summary>
         ///   Looks up a localized string similar to Show HP.
         /// </summary>
@@ -4586,6 +4586,15 @@ namespace ClassicUO.Resources {
         public static string ShowStatValuesOnBars {
             get {
                 return ResourceManager.GetString("ShowStatValuesOnBars", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Show distance in statusbar.
+        /// </summary>
+        public static string ShowDistanceOnHealthBar {
+            get {
+                return ResourceManager.GetString("ShowDistanceOnHealthBar", resourceCulture);
             }
         }
 

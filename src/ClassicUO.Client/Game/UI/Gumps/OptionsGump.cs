@@ -37,7 +37,7 @@ namespace ClassicUO.Game.UI.Gumps
         private InputField _autoOpenCorpseRange;
 
         //experimental
-        private Checkbox _autoOpenDoors, _autoOpenCorpse, _skipEmptyCorpse, _disableTabBtn, _disableCtrlQWBtn, _disableDefaultHotkeys, _disableArrowBtn, _disableAutoMove, _overrideContainerLocation, _smoothDoors, _showTargetRangeIndicator, _customBars, _customBarsBBG, _statValuesOnBars, _saveHealthbars, _saveGumpsRelativeToCenter;
+        private Checkbox _autoOpenDoors, _autoOpenCorpse, _skipEmptyCorpse, _disableTabBtn, _disableCtrlQWBtn, _disableDefaultHotkeys, _disableArrowBtn, _disableAutoMove, _overrideContainerLocation, _smoothDoors, _showTargetRangeIndicator, _customBars, _customBarsBBG, _statValuesOnBars, _showDistanceOnHealthBar, _saveHealthbars, _saveGumpsRelativeToCenter;
         private Checkbox _nameOverheadAlwaysOn, _nameOverheadShowHpBar;
         private HSliderBar _cellSize;
         private Checkbox _containerScaleItems, _containerDoubleClickToLoot, _relativeDragAnDropItems, _useLargeContianersGumps, _highlightContainersWhenMouseIsOver, _allowItemsOutsideContainerBounds;
@@ -3525,6 +3525,18 @@ namespace ClassicUO.Game.UI.Gumps
 
             section.Add
             (
+                _showDistanceOnHealthBar = AddCheckBox
+                (
+                    null,
+                    ResGumps.ShowDistanceOnHealthBar,
+                    _currentProfile.ShowDistanceOnHealthBar,
+                    0,
+                    0
+                )
+            );
+
+            section.Add
+            (
                 _saveHealthbars = AddCheckBox
                 (
                     null,
@@ -4202,6 +4214,7 @@ namespace ClassicUO.Game.UI.Gumps
                     _customBars.IsChecked = false;
                     _customBarsBBG.IsChecked = false;
                     _statValuesOnBars.IsChecked = false;
+                    _showDistanceOnHealthBar.IsChecked = false;
                     _autoOpenCorpse.IsChecked = false;
                     _autoOpenDoors.IsChecked = false;
                     _smoothDoors.IsChecked = false;
@@ -5002,6 +5015,17 @@ namespace ClassicUO.Game.UI.Gumps
             _currentProfile.ShowStatValuesOnBars = _statValuesOnBars.IsChecked;
 
             if (updateStatValues)
+            {
+                foreach (HealthBarGumpCustom customhealthbar in UIManager.Gumps.OfType<HealthBarGumpCustom>().ToList())
+                {
+                    customhealthbar.RequestUpdateContents();
+                }
+            }
+
+            bool updateDistanceOnBars = _currentProfile.ShowDistanceOnHealthBar != _showDistanceOnHealthBar.IsChecked;
+            _currentProfile.ShowDistanceOnHealthBar = _showDistanceOnHealthBar.IsChecked;
+
+            if (updateDistanceOnBars)
             {
                 foreach (HealthBarGumpCustom customhealthbar in UIManager.Gumps.OfType<HealthBarGumpCustom>().ToList())
                 {

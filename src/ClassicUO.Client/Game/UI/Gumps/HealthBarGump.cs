@@ -329,6 +329,10 @@ namespace ClassicUO.Game.UI.Gumps
         private const int HPB_BORDERSIZE = 1;
         private const int HPB_OUTLINESIZE = 1;
 
+        // Extra strip added to the right when the "show distance" option is on
+        // (mob/party bars only, never the player's own bar).
+        private const int HPB_DIST_WIDTH = 20;
+
 
         internal const int HPB_BAR_WIDTH = 100;
         private const int HPB_BAR_HEIGHT = 8;
@@ -369,7 +373,11 @@ namespace ClassicUO.Game.UI.Gumps
 
         // Centered current/max labels drawn over the bars (option-gated). Cached
         // values avoid rebuilding the RenderedText every frame.
-        private Label _hpText, _manaText, _stamText;
+        private Label _hpText, _manaText, _stamText, _distanceText;
+        private int _textDistance = -1;
+        // Center point of the distance strip, cached at build time since the
+        // label's own Width/Height are 0 until text is first assigned.
+        private int _distanceCenterX, _distanceCenterY;
         // Name's notoriety hue captured at build time, so the stat numbers match
         // the name's color but stay fixed if the name later recolors.
         private ushort _nameHue = HPB_TEXT_HUE;
@@ -402,8 +410,9 @@ namespace ClassicUO.Game.UI.Gumps
 
             _background = null;
             _hpLineRed = _manaLineRed = _stamLineRed = null;
-            _hpText = _manaText = _stamText = null;
+            _hpText = _manaText = _stamText = _distanceText = null;
             _textHits = _textHitsMax = _textMana = _textManaMax = _textStam = _textStamMax = -1;
+            _textDistance = -1;
 
             if (_textBox != null)
             {
@@ -747,6 +756,7 @@ namespace ClassicUO.Game.UI.Gumps
             }
 
             UpdateStatLabels(entity);
+            UpdateDistanceLabel(entity);
 
             ApplyPriorityOverlay();
         }
@@ -789,6 +799,26 @@ namespace ClassicUO.Game.UI.Gumps
                 ref _textStam,
                 ref _textStamMax
             );
+        }
+
+        // Refresh the distance-to-player number in the extra strip to the right
+        // of the bar (option-gated; null when off or on the player's own bar).
+        private void UpdateDistanceLabel(Entity entity)
+        {
+            if (_distanceText == null)
+            {
+                return;
+            }
+
+            int distance = entity != null && !entity.IsDestroyed ? entity.Distance : 0;
+
+            if (distance != _textDistance)
+            {
+                _textDistance = distance;
+                _distanceText.Text = distance.ToString();
+                _distanceText.X = _distanceCenterX - _distanceText.Width / 2;
+                _distanceText.Y = _distanceCenterY - _distanceText.Height / 2;
+            }
         }
 
         // Feature A: tint the outline ring with the plugin's priority hue, if
@@ -845,6 +875,8 @@ namespace ClassicUO.Game.UI.Gumps
             );
 
             bool showValues = ProfileManager.CurrentProfile.ShowStatValuesOnBars;
+            bool showDistance = ProfileManager.CurrentProfile.ShowDistanceOnHealthBar && LocalSerial != World.Player;
+            int barWidth = HPB_WIDTH + (showDistance ? HPB_DIST_WIDTH : 0);
             int barHeight = showValues ? HPB_BAR_HEIGHT_TEXT : HPB_BAR_HEIGHT;
             int barPitch = showValues ? HPB_BAR_PITCH_TEXT : HPB_BAR_PITCH;
             int row0 = showValues ? HPB_ROW_TOP_TEXT : HPB_ROW_TOP;
@@ -856,7 +888,7 @@ namespace ClassicUO.Game.UI.Gumps
             if (World.Party.Contains(LocalSerial) || World.PluginParty.Contains(LocalSerial))
             {
                 Height = HPB_HEIGHT_MULTILINE;
-                Width = HPB_WIDTH;
+                Width = barWidth;
 
                 Add(_background = new AlphaBlendControl(0.7f) { Width = Width, Height = Height, AcceptMouseInput = true, CanMove = true });
                 Add(_statusColorFill = new StatusbarColorFill { Width = Width, Height = Height, IsVisible = false });
@@ -1006,7 +1038,7 @@ namespace ClassicUO.Game.UI.Gumps
                     (
                         0,
                         0,
-                        HPB_WIDTH,
+                        Width,
                         HPB_BORDERSIZE,
                         HPB_COLOR_DRAW_BLACK.PackedValue
                     )
@@ -1018,7 +1050,7 @@ namespace ClassicUO.Game.UI.Gumps
                     (
                         0,
                         HPB_HEIGHT_MULTILINE - HPB_BORDERSIZE,
-                        HPB_WIDTH,
+                        Width,
                         HPB_BORDERSIZE,
                         HPB_COLOR_DRAW_BLACK.PackedValue
                     )
@@ -1040,13 +1072,20 @@ namespace ClassicUO.Game.UI.Gumps
                 (
                     _border[3] = new LineCHB
                     (
-                        HPB_WIDTH - HPB_BORDERSIZE,
+                        Width - HPB_BORDERSIZE,
                         0,
                         HPB_BORDERSIZE,
                         HPB_HEIGHT_MULTILINE,
                         HPB_COLOR_DRAW_BLACK.PackedValue
                     )
                 );
+
+                if (showDistance)
+                {
+                    Add(_distanceText = CreateStatLabel());
+                    _distanceCenterX = HPB_WIDTH + HPB_DIST_WIDTH / 2;
+                    _distanceCenterY = HPB_HEIGHT_MULTILINE / 2;
+                }
             }
             else
             {
@@ -1054,7 +1093,7 @@ namespace ClassicUO.Game.UI.Gumps
                 {
                     _oldWarMode = World.Player.InWarMode;
                     Height = HPB_HEIGHT_MULTILINE;
-                    Width = HPB_WIDTH;
+                    Width = barWidth;
 
                     Add(_background = new AlphaBlendControl(0.7f) { Width = Width, Height = Height, AcceptMouseInput = true, CanMove = true });
                     Add(_statusColorFill = new StatusbarColorFill { Width = Width, Height = Height, IsVisible = false });
@@ -1231,7 +1270,7 @@ namespace ClassicUO.Game.UI.Gumps
                     }
 
                     Height = HPB_HEIGHT_SINGLELINE;
-                    Width = HPB_WIDTH;
+                    Width = barWidth;
 
                     Add(_background = new AlphaBlendControl(0.7f) { Width = Width, Height = Height, AcceptMouseInput = true, CanMove = true });
                     Add(_statusColorFill = new StatusbarColorFill { Width = Width, Height = Height, IsVisible = false });
@@ -1283,7 +1322,7 @@ namespace ClassicUO.Game.UI.Gumps
                         (
                             0,
                             0,
-                            HPB_WIDTH,
+                            Width,
                             HPB_BORDERSIZE,
                             HPB_COLOR_DRAW_BLACK.PackedValue
                         )
@@ -1295,7 +1334,7 @@ namespace ClassicUO.Game.UI.Gumps
                         (
                             0,
                             HPB_HEIGHT_SINGLELINE - HPB_BORDERSIZE,
-                            HPB_WIDTH,
+                            Width,
                             HPB_BORDERSIZE,
                             HPB_COLOR_DRAW_BLACK.PackedValue
                         )
@@ -1317,13 +1356,20 @@ namespace ClassicUO.Game.UI.Gumps
                     (
                         _border[3] = new LineCHB
                         (
-                            HPB_WIDTH - HPB_BORDERSIZE,
+                            Width - HPB_BORDERSIZE,
                             0,
                             HPB_BORDERSIZE,
                             HPB_HEIGHT_SINGLELINE,
                             HPB_COLOR_DRAW_BLACK.PackedValue
                         )
                     );
+
+                    if (showDistance)
+                    {
+                        Add(_distanceText = CreateStatLabel());
+                        _distanceCenterX = HPB_WIDTH + HPB_DIST_WIDTH / 2;
+                        _distanceCenterY = HPB_SINGLE_ROW + barHeight / 2;
+                    }
 
 
                     Add
