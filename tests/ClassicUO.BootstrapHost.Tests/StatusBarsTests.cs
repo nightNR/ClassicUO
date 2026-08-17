@@ -160,9 +160,12 @@ public sealed unsafe class StatusBarsTests
         var payload = new StatusBarChangedPayload
         {
             Serial = 0x42,
-            HpPercent = 90,
-            ManaPercent = 40,
-            StaminaPercent = 60,
+            Hits = 90,
+            HitsMax = 100,
+            Mana = 40,
+            ManaMax = 100,
+            Stamina = 60,
+            StaminaMax = 100,
             Flags = (byte)(StatusBarFlags.Paralyzed | StatusBarFlags.Dead),
             Active = 0,
             GroupId = 3,
@@ -177,7 +180,8 @@ public sealed unsafe class StatusBarsTests
 
         received.Should().NotBeNull();
         received!.Value.Serial.Should().Be(0x42u);
-        received.Value.HpPercent.Should().Be((byte)90);
+        received.Value.Hits.Should().Be((ushort)90);
+        received.Value.HitsMax.Should().Be((ushort)100);
         received.Value.Active.Should().BeFalse();
         received.Value.GroupId.Should().Be(3);
         received.Value.Flags.Should().Be(ClassicUO.PluginApi.StatusBarFlags.Paralyzed | ClassicUO.PluginApi.StatusBarFlags.Dead);

@@ -69,9 +69,12 @@ public enum StatusBarFlags : byte
 public struct StatusBarChangedPayload
 {
     public uint Serial;
-    public byte HpPercent;
-    public byte ManaPercent;
-    public byte StaminaPercent;
+    public ushort Hits;
+    public ushort HitsMax;
+    public ushort Mana;
+    public ushort ManaMax;
+    public ushort Stamina;
+    public ushort StaminaMax;
     public byte Flags; // StatusBarFlags
     /// <summary>1 when the bar has a valid, in-range, living target; 0 when the target is out of range or dead.</summary>
     public byte Active;

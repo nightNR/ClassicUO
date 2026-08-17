@@ -50,9 +50,12 @@ namespace ClassicUO.UnitTests.Game.Managers
             var payload = new StatusBarChangedPayload
             {
                 Serial = 0xAAAA,
-                HpPercent = 80,
-                ManaPercent = 50,
-                StaminaPercent = 30,
+                Hits = 80,
+                HitsMax = 100,
+                Mana = 50,
+                ManaMax = 100,
+                Stamina = 30,
+                StaminaMax = 100,
                 Flags = (byte)(StatusBarFlags.Poisoned | StatusBarFlags.WarMode),
                 Active = 1,
                 GroupId = 7,
@@ -69,7 +72,8 @@ namespace ClassicUO.UnitTests.Game.Managers
             {
                 var roundTripped = *(StatusBarChangedPayload*)p;
                 Assert.Equal(payload.Serial, roundTripped.Serial);
-                Assert.Equal(payload.HpPercent, roundTripped.HpPercent);
+                Assert.Equal(payload.Hits, roundTripped.Hits);
+                Assert.Equal(payload.HitsMax, roundTripped.HitsMax);
                 Assert.Equal(payload.Flags, roundTripped.Flags);
                 Assert.Equal(payload.GroupId, roundTripped.GroupId);
                 Assert.Equal(payload.X, roundTripped.X);

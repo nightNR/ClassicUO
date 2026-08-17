@@ -258,7 +258,7 @@ internal sealed class StatusBarsImpl : IStatusBars
                 {
                     var p = MemoryMarshal.Read<StatusBarChangedPayload>(payload);
                     Changed?.Invoke(new StatusBarChangeInfo(
-                        p.Serial, p.HpPercent, p.ManaPercent, p.StaminaPercent,
+                        p.Serial, p.Hits, p.HitsMax, p.Mana, p.ManaMax, p.Stamina, p.StaminaMax,
                         (PluginApi.StatusBarFlags)p.Flags, p.Active != 0, p.GroupId, p.X, p.Y));
                 }
                 break;

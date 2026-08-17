@@ -89,12 +89,15 @@ public enum StatusBarFlags
 /// <summary>Snapshot delivered by <see cref="IStatusBars.Changed"/>.</summary>
 public readonly struct StatusBarChangeInfo
 {
-    public StatusBarChangeInfo(uint serial, byte hpPercent, byte manaPercent, byte staminaPercent, StatusBarFlags flags, bool active, int groupId, int x, int y)
+    public StatusBarChangeInfo(uint serial, ushort hits, ushort hitsMax, ushort mana, ushort manaMax, ushort stamina, ushort staminaMax, StatusBarFlags flags, bool active, int groupId, int x, int y)
     {
         Serial = serial;
-        HpPercent = hpPercent;
-        ManaPercent = manaPercent;
-        StaminaPercent = staminaPercent;
+        Hits = hits;
+        HitsMax = hitsMax;
+        Mana = mana;
+        ManaMax = manaMax;
+        Stamina = stamina;
+        StaminaMax = staminaMax;
         Flags = flags;
         Active = active;
         GroupId = groupId;
@@ -103,9 +106,12 @@ public readonly struct StatusBarChangeInfo
     }
 
     public uint Serial { get; }
-    public byte HpPercent { get; }
-    public byte ManaPercent { get; }
-    public byte StaminaPercent { get; }
+    public ushort Hits { get; }
+    public ushort HitsMax { get; }
+    public ushort Mana { get; }
+    public ushort ManaMax { get; }
+    public ushort Stamina { get; }
+    public ushort StaminaMax { get; }
     public StatusBarFlags Flags { get; }
 
     /// <summary>False when the target is out of range or dead.</summary>

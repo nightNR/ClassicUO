@@ -85,17 +85,20 @@ namespace ClassicUO.Game.UI.Gumps
         /// </summary>
         protected void EmitChangedIfNeeded(Entity entity)
         {
-            byte hp = 0, mana = 0, stam = 0;
+            ushort hits = 0, hitsMax = 0, mana = 0, manaMax = 0, stam = 0, stamMax = 0;
             byte flags = 0;
 
             if (entity != null)
             {
-                hp = Percent(entity.Hits, entity.HitsMax);
+                hits = entity.Hits;
+                hitsMax = entity.HitsMax;
 
                 if (entity is Mobile mobile)
                 {
-                    mana = Percent(mobile.Mana, mobile.ManaMax);
-                    stam = Percent(mobile.Stamina, mobile.StaminaMax);
+                    mana = mobile.Mana;
+                    manaMax = mobile.ManaMax;
+                    stam = mobile.Stamina;
+                    stamMax = mobile.StaminaMax;
 
                     if (mobile.IsPoisoned) flags |= (byte)PluginAbi.StatusBarFlags.Poisoned;
                     if (mobile.IsParalyzed) flags |= (byte)PluginAbi.StatusBarFlags.Paralyzed;
@@ -108,9 +111,12 @@ namespace ClassicUO.Game.UI.Gumps
             var current = new ClassicUO.PluginAbi.StatusBarChangedPayload
             {
                 Serial = LocalSerial,
-                HpPercent = hp,
-                ManaPercent = mana,
-                StaminaPercent = stam,
+                Hits = hits,
+                HitsMax = hitsMax,
+                Mana = mana,
+                ManaMax = manaMax,
+                Stamina = stam,
+                StaminaMax = stamMax,
                 Flags = flags,
                 Active = (byte)(IsInactive ? 0 : 1),
                 GroupId = PluginStatusBarGroups.FindGroupOf(LocalSerial),
@@ -126,18 +132,15 @@ namespace ClassicUO.Game.UI.Gumps
             PluginStatusBarEvents.RaiseChanged(current);
         }
 
-        private static byte Percent(int current, int max)
-        {
-            if (max <= 0) return 0;
-            return (byte)Math.Clamp(current * 100 / max, 0, 100);
-        }
-
         private static bool Equals(in ClassicUO.PluginAbi.StatusBarChangedPayload a, in ClassicUO.PluginAbi.StatusBarChangedPayload b)
         {
             return a.Serial == b.Serial
-                && a.HpPercent == b.HpPercent
-                && a.ManaPercent == b.ManaPercent
-                && a.StaminaPercent == b.StaminaPercent
+                && a.Hits == b.Hits
+                && a.HitsMax == b.HitsMax
+                && a.Mana == b.Mana
+                && a.ManaMax == b.ManaMax
+                && a.Stamina == b.Stamina
+                && a.StaminaMax == b.StaminaMax
                 && a.Flags == b.Flags
                 && a.Active == b.Active
                 && a.GroupId == b.GroupId
