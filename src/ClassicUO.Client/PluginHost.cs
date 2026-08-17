@@ -70,6 +70,11 @@ namespace ClassicUO
         private readonly dOnPluginTimerEvent _buffEvent, _timerEvent;
 
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        delegate void dOnGenericEvent(int eventId, IntPtr payloadPtr, int payloadLen);
+        [MarshalAs(UnmanagedType.FunctionPtr)]
+        private readonly dOnGenericEvent _genericEvent;
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         delegate void dOnPluginFocusWindow();
         [MarshalAs(UnmanagedType.FunctionPtr)]
         private readonly dOnPluginFocusWindow _focusGained, _focusLost;
@@ -108,6 +113,8 @@ namespace ClassicUO
                 _buffEvent = Marshal.GetDelegateForFunctionPointer<dOnPluginTimerEvent>(setup->BuffEventFn);
             if (setup->TimerEventFn != IntPtr.Zero)
                 _timerEvent = Marshal.GetDelegateForFunctionPointer<dOnPluginTimerEvent>(setup->TimerEventFn);
+            if (setup->GenericEventFn != IntPtr.Zero)
+                _genericEvent = Marshal.GetDelegateForFunctionPointer<dOnGenericEvent>(setup->GenericEventFn);
         }
 
         public Dictionary<IntPtr, GraphicsResource> GfxResources { get; } = new Dictionary<nint, GraphicsResource>();
@@ -319,6 +326,11 @@ namespace ClassicUO
         [MarshalAs(UnmanagedType.FunctionPtr)]
         private readonly dNoArg _clearPluginParty = Game.Managers.PluginPartyBridge.ClearPluginParty;
 
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        delegate int dGenericInvoke(int opcode, IntPtr argsPtr, int argsLen, IntPtr outBuf, int outCap);
+        [MarshalAs(UnmanagedType.FunctionPtr)]
+        private readonly dGenericInvoke _genericInvoke = Game.Managers.PluginGenericDispatch.Invoke;
+
 
         static short getPacketLength(int id)
         {
@@ -411,6 +423,7 @@ namespace ClassicUO
             cuoHost.SetPluginPartyMemberFn = Marshal.GetFunctionPointerForDelegate(_setPluginPartyMember);
             cuoHost.RemovePluginPartyMemberFn = Marshal.GetFunctionPointerForDelegate(_removePluginPartyMember);
             cuoHost.ClearPluginPartyFn = Marshal.GetFunctionPointerForDelegate(_clearPluginParty);
+            cuoHost.GenericInvokeFn = Marshal.GetFunctionPointerForDelegate(_genericInvoke);
             // UO.Load (GameController.Load) runs before PluginHost.Initialize, so the
             // client version is parsed by now. The host uses it to pick pre/post-KR
             // packet framing (e.g. MoveItem drop); 0 would break drops on modern servers.
@@ -491,6 +504,15 @@ namespace ClassicUO
         {
             _timerEvent?.Invoke(id, reason);
         }
+
+        public unsafe void GenericEvent(int eventId, ReadOnlySpan<byte> payload)
+        {
+            if (_genericEvent == null)
+                return;
+
+            fixed (byte* p = payload)
+                _genericEvent(eventId, (IntPtr)p, payload.Length);
+        }
     }
 
     interface IPluginHost
@@ -515,5 +537,6 @@ namespace ClassicUO
         public bool PacketOut(Span<byte> buffer);
         public void BuffEvent(int id, int reason);
         public void TimerEvent(int id, int reason);
+        public void GenericEvent(int eventId, ReadOnlySpan<byte> payload);
     }
 }

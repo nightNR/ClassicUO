@@ -1,0 +1,43 @@
+// SPDX-License-Identifier: BSD-2-Clause
+
+using System;
+using ClassicUO.PluginAbi;
+
+namespace ClassicUO.Game.Managers
+{
+    /// <summary>
+    /// Handles <see cref="ClientBindings.GenericInvokeFn"/> calls from a v2
+    /// plugin/host. New capabilities are added as new opcode cases here
+    /// instead of new <see cref="ClientBindings"/> fields — see the type doc
+    /// on <see cref="GenericOpcodes"/>.
+    /// </summary>
+    internal static unsafe class PluginGenericDispatch
+    {
+        public static int Invoke(int opcode, IntPtr argsPtr, int argsLen, IntPtr outBuf, int outCap)
+        {
+            switch (opcode)
+            {
+                case GenericOpcodes.GetSupportedOpcodes:
+                    return WriteSupportedOpcodes(outBuf, outCap);
+
+                default:
+                    return -1; // unknown opcode
+            }
+        }
+
+        private static int WriteSupportedOpcodes(IntPtr outBuf, int outCap)
+        {
+            // No custom opcodes registered yet beyond the reserved capability
+            // probe itself; extend this array as opcodes are added above.
+            ReadOnlySpan<int> opcodes = [GenericOpcodes.GetSupportedOpcodes];
+
+            int needed = opcodes.Length * sizeof(int);
+            if (outCap < needed)
+                return -2; // output buffer too small
+
+            var dst = new Span<int>((void*)outBuf, opcodes.Length);
+            opcodes.CopyTo(dst);
+            return needed;
+        }
+    }
+}

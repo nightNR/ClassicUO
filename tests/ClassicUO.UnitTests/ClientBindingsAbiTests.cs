@@ -66,7 +66,29 @@ namespace ClassicUO.UnitTests
             // SetStatusBarPriorityFn was appended after the 7 highlight fields and
             // before ClientVersion (still last), per the append-only ABI rule.
             Assert.Equal(checkLosBatchOffset + 8 * ptrSize, (int)Marshal.OffsetOf<ClientBindings>("SetStatusBarPriorityFn"));
-            Assert.Equal(checkLosBatchOffset + 9 * ptrSize, clientVersionOffset); // 7 highlight fields + SetStatusBarPriorityFn between them
+            // GenericInvokeFn (generic dispatch) was appended after that, still
+            // before ClientVersion — see GenericInvokeFn_IsAppendedRightBeforeClientVersion.
+            Assert.Equal(checkLosBatchOffset + 9 * ptrSize, (int)Marshal.OffsetOf<ClientBindings>("GenericInvokeFn"));
+            Assert.Equal(checkLosBatchOffset + 10 * ptrSize, clientVersionOffset);
+        }
+
+        [Fact]
+        public void GenericInvokeFn_IsAppendedRightBeforeClientVersion()
+        {
+            int ptrSize = sizeof(nint);
+            int genericInvokeOffset = (int)Marshal.OffsetOf<ClientBindings>("GenericInvokeFn");
+            int clientVersionOffset = (int)Marshal.OffsetOf<ClientBindings>("ClientVersion");
+
+            Assert.Equal(genericInvokeOffset + ptrSize, clientVersionOffset);
+        }
+
+        [Fact]
+        public void GenericEventFn_IsTheLastHostBindingsField()
+        {
+            int ptrSize = sizeof(nint);
+            int genericEventOffset = (int)Marshal.OffsetOf<HostBindings>("GenericEventFn");
+
+            Assert.Equal(Marshal.SizeOf<HostBindings>() - ptrSize, genericEventOffset);
         }
     }
 }

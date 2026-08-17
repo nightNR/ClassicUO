@@ -20,6 +20,7 @@ internal sealed class PluginContextImpl : IPluginContext
     private readonly DispatcherImpl _dispatcher;
     private readonly BuffsImpl _buffs;
     private readonly ScreenTimersImpl _screenTimers;
+    private readonly RawChannelImpl _raw;
 
     public PluginContextImpl(HostBridge bridge, PluginRegistration registration, string folderName, string pluginsRoot)
     {
@@ -36,6 +37,7 @@ internal sealed class PluginContextImpl : IPluginContext
         _dispatcher = new DispatcherImpl(bridge);
         _buffs = new BuffsImpl(bridge);
         _screenTimers = new ScreenTimersImpl(bridge);
+        _raw = new RawChannelImpl(bridge);
     }
 
     public string Id { get; }
@@ -52,6 +54,7 @@ internal sealed class PluginContextImpl : IPluginContext
     public IDispatcher Game => _dispatcher;
     public IPluginBuffs Buffs => _buffs;
     public IScreenTimers ScreenTimers => _screenTimers;
+    public IRawChannel Raw => _raw;
 
     public event Action? Connected;
     public event Action? Disconnected;
@@ -86,6 +89,7 @@ internal sealed class PluginContextImpl : IPluginContext
     public void RaiseWalkProgress(WalkState state) => _actions.RaiseWalkProgress(state);
     public void RaiseBuffEvent(int id, int reason) => _buffs.RaiseEvent(id, reason);
     public void RaiseTimerEvent(int id, int reason) => _screenTimers.RaiseEvent(id, reason);
+    public void RaiseGenericEvent(int eventId, byte[] payload) => _raw.RaiseEvent(eventId, payload);
     public void RaiseTick()                  => Tick?.Invoke();
     public void RaiseClosing()               => Closing?.Invoke();
     public void RaiseMouse(int button, int wheel) => _input.RaiseMouse(button, wheel);
@@ -434,6 +438,29 @@ internal sealed class ClientImpl : IClient
         finally
         {
             if (argsPtr != 0) Marshal.FreeHGlobal(argsPtr);
+        }
+    }
+}
+
+internal sealed class RawChannelImpl : IRawChannel
+{
+    private readonly HostBridge _bridge;
+    public RawChannelImpl(HostBridge bridge) { _bridge = bridge; }
+
+    public event Action<int, byte[]>? Event;
+    internal void RaiseEvent(int eventId, byte[] payload) => Event?.Invoke(eventId, payload);
+
+    public unsafe int Invoke(int opcode, ReadOnlySpan<byte> args, Span<byte> result)
+    {
+        var fn = _bridge.ClientBindings.GenericInvokeFn;
+        if (fn == 0) return -1;
+        if (!_bridge.IsGameThread)
+            throw new InvalidOperationException("Raw.Invoke must be called from the game thread; use IDispatcher.Post.");
+
+        fixed (byte* a = args)
+        fixed (byte* o = result)
+        {
+            return ((delegate* unmanaged[Cdecl]<int, nint, int, nint, int, int>)fn)(opcode, (nint)a, args.Length, (nint)o, result.Length);
         }
     }
 }

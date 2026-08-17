@@ -45,6 +45,10 @@ public struct HostBindings
     public nint WalkProgressFn;      // void(int state) — auto-walk state transition
     public nint BuffEventFn;         // void(int id, int reason) — plugin buff removed
     public nint TimerEventFn;        // void(int id, int reason) — screen timer removed
+    // Generic event push (cuo -> host -> plugin), keyed by an opcode-style event
+    // id instead of a dedicated field. New event kinds are added as new event ids,
+    // not new struct fields — see GenericDispatch.cs.
+    public nint GenericEventFn;      // void(int eventId, byte* payloadPtr, int payloadLen)
 }
 
 [StructLayout(LayoutKind.Sequential)]
@@ -88,6 +92,11 @@ public struct ClientBindings
     public nint RemoveCharacterFn;     // void(uint serial, byte priorityHighlight)
     public nint ClearCharactersFn;     // void(byte priorityHighlight)
     public nint SetStatusBarPriorityFn; // void(uint serial, int priority)
+    // Generic request/response dispatch (plugin/host -> cuo), keyed by an
+    // opcode instead of a dedicated field. New capabilities are added as new
+    // opcodes handled inside this one entry point, not new struct fields —
+    // see GenericDispatch.cs. Must stay before ClientVersion (append-only).
+    public nint GenericInvokeFn;     // int(int opcode, byte* argsPtr, int argsLen, byte* outBuf, int outCap)
     // Packed client version (major<<24|minor<<16|build<<8|revision). MUST stay
     // last — appended to preserve ABI, populated in Initialize() after UO.Load
     // has parsed it.

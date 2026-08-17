@@ -50,6 +50,9 @@ public interface IPluginContext
     /// <summary>Marshals work onto the game thread.</summary>
     IDispatcher Game { get; }
 
+    /// <summary>Opcode-based escape valve for capabilities without a dedicated typed service yet.</summary>
+    IRawChannel Raw { get; }
+
     /// <summary>Raised after a successful login. Fired on the game thread.</summary>
     event Action? Connected;
 

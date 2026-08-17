@@ -75,6 +75,7 @@ internal sealed unsafe class HostBridge
             p.RaisePacket(data, ref block, incoming: true);
         return !block;
     }
+    internal void TestRaiseGenericEvent(int eventId, byte[] payload) { foreach (var p in _loader.Plugins) p.RaiseGenericEvent(eventId, payload); }
 
     public int Run(string[] args)
     {
@@ -161,6 +162,7 @@ internal sealed unsafe class HostBridge
         WalkProgressFn    = (nint)(delegate* unmanaged[Cdecl]<int, void>)               &OnWalkProgress,
         BuffEventFn       = (nint)(delegate* unmanaged[Cdecl]<int, int, void>)         &OnBuffEvent,
         TimerEventFn      = (nint)(delegate* unmanaged[Cdecl]<int, int, void>)         &OnTimerEvent,
+        GenericEventFn    = (nint)(delegate* unmanaged[Cdecl]<int, nint, int, void>)   &OnGenericEvent,
     };
 
     // ─── cuo → host callbacks ────────────────────────────────────────────────
@@ -224,6 +226,10 @@ internal sealed unsafe class HostBridge
     [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
     private static void OnTimerEvent(int id, int reason)
         => _instance?.RaiseEachPlugin(p => p.RaiseTimerEvent(id, reason));
+
+    [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
+    private static void OnGenericEvent(int eventId, nint payloadPtr, int payloadLen)
+        => _instance?.HandleGenericEvent(eventId, payloadPtr, payloadLen);
 
     [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
     private static byte OnPacketIn(nint data, int* lengthRef)
@@ -293,6 +299,15 @@ internal sealed unsafe class HostBridge
         // Plugins observe-and-block only; the span aliases cuo's network
         // buffer and is not rewritten back.
         return block ? (byte)0 : (byte)1;
+    }
+
+    private void HandleGenericEvent(int eventId, nint payloadPtr, int payloadLen)
+    {
+        // Copy out: the payload only aliases cuo's stack/buffer for the
+        // duration of this call, and we fan out to N plugins.
+        var payload = new ReadOnlySpan<byte>((byte*)payloadPtr, payloadLen).ToArray();
+        foreach (var p in _loader.Plugins)
+            p.RaiseGenericEvent(eventId, payload);
     }
 
     public void PostToGameThread(Action action)
