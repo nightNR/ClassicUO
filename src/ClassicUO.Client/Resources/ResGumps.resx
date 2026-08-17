@@ -333,6 +333,9 @@
   <data name="ShowHousesContent" xml:space="preserve">
     <value>Show houses content</value>
   </data>
+  <data name="CounterShowVitals" xml:space="preserve">
+    <value>Show HP/Mana/Stamina in first counter slot</value>
+  </data>
   <data name="ShowHP" xml:space="preserve">
     <value>Show HP</value>
   </data>

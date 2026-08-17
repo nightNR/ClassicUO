@@ -298,6 +298,7 @@ namespace ClassicUO.Configuration
         public int CounterBarHighlightAmount { get; set; } = 5;
         public int CounterBarCellSize { get; set; } = 40;
         public bool CounterBarUseFixedGrid { get; set; } = false;
+        public bool CounterBarShowVitals { get; set; }
         public int CounterBarRows { get; set; } = 3;
         public int CounterBarColumns { get; set; } = 10;
 

@@ -3865,6 +3865,15 @@ namespace ClassicUO.Resources {
         }
 
         /// <summary>
+        ///   Looks up a localized string similar to Show HP/Mana/Stamina in first counter slot.
+        /// </summary>
+        public static string CounterShowVitals {
+            get {
+                return ResourceManager.GetString("CounterShowVitals", resourceCulture);
+            }
+        }
+
+        /// <summary>
         ///   Looks up a localized string similar to Show HP.
         /// </summary>
         public static string ShowHP {

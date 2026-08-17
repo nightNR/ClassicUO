@@ -57,7 +57,7 @@ namespace ClassicUO.Game.UI.Gumps
 
 
         //counters
-        private Checkbox _enableCounters, _highlightOnChange, _highlightOnAmount, _enableAbbreviatedAmount, _useFixedGridCheckbox;
+        private Checkbox _enableCounters, _highlightOnChange, _highlightOnAmount, _enableAbbreviatedAmount, _useFixedGridCheckbox, _showCounterVitals;
         private Checkbox _enableDragSelect, _dragSelectHumanoidsOnly, _dragSelectHostileOnly;
 
         // sounds
@@ -3025,6 +3025,17 @@ namespace ClassicUO.Game.UI.Gumps
             startX += 40;
             startY += _enableCounters.Height + 2;
 
+            _showCounterVitals = AddCheckBox
+            (
+                rightArea,
+                ResGumps.CounterShowVitals,
+                _currentProfile.CounterBarShowVitals,
+                startX,
+                startY
+            );
+
+            startY += _showCounterVitals.Height + 2;
+
             _highlightOnChange = AddCheckBox
             (
                 rightArea,
@@ -4355,6 +4366,7 @@ namespace ClassicUO.Game.UI.Gumps
 
                 case 9: // counters
                     _enableCounters.IsChecked = false;
+                    _showCounterVitals.IsChecked = false;
                     _highlightOnChange.IsChecked = false;
                     _enableAbbreviatedAmount.IsChecked = false;
                     _useFixedGridCheckbox.IsChecked = false;
@@ -4859,6 +4871,7 @@ namespace ClassicUO.Game.UI.Gumps
             bool before = _currentProfile.CounterBarEnabled;
             _currentProfile.CounterBarEnabled = _enableCounters.IsChecked;
             _currentProfile.CounterBarCellSize = _cellSize.Value;
+            _currentProfile.CounterBarShowVitals = _showCounterVitals.IsChecked;
 
             _currentProfile.CounterBarHighlightOnChange = _highlightOnChange.IsChecked;
 
@@ -4927,6 +4940,8 @@ namespace ClassicUO.Game.UI.Gumps
                 counterGump.SetCellSize(_currentProfile.CounterBarCellSize);
                 counterGump.ApplyGridSettings(useFixedGrid, gridRows, gridCols);
             }
+
+            counterGump?.SetVitalsVisible(_currentProfile.CounterBarShowVitals);
 
             // experimental
             // Reset nested checkboxes if parent checkbox is unchecked

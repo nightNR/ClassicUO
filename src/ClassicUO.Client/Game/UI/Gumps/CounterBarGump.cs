@@ -28,6 +28,8 @@ namespace ClassicUO.Game.UI.Gumps
         private Label _helpTextLabel;
 
         private DataBox _dataBox;
+        private CounterVitals _counterVitals;
+        private int _vitalsIndex;
         private int _rectSize;
         private ScissorControl _scissor;
 
@@ -213,6 +215,7 @@ namespace ClassicUO.Game.UI.Gumps
             Add(_scissor = new ScissorControl(true, borderSize, borderSize, 0, 0));
             _dataBox = new DataBox(borderSize, borderSize, 0, 0);
             Add(_dataBox);
+            SetVitalsVisible(ProfileManager.CurrentProfile.CounterBarShowVitals);
             Add(new ScissorControl(false));
             _dataBox.WantUpdateSize = true;
 
@@ -297,8 +300,8 @@ namespace ClassicUO.Game.UI.Gumps
 
                 for (int i = 0; i < _dataBox.Children.Count; i++)
                 {
-                    CounterItem c = _dataBox.Children[i] as CounterItem;
-                    if (c == null || c.IsDisposed)
+                    Control c = _dataBox.Children[i];
+                    if (c.IsDisposed)
                     {
                         continue;
                     }
@@ -317,8 +320,8 @@ namespace ClassicUO.Game.UI.Gumps
 
             for (int i = 0; i < _dataBox.Children.Count; i++)
             {
-                CounterItem c = _dataBox.Children[i] as CounterItem;
-                if (c != null && !c.IsDisposed)
+                Control c = _dataBox.Children[i];
+                if (!c.IsDisposed)
                 {
                     c.X = x + BORDER_LEFT;
                     c.Y = y + BORDER_TOP;
@@ -404,7 +407,7 @@ namespace ClassicUO.Game.UI.Gumps
                 // slot index is 1-based since we have to assume the average user is non-technical
                 // everything else would be confusing
 
-                if (_dataBox.Children.Skip(slot - 1).FirstOrDefault() is CounterItem item)
+                if (_dataBox.Children.OfType<CounterItem>().Skip(slot - 1).FirstOrDefault() is CounterItem item)
                 {
                     item.Use();
                 }
@@ -417,6 +420,28 @@ namespace ClassicUO.Game.UI.Gumps
             {
                 GameActions.Print(World, string.Format(ResGumps.CounterErrorSlotNotValid, slotString));
             }
+        }
+
+        public void SetVitalsVisible(bool visible)
+        {
+            if (_dataBox == null)
+            {
+                return;
+            }
+
+            if (visible && (_counterVitals == null || _counterVitals.IsDisposed))
+            {
+                _counterVitals = new CounterVitals(this);
+                _dataBox.Insert(Math.Clamp(_vitalsIndex, 0, _dataBox.Children.Count), _counterVitals);
+            }
+            else if (!visible && _counterVitals != null)
+            {
+                _vitalsIndex = _dataBox.Children.IndexOf(_counterVitals);
+                _counterVitals.Dispose();
+                _counterVitals = null;
+            }
+
+            SetupLayout();
         }
 
         public override void Save(XmlTextWriter writer)
@@ -432,6 +457,10 @@ namespace ClassicUO.Game.UI.Gumps
             writer.WriteAttributeString("cols", _cols.ToString());
             writer.WriteAttributeString("freewidth", _freeWidth.ToString());
             writer.WriteAttributeString("freeheight", _freeHeight.ToString());
+            writer.WriteAttributeString(
+                "vitalsindex",
+                (_counterVitals == null ? _vitalsIndex : _dataBox.Children.IndexOf(_counterVitals)).ToString()
+            );
 
             IEnumerable<CounterItem> controls = FindControls<CounterItem>();
 
@@ -510,6 +539,11 @@ namespace ClassicUO.Game.UI.Gumps
                 freeHeight = height;
             }
 
+            if (!int.TryParse(xml.GetAttribute("vitalsindex"), out _vitalsIndex))
+            {
+                _vitalsIndex = 0;
+            }
+
             BuildGump();
 
             XmlElement controlsXml = xml["controls"];
@@ -536,6 +570,11 @@ namespace ClassicUO.Game.UI.Gumps
 
                     _dataBox.Add(c);
                 }
+            }
+
+            if (_counterVitals != null)
+            {
+                _dataBox.Insert(Math.Clamp(_vitalsIndex, 0, _dataBox.Children.Count - 1), _counterVitals);
             }
 
             IsEnabled = IsVisible = ProfileManager.CurrentProfile.CounterBarEnabled;
