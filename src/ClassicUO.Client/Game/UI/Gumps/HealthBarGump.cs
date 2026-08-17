@@ -72,6 +72,79 @@ namespace ClassicUO.Game.UI.Gumps
 
         protected abstract void BuildGump();
 
+        private ClassicUO.PluginAbi.StatusBarChangedPayload _lastEmitted;
+        private bool _hasEmitted;
+
+        /// <summary>
+        /// Diffs the bar's current tracked state against the last emitted
+        /// snapshot and fires <see cref="PluginStatusBarEvents.RaiseChanged"/>
+        /// when anything differs. Called once per <c>Update()</c> by both
+        /// subclasses, after their own rendering diff has already run — this
+        /// keeps event emission decoupled from that logic (which fires at
+        /// different points and doesn't diff every field this event needs).
+        /// </summary>
+        protected void EmitChangedIfNeeded(Entity entity)
+        {
+            byte hp = 0, mana = 0, stam = 0;
+            byte flags = 0;
+
+            if (entity != null)
+            {
+                hp = Percent(entity.Hits, entity.HitsMax);
+
+                if (entity is Mobile mobile)
+                {
+                    mana = Percent(mobile.Mana, mobile.ManaMax);
+                    stam = Percent(mobile.Stamina, mobile.StaminaMax);
+
+                    if (mobile.IsPoisoned) flags |= (byte)PluginAbi.StatusBarFlags.Poisoned;
+                    if (mobile.IsParalyzed) flags |= (byte)PluginAbi.StatusBarFlags.Paralyzed;
+                    if (mobile.InWarMode) flags |= (byte)PluginAbi.StatusBarFlags.WarMode;
+                    if (mobile.IsYellowHits) flags |= (byte)PluginAbi.StatusBarFlags.YellowHits;
+                    if (mobile.IsDead) flags |= (byte)PluginAbi.StatusBarFlags.Dead;
+                }
+            }
+
+            var current = new ClassicUO.PluginAbi.StatusBarChangedPayload
+            {
+                Serial = LocalSerial,
+                HpPercent = hp,
+                ManaPercent = mana,
+                StaminaPercent = stam,
+                Flags = flags,
+                Active = (byte)(IsInactive ? 0 : 1),
+                GroupId = PluginStatusBarGroups.FindGroupOf(LocalSerial),
+                X = (short)X,
+                Y = (short)Y,
+            };
+
+            if (_hasEmitted && Equals(current, _lastEmitted))
+                return;
+
+            _hasEmitted = true;
+            _lastEmitted = current;
+            PluginStatusBarEvents.RaiseChanged(current);
+        }
+
+        private static byte Percent(int current, int max)
+        {
+            if (max <= 0) return 0;
+            return (byte)Math.Clamp(current * 100 / max, 0, 100);
+        }
+
+        private static bool Equals(in ClassicUO.PluginAbi.StatusBarChangedPayload a, in ClassicUO.PluginAbi.StatusBarChangedPayload b)
+        {
+            return a.Serial == b.Serial
+                && a.HpPercent == b.HpPercent
+                && a.ManaPercent == b.ManaPercent
+                && a.StaminaPercent == b.StaminaPercent
+                && a.Flags == b.Flags
+                && a.Active == b.Active
+                && a.GroupId == b.GroupId
+                && a.X == b.X
+                && a.Y == b.Y;
+        }
+
 
         public override void Dispose()
         {
@@ -79,6 +152,11 @@ namespace ClassicUO.Game.UI.Gumps
             {
                 GameActions.SendCloseStatus(LocalSerial);
             }*/
+
+            if (!IsDisposed)
+            {
+                PluginStatusBarEvents.RaiseClosed(LocalSerial);
+            }
 
             _textBox?.Dispose();
             _textBox = null;
@@ -759,6 +837,8 @@ namespace ClassicUO.Game.UI.Gumps
             UpdateDistanceLabel(entity);
 
             ApplyPriorityOverlay();
+
+            EmitChangedIfNeeded(entity);
         }
 
         // Refresh the current/max labels (option-gated; fields null when off).
@@ -2167,6 +2247,8 @@ namespace ClassicUO.Game.UI.Gumps
                     _background.Graphic = World.Player.InWarMode ? BACKGROUND_WAR : BACKGROUND_NORMAL;
                 }
             }
+
+            EmitChangedIfNeeded(entity);
         }
 
         public override void OnButtonClick(int buttonID)

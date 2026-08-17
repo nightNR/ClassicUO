@@ -43,4 +43,76 @@ public interface IStatusBars
     /// to the game thread.
     /// </summary>
     void SetStatusBarPriority(uint serial, int priority);
+
+    /// <summary>
+    /// Raised whenever any status bar opens — plugin-driven (<see cref="OpenStatusBar"/>)
+    /// or player-driven (clicking a mobile, party UI, macros, restored from a
+    /// saved profile, etc). Fired on the game thread.
+    /// </summary>
+    event Action<uint>? Opened;
+
+    /// <summary>
+    /// Raised whenever any status bar closes, for any reason (user close,
+    /// target out of range/dead, plugin <see cref="CloseStatusBar"/>, options
+    /// toggle rebuild). Fired on the game thread.
+    /// </summary>
+    event Action<uint>? Closed;
+
+    /// <summary>
+    /// Raised when an open status bar's tracked state changes (HP/mana/stamina,
+    /// status flags, position, group, or active/inactive). Fired on the game
+    /// thread, at most once per tick per bar, only when something differs from
+    /// the last-emitted snapshot.
+    /// </summary>
+    event Action<StatusBarChangeInfo>? Changed;
+
+    /// <summary>
+    /// Lists every currently-open status bar's serial, plugin-opened or
+    /// player-opened alike.
+    /// </summary>
+    uint[] ListOpen();
+}
+
+/// <summary>Bitmask reported on <see cref="StatusBarChangeInfo.Flags"/>.</summary>
+[Flags]
+public enum StatusBarFlags
+{
+    None = 0,
+    Poisoned = 1,
+    Paralyzed = 2,
+    Invulnerable = 4,
+    WarMode = 8,
+    YellowHits = 16,
+    Dead = 32,
+}
+
+/// <summary>Snapshot delivered by <see cref="IStatusBars.Changed"/>.</summary>
+public readonly struct StatusBarChangeInfo
+{
+    public StatusBarChangeInfo(uint serial, byte hpPercent, byte manaPercent, byte staminaPercent, StatusBarFlags flags, bool active, int groupId, int x, int y)
+    {
+        Serial = serial;
+        HpPercent = hpPercent;
+        ManaPercent = manaPercent;
+        StaminaPercent = staminaPercent;
+        Flags = flags;
+        Active = active;
+        GroupId = groupId;
+        X = x;
+        Y = y;
+    }
+
+    public uint Serial { get; }
+    public byte HpPercent { get; }
+    public byte ManaPercent { get; }
+    public byte StaminaPercent { get; }
+    public StatusBarFlags Flags { get; }
+
+    /// <summary>False when the target is out of range or dead.</summary>
+    public bool Active { get; }
+
+    /// <summary>0 when the bar does not belong to an anchor group.</summary>
+    public int GroupId { get; }
+    public int X { get; }
+    public int Y { get; }
 }

@@ -2,6 +2,7 @@
 
 using System.Runtime.InteropServices;
 using System.Text;
+using ClassicUO.PluginAbi;
 using ClassicUO.PluginApi;
 
 namespace ClassicUO.BootstrapHost;
@@ -89,7 +90,11 @@ internal sealed class PluginContextImpl : IPluginContext
     public void RaiseWalkProgress(WalkState state) => _actions.RaiseWalkProgress(state);
     public void RaiseBuffEvent(int id, int reason) => _buffs.RaiseEvent(id, reason);
     public void RaiseTimerEvent(int id, int reason) => _screenTimers.RaiseEvent(id, reason);
-    public void RaiseGenericEvent(int eventId, byte[] payload) => _raw.RaiseEvent(eventId, payload);
+    public void RaiseGenericEvent(int eventId, byte[] payload)
+    {
+        _raw.RaiseEvent(eventId, payload);
+        _statusBars.RaiseGenericEvent(eventId, payload);
+    }
     public void RaiseTick()                  => Tick?.Invoke();
     public void RaiseClosing()               => Closing?.Invoke();
     public void RaiseMouse(int button, int wheel) => _input.RaiseMouse(button, wheel);
@@ -229,6 +234,57 @@ internal sealed class StatusBarsImpl : IStatusBars
 {
     private readonly HostBridge _bridge;
     public StatusBarsImpl(HostBridge bridge) { _bridge = bridge; }
+
+    public event Action<uint>? Opened;
+    public event Action<uint>? Closed;
+    public event Action<StatusBarChangeInfo>? Changed;
+
+    internal void RaiseGenericEvent(int eventId, byte[] payload)
+    {
+        switch (eventId)
+        {
+            case GenericEventIds.StatusBarOpened:
+                if (payload.Length >= sizeof(uint))
+                    Opened?.Invoke(BitConverter.ToUInt32(payload, 0));
+                break;
+
+            case GenericEventIds.StatusBarClosed:
+                if (payload.Length >= sizeof(uint))
+                    Closed?.Invoke(BitConverter.ToUInt32(payload, 0));
+                break;
+
+            case GenericEventIds.StatusBarChanged:
+                if (payload.Length >= Marshal.SizeOf<StatusBarChangedPayload>())
+                {
+                    var p = MemoryMarshal.Read<StatusBarChangedPayload>(payload);
+                    Changed?.Invoke(new StatusBarChangeInfo(
+                        p.Serial, p.HpPercent, p.ManaPercent, p.StaminaPercent,
+                        (PluginApi.StatusBarFlags)p.Flags, p.Active != 0, p.GroupId, p.X, p.Y));
+                }
+                break;
+        }
+    }
+
+    public unsafe uint[] ListOpen()
+    {
+        var fn = _bridge.ClientBindings.GenericInvokeFn;
+        if (fn == 0) return [];
+        if (!_bridge.IsGameThread)
+            throw new InvalidOperationException("ListOpen must be called from the game thread; use IDispatcher.Post.");
+
+        Span<byte> buf = stackalloc byte[4096]; // up to 1024 open bars; ListOpenStatusBars errors (-2) rather than truncating
+        int written;
+        fixed (byte* o = buf)
+        {
+            written = ((delegate* unmanaged[Cdecl]<int, nint, int, nint, int, int>)fn)(GenericOpcodes.ListOpenStatusBars, 0, 0, (nint)o, buf.Length);
+        }
+
+        if (written <= 0) return [];
+
+        var result = new uint[written / sizeof(uint)];
+        MemoryMarshal.Cast<byte, uint>(buf[..written]).CopyTo(result);
+        return result;
+    }
 
     public unsafe void OpenStatusBar(uint serial, int x, int y, bool moveIfExists = true, int groupId = 0)
     {

@@ -20,6 +20,9 @@ namespace ClassicUO.Game.Managers
                 case GenericOpcodes.GetSupportedOpcodes:
                     return WriteSupportedOpcodes(outBuf, outCap);
 
+                case GenericOpcodes.ListOpenStatusBars:
+                    return PluginStatusBarEvents.ListOpen(outBuf, outCap);
+
                 default:
                     return -1; // unknown opcode
             }
@@ -27,9 +30,11 @@ namespace ClassicUO.Game.Managers
 
         private static int WriteSupportedOpcodes(IntPtr outBuf, int outCap)
         {
-            // No custom opcodes registered yet beyond the reserved capability
-            // probe itself; extend this array as opcodes are added above.
-            ReadOnlySpan<int> opcodes = [GenericOpcodes.GetSupportedOpcodes];
+            ReadOnlySpan<int> opcodes =
+            [
+                GenericOpcodes.GetSupportedOpcodes,
+                GenericOpcodes.ListOpenStatusBars,
+            ];
 
             int needed = opcodes.Length * sizeof(int);
             if (outCap < needed)

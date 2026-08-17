@@ -125,4 +125,86 @@ public sealed unsafe class StatusBarsTests
         impl.SetOverlay(1, 1);
         impl.SetStatusBarPriority(1, 1);
     }
+
+    [Fact]
+    public void RaiseGenericEvent_Opened_DecodesSerial()
+    {
+        var impl = NewImplWithBindings(new ClientBindings());
+        uint? received = null;
+        impl.Opened += s => received = s;
+
+        impl.RaiseGenericEvent(GenericEventIds.StatusBarOpened, BitConverter.GetBytes(0x777u));
+
+        received.Should().Be(0x777u);
+    }
+
+    [Fact]
+    public void RaiseGenericEvent_Closed_DecodesSerial()
+    {
+        var impl = NewImplWithBindings(new ClientBindings());
+        uint? received = null;
+        impl.Closed += s => received = s;
+
+        impl.RaiseGenericEvent(GenericEventIds.StatusBarClosed, BitConverter.GetBytes(0x999u));
+
+        received.Should().Be(0x999u);
+    }
+
+    [Fact]
+    public void RaiseGenericEvent_Changed_DecodesPayload()
+    {
+        var impl = NewImplWithBindings(new ClientBindings());
+        ClassicUO.PluginApi.StatusBarChangeInfo? received = null;
+        impl.Changed += info => received = info;
+
+        var payload = new StatusBarChangedPayload
+        {
+            Serial = 0x42,
+            HpPercent = 90,
+            ManaPercent = 40,
+            StaminaPercent = 60,
+            Flags = (byte)(StatusBarFlags.Paralyzed | StatusBarFlags.Dead),
+            Active = 0,
+            GroupId = 3,
+            X = 5,
+            Y = 6,
+        };
+        var bytes = new byte[Marshal.SizeOf<StatusBarChangedPayload>()];
+        fixed (byte* dst = bytes)
+            *(StatusBarChangedPayload*)dst = payload;
+
+        impl.RaiseGenericEvent(GenericEventIds.StatusBarChanged, bytes);
+
+        received.Should().NotBeNull();
+        received!.Value.Serial.Should().Be(0x42u);
+        received.Value.HpPercent.Should().Be((byte)90);
+        received.Value.Active.Should().BeFalse();
+        received.Value.GroupId.Should().Be(3);
+        received.Value.Flags.Should().Be(ClassicUO.PluginApi.StatusBarFlags.Paralyzed | ClassicUO.PluginApi.StatusBarFlags.Dead);
+    }
+
+    [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
+    private static int FakeListOpen(int opcode, nint argsPtr, int argsLen, nint outBuf, int outCap)
+    {
+        Span<uint> serials = [0x10, 0x20, 0x30];
+        var needed = serials.Length * sizeof(uint);
+        if (outCap < needed) return -2;
+        var dst = new Span<uint>((void*)outBuf, serials.Length);
+        serials.CopyTo(dst);
+        return needed;
+    }
+
+    [Fact]
+    public void ListOpen_InvokesGenericOpcode_AndDecodesSerials()
+    {
+        var bindings = new ClientBindings
+        {
+            GenericInvokeFn = (nint)(delegate* unmanaged[Cdecl]<int, nint, int, nint, int, int>)&FakeListOpen
+        };
+        var impl = NewImplWithBindings(bindings);
+
+        var result = impl.ListOpen();
+
+        result.Should().Equal(0x10u, 0x20u, 0x30u);
+    }
 }

@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: BSD-2-Clause
 
+using System.Runtime.InteropServices;
+
 namespace ClassicUO.PluginAbi;
 
 /// <summary>
@@ -18,6 +20,15 @@ public static class GenericOpcodes
     /// result actually lists — an older cuo build simply won't list newer ones.
     /// </summary>
     public const int GetSupportedOpcodes = 0;
+
+    /// <summary>
+    /// Lists every currently-open status (health) bar, plugin-opened or
+    /// player-opened alike. Args: none. Result: a packed <c>uint[]</c> of
+    /// serials. Returns -2 (and writes nothing) if the caller's buffer can't
+    /// hold every open bar — size for the worst case rather than retrying,
+    /// since a partial list would silently hide bars.
+    /// </summary>
+    public const int ListOpenStatusBars = 1;
 }
 
 /// <summary>
@@ -27,4 +38,44 @@ public static class GenericOpcodes
 /// </summary>
 public static class GenericEventIds
 {
+    /// <summary>A status bar was opened (plugin- or player-driven). Payload: <c>uint</c> serial.</summary>
+    public const int StatusBarOpened = 1;
+
+    /// <summary>A status bar was closed (any reason: user, out-of-range, death, plugin). Payload: <c>uint</c> serial.</summary>
+    public const int StatusBarClosed = 2;
+
+    /// <summary>A status bar's tracked state changed. Payload: <see cref="StatusBarChangedPayload"/>.</summary>
+    public const int StatusBarChanged = 3;
+}
+
+/// <summary>Bitmask for <see cref="StatusBarChangedPayload.Flags"/>.</summary>
+[Flags]
+public enum StatusBarFlags : byte
+{
+    None = 0,
+    Poisoned = 1,
+    Paralyzed = 2,
+    Invulnerable = 4,
+    WarMode = 8,
+    YellowHits = 16,
+    Dead = 32,
+}
+
+/// <summary>
+/// Wire payload for <see cref="GenericEventIds.StatusBarChanged"/>. Fixed
+/// layout, blitted directly — no serialization step on either side.
+/// </summary>
+[StructLayout(LayoutKind.Sequential)]
+public struct StatusBarChangedPayload
+{
+    public uint Serial;
+    public byte HpPercent;
+    public byte ManaPercent;
+    public byte StaminaPercent;
+    public byte Flags; // StatusBarFlags
+    /// <summary>1 when the bar has a valid, in-range, living target; 0 when the target is out of range or dead.</summary>
+    public byte Active;
+    public int GroupId;
+    public short X;
+    public short Y;
 }

@@ -398,6 +398,11 @@ namespace ClassicUO.Game.Managers
                 }
 
                 _needSort = Gumps.Count > 1;
+
+                if (gump is BaseHealthBarGump bar)
+                {
+                    PluginStatusBarEvents.RaiseOpened(bar.LocalSerial);
+                }
             }
         }
 
