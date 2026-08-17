@@ -474,72 +474,6 @@ namespace ClassicUO.Game.Scenes
             return !(itemData.IsFoliage && !itemData.IsMultiMovable && season >= Season.Winter);
         }
 
-        private bool HasSurfaceOverhead(Mobile mob)
-        {
-            if (
-                mob.Serial == _world.Player.Serial /* || _maxZ == _maxGroundZ*/
-            )
-            {
-                return false;
-            }
-
-            if (mob._surfaceOverheadCacheX == mob.X && mob._surfaceOverheadCacheY == mob.Y && mob._surfaceOverheadCacheMaxZ == _maxZ)
-            {
-                return mob._surfaceOverheadCache;
-            }
-
-            bool found = false;
-
-            for (int y = -1; y <= 2; ++y)
-            {
-                for (int x = -1; x <= 2; ++x)
-                {
-                    GameObject tile = _world.Map.GetTile(mob.X + x, mob.Y + y);
-
-                    found = false;
-
-                    while (tile != null)
-                    {
-                        var next = tile.TNext;
-
-                        if (tile.Z > mob.Z && (tile is Static || tile is Multi))
-                        {
-                            ref var itemData = ref Client.Game.UO.FileManager.TileData.StaticData[tile.Graphic];
-
-                            if (itemData.IsNoShoot || itemData.IsWindow)
-                            {
-                                if (_maxZ - tile.Z + 5 >= tile.Z - mob.Z)
-                                {
-                                    found = true;
-
-                                    break;
-                                }
-                            }
-                        }
-
-                        tile = next;
-                    }
-
-                    if (!found)
-                    {
-                        break;
-                    }
-                }
-
-                if (!found)
-                {
-                    break;
-                }
-            }
-
-            mob._surfaceOverheadCacheX = (ushort)mob.X;
-            mob._surfaceOverheadCacheY = (ushort)mob.Y;
-            mob._surfaceOverheadCacheMaxZ = _maxZ;
-            mob._surfaceOverheadCache = found;
-
-            return found;
-        }
-
         // Returns: 0 = break (handled), 1 = continue (skip), 2 = return retValue from AddTileToRenderList
         private int ProcessStaticLikeTail(
             GameObject obj,
@@ -1060,7 +994,9 @@ namespace ClassicUO.Game.Scenes
                                 continue;
                             }
 
-                            obj.AllowedToDraw = !HasSurfaceOverhead(mobile);
+                            // Do not hide mobiles merely because a house surface is above them.
+                            // Roof rendering and the regular Z clipping are handled separately.
+                            obj.AllowedToDraw = true;
 
                             PushToRenderQueue(
                                 obj,
