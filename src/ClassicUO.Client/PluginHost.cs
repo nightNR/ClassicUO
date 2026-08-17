@@ -1,6 +1,7 @@
 ﻿using ClassicUO.Configuration;
 using ClassicUO.Game;
 using ClassicUO.Network;
+using ClassicUO.PluginAbi;
 using Microsoft.Xna.Framework.Graphics;
 using SDL3;
 using System;
@@ -11,76 +12,6 @@ using System.Runtime.InteropServices;
 
 namespace ClassicUO
 {
-    [StructLayout(LayoutKind.Sequential)]
-    public unsafe struct HostBindings
-    {
-        public IntPtr InitializeFn;
-        public IntPtr LoadPluginFn;
-        public IntPtr TickFn;
-        public IntPtr ClosingFn;
-        public IntPtr FocusGainedFn;
-        public IntPtr FocusLostFn;
-        public IntPtr ConnectedFn;
-        public IntPtr DisconnectedFn;
-        public IntPtr /*delegate*<int, int, bool, bool>*/ HotkeyFn;
-        public IntPtr /*delegate*<int, int, void>*/ MouseFn;
-        public IntPtr /*delegate*<IntPtr, ref int, void>*/ CmdListFn;
-        public IntPtr /*delegate*<IntPtr, int>*/ SdlEventFn;
-        public IntPtr /*delegate*<int, int, int, void>*/ UpdatePlayerPosFn;
-        public IntPtr PacketInFn;
-        public IntPtr PacketOutFn;
-        public IntPtr /*delegate*<int, void>*/ WalkProgressFn;
-        public IntPtr /*delegate*<int, int, void>*/ BuffEventFn;
-        public IntPtr /*delegate*<int, int, void>*/ TimerEventFn;
-    }
-
-    [StructLayout(LayoutKind.Sequential)]
-    unsafe struct ClientBindings
-    {
-        public IntPtr /*delegate*<IntPtr, ref int, bool>*/ PluginRecvFn;
-        public IntPtr /*delegate*<IntPtr, ref int, bool>*/ PluginSendFn;
-        public IntPtr /*delegate*<int, short>*/ PacketLengthFn;
-        public IntPtr /*delegate*<int, void>*/ CastSpellFn;
-        public IntPtr /*delegate*<IntPtr>*/ SetWindowTitleFn;
-        public IntPtr /*delegate*<int, IntPtr, IntPtr, bool, bool>*/ GetClilocFn;
-        public IntPtr /*delegate*<int, bool, bool>*/ RequestMoveFn;
-        public IntPtr /*delegate*<ref int, ref int, ref int, bool>*/ GetPlayerPositionFn;
-        public IntPtr ReflectionCmdFn;
-        public IntPtr /*delegate*<int, int, int, int, bool, bool>*/ WalkToFn;
-        public IntPtr /*delegate*<void>*/ StopWalkFn;
-        public IntPtr /*delegate*<uint, int, int, byte, int, void>*/ OpenStatusBarFn;
-        public IntPtr /*delegate*<uint, void>*/ CloseStatusBarFn;
-        public IntPtr /*delegate*<uint, ushort, ushort, void>*/ SetOverlayFn;
-        public IntPtr /*delegate*<int, ushort, int, int, IntPtr, void>*/ AddBuffFn;
-        public IntPtr /*delegate*<int, void>*/ RemoveBuffFn;
-        public IntPtr /*delegate*<void>*/ ClearBuffsFn;
-        public IntPtr /*delegate*<int, int, int, int, int, void>*/ DefineTimerGroupFn;
-        public IntPtr /*delegate*<int, int, int, ushort, int, int, int, int, int, IntPtr, byte, int, uint, ushort, ushort, sbyte, short, short, int, void>*/ AddTimerFn;
-        public IntPtr /*delegate*<int, void>*/ RemoveTimerFn;
-        public IntPtr /*delegate*<int, void>*/ RemoveTimerGroupFn;
-        public IntPtr /*delegate*<void>*/ ClearTimersFn;
-        public IntPtr /*delegate*<uint, ushort, int, int, int, int, void>*/ SetPluginPartyMemberFn;
-        public IntPtr /*delegate*<uint, void>*/ RemovePluginPartyMemberFn;
-        public IntPtr /*delegate*<void>*/ ClearPluginPartyFn;
-        public IntPtr /*delegate*<int,int,int,int,int,int,int,byte, byte>*/ CheckLosFn;
-        public IntPtr /*delegate*<int,int,int,int*,int,int,byte,byte*, void>*/ CheckLosBatchFn;
-        // Highlight fields (below) and ClientVersion are appended after every
-        // pre-existing field to preserve the ABI for external v1 plugin binaries
-        // (e.g. cuoapi.dll) compiled against the pre-highlight layout — never insert
-        // new fields in the middle of this struct, only ever append.
-        public IntPtr /*delegate*<IntPtr, int, int, uint, int, int, ushort, int, int, int, void>*/ AddAreaFn;
-        public IntPtr /*delegate*<IntPtr, void>*/ RemoveAreaFn;
-        public IntPtr /*delegate*<void>*/ ClearAreasFn;
-        public IntPtr /*delegate*<IntPtr, int>*/ GetAreaTimerFn;
-        public IntPtr /*delegate*<uint, ushort, byte, void>*/ AddCharacterFn;
-        public IntPtr /*delegate*<uint, byte, void>*/ RemoveCharacterFn;
-        public IntPtr /*delegate*<byte, void>*/ ClearCharactersFn;
-        public IntPtr /*delegate*<uint, int, void>*/ SetStatusBarPriorityFn;
-        // Packed client version (major<<24|minor<<16|build<<8|revision). Appended last
-        // to preserve ABI; populated in Initialize() after UO.Load has parsed it.
-        public int ClientVersion;
-    }
-
     internal unsafe sealed class UnmanagedAssistantHost : IPluginHost
     {
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]

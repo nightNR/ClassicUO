@@ -36,6 +36,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\ClassicUO.PluginAbi\ClassicUO.PluginAbi.csproj" />
     <ProjectReference Include="..\ClassicUO.PluginApi\ClassicUO.PluginApi.csproj" />
   </ItemGroup>
 

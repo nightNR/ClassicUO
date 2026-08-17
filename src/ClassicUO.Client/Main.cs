@@ -5,6 +5,7 @@ using ClassicUO.Game;
 using ClassicUO.Game.Managers;
 using ClassicUO.IO;
 using ClassicUO.Network;
+using ClassicUO.PluginAbi;
 using ClassicUO.Resources;
 using ClassicUO.Utility;
 using ClassicUO.Utility.Logging;

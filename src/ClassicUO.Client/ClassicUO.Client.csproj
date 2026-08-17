@@ -87,6 +87,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\external\FNA\FNA.Core.csproj" />
     <ProjectReference Include="..\ClassicUO.Assets\ClassicUO.Assets.csproj" />
+    <ProjectReference Include="..\ClassicUO.PluginAbi\ClassicUO.PluginAbi.csproj" />
     <ProjectReference Include="..\ClassicUO.PluginApi\ClassicUO.PluginApi.csproj" />
     <ProjectReference Include="..\ClassicUO.Renderer\ClassicUO.Renderer.csproj" />
     <ProjectReference Include="..\ClassicUO.Utility\ClassicUO.Utility.csproj" />

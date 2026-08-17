@@ -3,6 +3,7 @@
 using System.Collections.Concurrent;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
+using ClassicUO.PluginAbi;
 using ClassicUO.PluginApi;
 
 namespace ClassicUO.BootstrapHost;
@@ -317,73 +318,4 @@ internal sealed unsafe class HostBridge
         foreach (var p in _loader.Plugins)
             action(p);
     }
-}
-
-[StructLayout(LayoutKind.Sequential)]
-internal struct HostBindings
-{
-    public nint InitializeFn;
-    public nint LoadPluginFn;
-    public nint TickFn;
-    public nint ClosingFn;
-    public nint FocusGainedFn;
-    public nint FocusLostFn;
-    public nint ConnectedFn;
-    public nint DisconnectedFn;
-    public nint HotkeyFn;
-    public nint MouseFn;
-    public nint CmdListFn;
-    public nint SdlEventFn;
-    public nint UpdatePlayerPosFn;
-    public nint PacketInFn;
-    public nint PacketOutFn;
-    public nint WalkProgressFn;
-    public nint BuffEventFn;   // void(int id, int reason)
-    public nint TimerEventFn;  // void(int id, int reason)
-}
-
-[StructLayout(LayoutKind.Sequential)]
-internal struct ClientBindings
-{
-    public nint PluginRecvFn;          // bool(nint data, ref int length) — inject to client
-    public nint PluginSendFn;          // bool(nint data, ref int length) — inject to server
-    public nint PacketLengthFn;        // short(int id)
-    public nint CastSpellFn;           // void(int index)
-    public nint SetWindowTitleFn;      // void(nint utf8Ptr)
-    public nint GetClilocFn;           // nint(int id, nint utf8ArgsPtr, bool capitalize)
-    public nint RequestMoveFn;         // bool(int dir, bool run)
-    public nint GetPlayerPositionFn;   // bool(out int x, out int y, out int z)
-    public nint ReflectionCmdFn;       // legacy reflection commands; unused by v2
-    public nint WalkToFn;              // bool(int x, int y, int z, int distance, byte run)
-    public nint StopWalkFn;            // void()
-    public nint OpenStatusBarFn;       // void(uint serial, int x, int y, byte moveIfExists, int groupId)
-    public nint CloseStatusBarFn;      // void(uint serial)
-    public nint SetOverlayFn;          // void(uint serial, ushort hue, ushort backgroundHue)
-    public nint AddBuffFn;             // void(int id, ushort graphic, int durationMs, int kind, nint textUtf8)
-    public nint RemoveBuffFn;          // void(int id)
-    public nint ClearBuffsFn;          // void()
-    public nint DefineTimerGroupFn;    // void(int groupId, int x, int y, int direction, int gap)
-    public nint AddTimerFn;            // void(int id, int shape, int durationMs, ushort hue, int groupId, int x, int y, int width, int height, nint labelUtf8, byte showTime, int anchorKind, uint anchorSerial, ushort ax, ushort ay, sbyte az, short offX, short offY, int graceMs)
-    public nint RemoveTimerFn;         // void(int id)
-    public nint RemoveTimerGroupFn;    // void(int groupId)
-    public nint ClearTimersFn;         // void()
-    // Unused by v2 (no PluginParty/CheckLos support here) but must exist as
-    // padding: the native ClientBindings struct in PluginHost.cs places these
-    // between ClearTimersFn and the highlight fields below, and this struct's
-    // layout must stay a byte-exact prefix of the native one for every field
-    // it declares. Never insert new fields before this block — only append
-    // after ClearCharactersFn.
-    public nint SetPluginPartyMemberFn;
-    public nint RemovePluginPartyMemberFn;
-    public nint ClearPluginPartyFn;
-    public nint CheckLosFn;
-    public nint CheckLosBatchFn;
-    public nint AddAreaFn;             // void(nint idUtf8, int durationMs, int snapKind, uint anchorSerial, int x, int y, ushort hue, int rangeX, int rangeY, int objectTypes)
-    public nint RemoveAreaFn;          // void(nint idUtf8)
-    public nint ClearAreasFn;          // void()
-    public nint GetAreaTimerFn;        // int(nint idUtf8)
-    public nint AddCharacterFn;        // void(uint serial, ushort hue, byte priorityHighlight)
-    public nint RemoveCharacterFn;     // void(uint serial, byte priorityHighlight)
-    public nint ClearCharactersFn;     // void(byte priorityHighlight)
-    public nint SetStatusBarPriorityFn; // void(uint serial, int priority)
 }

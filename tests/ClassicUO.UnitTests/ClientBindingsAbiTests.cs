@@ -2,12 +2,13 @@
 
 using System.Reflection;
 using System.Runtime.InteropServices;
+using ClassicUO.PluginAbi;
 using Xunit;
 
 namespace ClassicUO.UnitTests
 {
     /// <summary>
-    /// Locks in the append-only ABI contract for <see cref="ClassicUO.ClientBindings"/>.
+    /// Locks in the append-only ABI contract for <see cref="ClassicUO.PluginAbi.ClientBindings"/>.
     /// This struct's raw memory layout is read by pre-compiled external v1 plugin
     /// binaries (e.g. external/cuoapi/cuoapi.dll) that were built against a specific,
     /// frozen field order. Inserting a new field ANYWHERE but the end shifts every
