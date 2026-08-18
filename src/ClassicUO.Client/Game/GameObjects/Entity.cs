@@ -139,14 +139,10 @@ namespace ClassicUO.Game.GameObjects
                     Socket.Send_NameRequest(Serial);
                 }
 
-                var nameplateGump = new NameOverheadGump(World, this);
-
-                if (World.NameOverHeadManager.TryGetOverride(Serial, out bool overrideVisible, out byte opacityPercent) && overrideVisible)
-                {
-                    nameplateGump.Alpha = opacityPercent / 100f;
-                }
-
-                UIManager.Add(nameplateGump);
+                // Opacity (including plugin nameplate overrides) is applied every
+                // tick by NameOverheadGump.Update(), starting with the very first
+                // frame — no need to sample the override here.
+                UIManager.Add(new NameOverheadGump(World, this));
             }
 
 

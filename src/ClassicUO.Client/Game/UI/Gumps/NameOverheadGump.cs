@@ -548,6 +548,17 @@ namespace ClassicUO.Game.UI.Gumps
                         ? Notoriety.GetHue(m.NotorietyFlag)
                         : (ushort)0x0481;
                 }
+
+                // Re-sampled every tick (not just at construction) so a plugin
+                // override applied to an already-displaying nameplate, changed
+                // while it's alive, or cleared, always takes effect on the next
+                // frame. No override (or a force-hidden one that never reaches
+                // this Update, since UpdateObjectHandles closes it first) renders
+                // fully opaque.
+                Alpha = World.NameOverHeadManager.TryGetOverride(LocalSerial, out bool overrideVisible, out byte opacityPercent) && overrideVisible
+                    ? opacityPercent / 100f
+                    : 1f;
+                _background.Alpha = 0.7f * Alpha;
             }
         }
 
@@ -627,7 +638,7 @@ namespace ClassicUO.Game.UI.Gumps
                     + (bounds.Height >> 1);
             }
 
-            Vector3 hueVector = ShaderHueTranslator.GetHueVector(0);
+            Vector3 hueVector = ShaderHueTranslator.GetHueVector(0, false, Alpha);
 
             Point p = Client.Game.Scene.Camera.WorldToScreen(new Point(x, y));
             x = p.X - (Width >> 1);
@@ -661,21 +672,12 @@ namespace ClassicUO.Game.UI.Gumps
             base.AddToRenderLists(renderLists, x, y, ref layerDepthRef);
 
             int renderedTextOffset = Math.Max(0, Width - _renderedText.Width - 4) >> 1;
-            renderLists.AddGumpNoAtlas(batcher =>
-                {
-                    return _renderedText.Draw(
-                        batcher,
-                        Width,
-                        Height,
-                        x + 2 + renderedTextOffset,
-                        y + 2,
-                        Width,
-                        Height,
-                        0,
-                        0,
-                        layerDepth + CHILD_LAYER_INCREMENT * 2
-                    );
-                }
+            renderLists.AddGumpNoAtlas(
+                _renderedText,
+                x + 2 + renderedTextOffset,
+                y + 2,
+                layerDepth + CHILD_LAYER_INCREMENT * 2,
+                Alpha
             );
 
             if (_showHpBar && World.Get(LocalSerial) is Mobile mob)

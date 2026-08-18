@@ -56,11 +56,59 @@ namespace ClassicUO.Game.Managers
         public void SetOverride(uint serial, bool visible, byte opacityPercent) =>
             _overrides[serial] = (visible, opacityPercent > 100 ? (byte)100 : opacityPercent);
 
-        /// <summary>Removes the override for serial, if any.</summary>
-        public void ClearOverride(uint serial) => _overrides.Remove(serial);
+        /// <summary>
+        /// Removes the override for serial, if any. If the override had forced the
+        /// entity's nameplate closed (<see cref="ObjectHandlesStatus.CLOSED"/>),
+        /// resets it to <see cref="ObjectHandlesStatus.NONE"/> so normal filter
+        /// rules (<see cref="IsAllowed"/>) get a chance to reopen it next frame,
+        /// instead of leaving it stuck hidden forever.
+        /// <para>
+        /// Note: this also reopens a nameplate the player had manually closed
+        /// (right-clicked) <em>before</em> the override was set — the manual
+        /// close and the override both use the same CLOSED status, so they're
+        /// indistinguishable here. That's an accepted trade-off, not a bug.
+        /// </para>
+        /// </summary>
+        public void ClearOverride(uint serial)
+        {
+            _overrides.Remove(serial);
+            ReopenIfForceClosed(serial);
+        }
 
-        /// <summary>Removes every override, regardless of which plugin set it.</summary>
-        public void ClearAllOverrides() => _overrides.Clear();
+        /// <summary>
+        /// Removes every override, regardless of which plugin set it. Same
+        /// per-serial CLOSED-to-NONE reset as <see cref="ClearOverride"/> for
+        /// each cleared serial.
+        /// </summary>
+        public void ClearAllOverrides()
+        {
+            if (_overrides.Count == 0)
+            {
+                return;
+            }
+
+            // Snapshot keys first: ReopenIfForceClosed doesn't mutate _overrides,
+            // but avoid relying on that and keep the clear atomic up front.
+            uint[] serials = new uint[_overrides.Count];
+            _overrides.Keys.CopyTo(serials, 0);
+
+            _overrides.Clear();
+
+            foreach (uint serial in serials)
+            {
+                ReopenIfForceClosed(serial);
+            }
+        }
+
+        private void ReopenIfForceClosed(uint serial)
+        {
+            Entity entity = _world.Get(serial);
+
+            if (entity != null && entity.ObjectHandlesStatus == ObjectHandlesStatus.CLOSED)
+            {
+                entity.ObjectHandlesStatus = ObjectHandlesStatus.NONE;
+            }
+        }
 
         /// <summary>
         /// Looks up the override for serial. Returns <c>false</c> (with

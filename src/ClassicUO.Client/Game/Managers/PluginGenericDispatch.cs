@@ -2,7 +2,6 @@
 
 using System;
 using ClassicUO.PluginAbi;
-using ClassicUO.Game;
 
 namespace ClassicUO.Game.Managers
 {
