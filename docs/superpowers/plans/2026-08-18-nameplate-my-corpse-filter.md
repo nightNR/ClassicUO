@@ -4,7 +4,9 @@
 
 **Goal:** Add a "My Corpse" nameplate filter checkbox that shows the player's own corpse's nameplate independently of the generic "Corpses" filter.
 
-**Architecture:** Track the player's own corpse serials (captured from the `0xAF` DisplayDeath packet, which the client currently discards for the local player) in a new `PlayerMobile.OwnCorpses` hash set. Add a `MyCorpse` bit to the existing `NameOverheadTypeAllowed` flags enum, consult it in `NameOverHeadManager.IsAllowed`, and expose it as a new checkbox in `NameOverHeadHandlerGump`.
+**Architecture:** Track the player's own corpse serials (captured from the `0xAF` DisplayDeath packet, which the client currently discards for the local player) in a new `CorpseManager.OwnCorpses` hash set (moved here, not `PlayerMobile`, after discovering `new PlayerMobile(...)` cannot be constructed in the unit test host — see Task 1 note). Add a `MyCorpse` bit to the existing `NameOverheadTypeAllowed` flags enum, consult it in `NameOverHeadManager.IsAllowed`, and expose it as a new checkbox in `NameOverHeadHandlerGump`.
+
+**Plan amendment (mid-execution):** the original design put `OwnCorpses` on `PlayerMobile`. Its constructor unconditionally touches `Client.Game.UO.FileManager`, which is only populated by the real FNA game bootstrap — the same category of gap `TargetManagerTryResolveObjectTests.ReturnsTrue_ForLandObject` already documents for `Land.TileData`. Constructing a bare `PlayerMobile` in a unit test throws `NullReferenceException`. `World.CorpseManager` has no such dependency and is already constructed by `new World()` (used throughout the existing test suite), and is already the natural home for corpse metadata (it already tracks `CorpseInfo` for other players' corpses via the same `DisplayDeath` packet). Moving `OwnCorpses` there keeps the feature fully unit-testable and is arguably a better fit architecturally.
 
 **Tech Stack:** C# / .NET 10, xUnit for tests.
 
@@ -21,52 +23,64 @@
 
 ## File Structure
 
-- Modify: `src/ClassicUO.Client/Game/GameObjects/PlayerMobile.cs` — add `OwnCorpses` hash set.
+- Modify: `src/ClassicUO.Client/Game/Managers/CorpseManager.cs` — add `OwnCorpses` hash set.
 - Modify: `src/ClassicUO.Client/Game/Managers/NameOverHeadManager.cs` — add `MyCorpse` flag, update `IsAllowed`.
 - Modify: `src/ClassicUO.Client/Network/PacketHandlers.cs` — capture the player's own corpse serial in `DisplayDeath`.
 - Modify: `src/ClassicUO.Client/Game/UI/Gumps/NameOverHeadHandlerGump.cs` — add the "My Corpse" checkbox.
 - Modify: `src/ClassicUO.Client/Resources/ResGumps.resx` and `ResGumps.Designer.cs` — add the `MyCorpse` label string.
-- Test: `tests/ClassicUO.UnitTests/Game/GameObjects/PlayerMobileOwnCorpsesTests.cs` (new)
+- Test: `tests/ClassicUO.UnitTests/Game/Managers/CorpseManagerOwnCorpsesTests.cs` (new)
 - Test: `tests/ClassicUO.UnitTests/Game/Managers/NameOverHeadManagerIsAllowedTests.cs` (new)
 
 ---
 
-### Task 1: `PlayerMobile.OwnCorpses` tracking set
+### Task 1: `CorpseManager.OwnCorpses` tracking set
 
 **Files:**
-- Modify: `src/ClassicUO.Client/Game/GameObjects/PlayerMobile.cs:52`
-- Test: `tests/ClassicUO.UnitTests/Game/GameObjects/PlayerMobileOwnCorpsesTests.cs`
+- Modify: `src/ClassicUO.Client/Game/Managers/CorpseManager.cs`
+- Test: `tests/ClassicUO.UnitTests/Game/Managers/CorpseManagerOwnCorpsesTests.cs`
 
 **Interfaces:**
-- Produces: `PlayerMobile.OwnCorpses` — `public readonly HashSet<uint> OwnCorpses`, consumed by Task 2 (`NameOverHeadManager.IsAllowed`) and Task 3 (`PacketHandlers.DisplayDeath`).
+- Produces: `CorpseManager.OwnCorpses` — `public readonly HashSet<uint> OwnCorpses`, consumed by Task 2 (`NameOverHeadManager.IsAllowed`) and Task 3 (`PacketHandlers.DisplayDeath`). Also cleared by the existing `CorpseManager.Clear()`.
 
 - [ ] **Step 1: Write the failing test**
 
-Create `tests/ClassicUO.UnitTests/Game/GameObjects/PlayerMobileOwnCorpsesTests.cs`:
+Create `tests/ClassicUO.UnitTests/Game/Managers/CorpseManagerOwnCorpsesTests.cs`:
 
 ```csharp
 // SPDX-License-Identifier: BSD-2-Clause
 
 using ClassicUO.Game;
-using ClassicUO.Game.GameObjects;
+using ClassicUO.Game.Managers;
 using Xunit;
 
-namespace ClassicUO.UnitTests.Game.GameObjects
+namespace ClassicUO.UnitTests.Game.Managers
 {
-    public class PlayerMobileOwnCorpsesTests
+    public class CorpseManagerOwnCorpsesTests
     {
         [Fact]
         public void OwnCorpses_StartsEmpty_AndIsMutable()
         {
             var world = new World();
-            var player = new PlayerMobile(world, 0x00000001);
+            var sut = new CorpseManager(world);
 
-            Assert.Empty(player.OwnCorpses);
+            Assert.Empty(sut.OwnCorpses);
 
-            player.OwnCorpses.Add(0x40000001);
+            sut.OwnCorpses.Add(0x40000001);
 
-            Assert.Single(player.OwnCorpses);
-            Assert.Contains(0x40000001u, player.OwnCorpses);
+            Assert.Single(sut.OwnCorpses);
+            Assert.Contains(0x40000001u, sut.OwnCorpses);
+        }
+
+        [Fact]
+        public void Clear_EmptiesOwnCorpses()
+        {
+            var world = new World();
+            var sut = new CorpseManager(world);
+            sut.OwnCorpses.Add(0x40000001);
+
+            sut.Clear();
+
+            Assert.Empty(sut.OwnCorpses);
         }
     }
 }
@@ -74,29 +88,49 @@ namespace ClassicUO.UnitTests.Game.GameObjects
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `dotnet test tests/ClassicUO.UnitTests --filter "FullyQualifiedName~PlayerMobileOwnCorpsesTests"`
-Expected: FAIL — build error, `OwnCorpses` does not exist on `PlayerMobile`.
+Run: `dotnet test tests/ClassicUO.UnitTests --filter "FullyQualifiedName~CorpseManagerOwnCorpsesTests"`
+Expected: FAIL — build error, `OwnCorpses` does not exist on `CorpseManager`.
 
-- [ ] **Step 3: Add the field**
+- [ ] **Step 3: Add the field and clear it**
 
-In `src/ClassicUO.Client/Game/GameObjects/PlayerMobile.cs`, next to the existing corpse-tracking sets (line 52):
+In `src/ClassicUO.Client/Game/Managers/CorpseManager.cs`, add the field next to `_corpses`/`_world` and expose it publicly, and clear it in `Clear()`:
 
 ```csharp
-        public readonly HashSet<uint> AutoOpenedCorpses = new HashSet<uint>();
-        public readonly HashSet<uint> ManualOpenedCorpses = new HashSet<uint>();
+    internal sealed class CorpseManager
+    {
+        private readonly Deque<CorpseInfo> _corpses = new Deque<CorpseInfo>();
+        private readonly World _world;
+
         public readonly HashSet<uint> OwnCorpses = new HashSet<uint>();
+
+        public CorpseManager(World world)
+        {
+            _world = world;
+        }
 ```
+
+and:
+
+```csharp
+        public void Clear()
+        {
+            _corpses.Clear();
+            OwnCorpses.Clear();
+        }
+```
+
+Add `using System.Collections.Generic;` to the top of the file if it is not already present.
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `dotnet test tests/ClassicUO.UnitTests --filter "FullyQualifiedName~PlayerMobileOwnCorpsesTests"`
-Expected: PASS
+Run: `dotnet test tests/ClassicUO.UnitTests --filter "FullyQualifiedName~CorpseManagerOwnCorpsesTests"`
+Expected: PASS (2 tests)
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/ClassicUO.Client/Game/GameObjects/PlayerMobile.cs tests/ClassicUO.UnitTests/Game/GameObjects/PlayerMobileOwnCorpsesTests.cs
-git commit -m "Track the player's own corpse serials on PlayerMobile"
+git add src/ClassicUO.Client/Game/Managers/CorpseManager.cs tests/ClassicUO.UnitTests/Game/Managers/CorpseManagerOwnCorpsesTests.cs
+git commit -m "Track the player's own corpse serials on CorpseManager"
 ```
 
 ---
@@ -108,7 +142,7 @@ git commit -m "Track the player's own corpse serials on PlayerMobile"
 - Test: `tests/ClassicUO.UnitTests/Game/Managers/NameOverHeadManagerIsAllowedTests.cs`
 
 **Interfaces:**
-- Consumes: `PlayerMobile.OwnCorpses` (Task 1); `World.CreatePlayer(uint serial)`; `World.Player`.
+- Consumes: `CorpseManager.OwnCorpses` (Task 1); `World.CorpseManager` (existing).
 - Produces: `NameOverheadTypeAllowed.MyCorpse` flag and updated `NameOverHeadManager.IsAllowed(Entity)` corpse branch, consumed by Task 4 (gump checkbox) purely through the existing `TypeAllowed` bitmask — no new public surface needed there.
 
 - [ ] **Step 1: Write the failing tests**
@@ -136,12 +170,11 @@ namespace ClassicUO.UnitTests.Game.Managers
                 .SetValue(null, profile);
         }
 
-        private static (World world, NameOverHeadManager sut) CreateWorldWithPlayer(NameOverheadTypeAllowed typeAllowed)
+        private static (World world, NameOverHeadManager sut) CreateWorld(NameOverheadTypeAllowed typeAllowed)
         {
             SetCurrentProfile(new Profile { NameOverheadTypeAllowed = typeAllowed });
 
             var world = new World();
-            world.CreatePlayer(0x00000001);
 
             return (world, new NameOverHeadManager(world));
         }
@@ -154,9 +187,9 @@ namespace ClassicUO.UnitTests.Game.Managers
         [Fact]
         public void OwnCorpse_Shown_WhenOnlyMyCorpseFlagSet()
         {
-            var (world, sut) = CreateWorldWithPlayer(NameOverheadTypeAllowed.MyCorpse);
+            var (world, sut) = CreateWorld(NameOverheadTypeAllowed.MyCorpse);
             var corpse = CreateCorpse(world, 0x40000001);
-            world.Player.OwnCorpses.Add(corpse.Serial);
+            world.CorpseManager.OwnCorpses.Add(corpse.Serial);
 
             Assert.True(sut.IsAllowed(corpse));
         }
@@ -164,9 +197,9 @@ namespace ClassicUO.UnitTests.Game.Managers
         [Fact]
         public void OwnCorpse_Shown_WhenOnlyCorpsesFlagSet()
         {
-            var (world, sut) = CreateWorldWithPlayer(NameOverheadTypeAllowed.Corpses);
+            var (world, sut) = CreateWorld(NameOverheadTypeAllowed.Corpses);
             var corpse = CreateCorpse(world, 0x40000001);
-            world.Player.OwnCorpses.Add(corpse.Serial);
+            world.CorpseManager.OwnCorpses.Add(corpse.Serial);
 
             Assert.True(sut.IsAllowed(corpse));
         }
@@ -174,9 +207,9 @@ namespace ClassicUO.UnitTests.Game.Managers
         [Fact]
         public void OwnCorpse_Hidden_WhenNeitherFlagSet()
         {
-            var (world, sut) = CreateWorldWithPlayer(NameOverheadTypeAllowed.Items);
+            var (world, sut) = CreateWorld(NameOverheadTypeAllowed.Items);
             var corpse = CreateCorpse(world, 0x40000001);
-            world.Player.OwnCorpses.Add(corpse.Serial);
+            world.CorpseManager.OwnCorpses.Add(corpse.Serial);
 
             Assert.False(sut.IsAllowed(corpse));
         }
@@ -184,9 +217,9 @@ namespace ClassicUO.UnitTests.Game.Managers
         [Fact]
         public void StrangerCorpse_NotShown_ByMyCorpseFlagAlone()
         {
-            var (world, sut) = CreateWorldWithPlayer(NameOverheadTypeAllowed.MyCorpse);
+            var (world, sut) = CreateWorld(NameOverheadTypeAllowed.MyCorpse);
             var corpse = CreateCorpse(world, 0x40000002);
-            // Note: not added to world.Player.OwnCorpses.
+            // Note: not added to world.CorpseManager.OwnCorpses.
 
             Assert.False(sut.IsAllowed(corpse));
         }
@@ -238,7 +271,7 @@ And replace the corpse branch inside `IsAllowed`:
             {
                 if (item.IsCorpse)
                 {
-                    if (_world.Player != null && _world.Player.OwnCorpses.Contains(item.Serial) && TypeAllowed.HasFlag(NameOverheadTypeAllowed.MyCorpse))
+                    if (_world.CorpseManager.OwnCorpses.Contains(item.Serial) && TypeAllowed.HasFlag(NameOverheadTypeAllowed.MyCorpse))
                         return true;
 
                     return TypeAllowed.HasFlag(NameOverheadTypeAllowed.Corpses);
@@ -279,7 +312,7 @@ git commit -m "Add independent My Corpse nameplate filter flag"
 - Modify: `src/ClassicUO.Client/Network/PacketHandlers.cs:3709-3725`
 
 **Interfaces:**
-- Consumes: `PlayerMobile.OwnCorpses` (Task 1).
+- Consumes: `CorpseManager.OwnCorpses` (Task 1).
 - Produces: nothing new consumed by later tasks — this wires the real gameplay data source for `OwnCorpses`, which Tasks 1–2 already cover in isolation with manual `Add` calls.
 
 **Note on testing:** `DisplayDeath` is a `private static void DisplayDeath(World world, ref StackDataReader p)` method taking a `ref` parameter of a `ref struct` (`StackDataReader`). Neither normal calls (it's private) nor reflection (`MethodInfo.Invoke` cannot pass `ref struct` arguments through `object[]`) can exercise it from a test in this codebase — the same category of gap `TargetManagerTryResolveObjectTests.ReturnsTrue_ForLandObject` documents for `Land.TileData`. This task is covered by manual verification only (see Step 3).
@@ -328,7 +361,7 @@ Replace it with:
             {
                 if (SerialHelper.IsValid(corpseSerial))
                 {
-                    world.Player.OwnCorpses.Add(corpseSerial);
+                    world.CorpseManager.OwnCorpses.Add(corpseSerial);
                 }
 
                 return;
