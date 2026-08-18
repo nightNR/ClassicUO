@@ -214,16 +214,21 @@ public struct NameplateOverridePayload
 `NameplatesImpl : INameplates`, same shape as `HighlightImpl`: packs a
 `NameplateOverridePayload` (or bare `uint` for clear-one) and calls
 `GenericInvokeFn` with the new opcodes. Dispatch on the client side
-(wherever `GenericOpcodes.Attack` is handled, e.g.
-`Game/Managers/PluginGenericDispatch.cs`) reads the payload and calls
+(`Game/Managers/PluginGenericDispatch.cs`, alongside the existing
+`GenericOpcodes.Attack` case) reads the payload and calls
 `World.NameOverHeadManager.SetOverride/ClearOverride/ClearAllOverrides`
-via `Game.Post` (game-thread marshal, matching existing opcode handlers).
+directly (no thread marshal needed there — the dispatch function already
+runs on the game thread, same as `InvokeAttack`).
 
-Per-plugin ownership for `ClearAllOverrides`: each plugin's dispatch context
-tracks which serials it has set overrides for (small `HashSet<uint>` in the
-plugin's dispatch state, same pattern likely already used for
-highlight/timer ownership) so one plugin's `ClearAllOverrides` cannot wipe
-another plugin's override.
+`ClearAllOverrides` has **no per-plugin ownership tracking** — confirmed by
+reading `PluginHighlights`/`PluginHost.cs`: `ClearCharacters`, `ClearAreas`,
+and the buff/timer `ClearAll` calls all clear state globally regardless of
+which plugin called them, despite their doc comments saying "this plugin
+owns." There's no existing mechanism that partitions state by plugin
+identity at this ABI layer. This spec follows the same precedent:
+`ClearAllOverrides` clears every override, from any plugin. A future spec
+could add per-plugin partitioning across all of these APIs at once if it
+becomes a real problem, but it's out of scope here.
 
 ## Testing
 
