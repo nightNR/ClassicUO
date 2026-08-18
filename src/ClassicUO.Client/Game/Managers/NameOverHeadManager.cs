@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BSD-2-Clause
 
 using System;
+using System.Collections.Generic;
 using ClassicUO.Configuration;
 using ClassicUO.Game.Data;
 using ClassicUO.Game.GameObjects;
@@ -43,6 +44,41 @@ namespace ClassicUO.Game.Managers
         {
             get => ProfileManager.CurrentProfile.NameOverheadToggled;
             set => ProfileManager.CurrentProfile.NameOverheadToggled = value;
+        }
+
+        private readonly Dictionary<uint, (bool Visible, byte OpacityPercent)> _overrides = new();
+
+        /// <summary>
+        /// Forces serial's nameplate visible (at <paramref name="opacityPercent"/>,
+        /// clamped 0-100) or hidden, replacing any existing override for the
+        /// same serial.
+        /// </summary>
+        public void SetOverride(uint serial, bool visible, byte opacityPercent) =>
+            _overrides[serial] = (visible, opacityPercent > 100 ? (byte)100 : opacityPercent);
+
+        /// <summary>Removes the override for serial, if any.</summary>
+        public void ClearOverride(uint serial) => _overrides.Remove(serial);
+
+        /// <summary>Removes every override, regardless of which plugin set it.</summary>
+        public void ClearAllOverrides() => _overrides.Clear();
+
+        /// <summary>
+        /// Looks up the override for serial. Returns <c>false</c> (with
+        /// <paramref name="visible"/> = false, <paramref name="opacityPercent"/>
+        /// = 100) when no override is set.
+        /// </summary>
+        public bool TryGetOverride(uint serial, out bool visible, out byte opacityPercent)
+        {
+            if (_overrides.TryGetValue(serial, out var o))
+            {
+                visible = o.Visible;
+                opacityPercent = o.OpacityPercent;
+                return true;
+            }
+
+            visible = false;
+            opacityPercent = 100;
+            return false;
         }
 
         public bool IsAllowed(Entity entity)
