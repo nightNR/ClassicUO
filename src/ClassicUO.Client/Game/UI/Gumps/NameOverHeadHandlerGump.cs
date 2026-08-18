@@ -37,7 +37,7 @@ namespace ClassicUO.Game.UI.Gumps
             LayerOrder = UILayer.Over;
 
             AlphaBlendControl alpha;
-            Checkbox stayActive, cbAll, cbItems, cbCorpses, cbInnocent, cbAlly, cbGray, cbCriminal, cbEnemy, cbMurderer, cbInvulnerable;
+            Checkbox stayActive, cbAll, cbItems, cbCorpses, cbMyCorpse, cbInnocent, cbAlly, cbGray, cbCriminal, cbEnemy, cbMurderer, cbInvulnerable;
 
             Add
             (
@@ -83,6 +83,7 @@ namespace ClassicUO.Game.UI.Gumps
             Add(cbAll = MakeCheckbox(ResGumps.All, typeAllowed == NameOverheadTypeAllowed.All, ref currentY));
             Add(cbItems = MakeCheckbox("Items", typeAllowed.HasFlag(NameOverheadTypeAllowed.Items), ref currentY));
             Add(cbCorpses = MakeCheckbox("Corpses", typeAllowed.HasFlag(NameOverheadTypeAllowed.Corpses), ref currentY));
+            Add(cbMyCorpse = MakeCheckbox(ResGumps.MyCorpse, typeAllowed.HasFlag(NameOverheadTypeAllowed.MyCorpse), ref currentY));
             Add(cbInnocent = MakeCheckbox("Innocent", typeAllowed.HasFlag(NameOverheadTypeAllowed.Innocent), ref currentY));
             Add(cbAlly = MakeCheckbox("Ally", typeAllowed.HasFlag(NameOverheadTypeAllowed.Ally), ref currentY));
             Add(cbGray = MakeCheckbox("Gray", typeAllowed.HasFlag(NameOverheadTypeAllowed.Gray), ref currentY));
@@ -102,6 +103,7 @@ namespace ClassicUO.Game.UI.Gumps
             {
                 (cb: cbItems, flag: NameOverheadTypeAllowed.Items),
                 (cb: cbCorpses, flag: NameOverheadTypeAllowed.Corpses),
+                (cb: cbMyCorpse, flag: NameOverheadTypeAllowed.MyCorpse),
                 (cb: cbInnocent, flag: NameOverheadTypeAllowed.Innocent),
                 (cb: cbAlly, flag: NameOverheadTypeAllowed.Ally),
                 (cb: cbGray, flag: NameOverheadTypeAllowed.Gray),

@@ -1672,6 +1672,9 @@ Client version: '{0}'</value>
   <data name="StayActive" xml:space="preserve">
     <value>Stay active</value>
   </data>
+  <data name="MyCorpse" xml:space="preserve">
+    <value>My Corpse</value>
+  </data>
   <data name="OverheadPartyMessages" xml:space="preserve">
     <value>Show party messages overhead</value>
   </data>

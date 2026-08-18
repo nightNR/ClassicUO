@@ -4214,7 +4214,16 @@ namespace ClassicUO.Resources {
                 return ResourceManager.GetString("StayActive", resourceCulture);
             }
         }
-        
+
+        /// <summary>
+        ///   Looks up a localized string similar to My Corpse.
+        /// </summary>
+        public static string MyCorpse {
+            get {
+                return ResourceManager.GetString("MyCorpse", resourceCulture);
+            }
+        }
+
         /// <summary>
         ///   Looks up a localized string similar to Story {0} Visibility.
         /// </summary>
