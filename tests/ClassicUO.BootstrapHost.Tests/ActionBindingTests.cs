@@ -20,6 +20,8 @@ public sealed unsafe class ActionBindingTests : IDisposable
 {
     private static int s_x, s_y, s_z, s_dist;
     private static bool s_run, s_stopCalled;
+    private static int s_attackOpcode, s_attackArgsLen;
+    private static uint s_attackSerial;
 
     private readonly string _tempRoot;
     private readonly string _pluginsRoot;
@@ -28,6 +30,8 @@ public sealed unsafe class ActionBindingTests : IDisposable
     {
         s_x = s_y = s_z = s_dist = 0;
         s_run = s_stopCalled = false;
+        s_attackOpcode = s_attackArgsLen = 0;
+        s_attackSerial = 0;
 
         _tempRoot = Path.Combine(Path.GetTempPath(), "cuo-bootstraphost-tests", Guid.NewGuid().ToString("N"));
         _pluginsRoot = Path.Combine(_tempRoot, "Plugins");
@@ -53,6 +57,16 @@ public sealed unsafe class ActionBindingTests : IDisposable
 
     [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
     private static void StopWalkRecorder() => s_stopCalled = true;
+
+    [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
+    private static int GenericInvokeRecorder(int opcode, nint argsPtr, int argsLen, nint outBuf, int outCap)
+    {
+        s_attackOpcode = opcode;
+        s_attackArgsLen = argsLen;
+        if (argsLen >= sizeof(uint))
+            s_attackSerial = *(uint*)argsPtr;
+        return 0;
+    }
 
     [Fact]
     public void WalkTo_invokes_the_client_binding_with_its_arguments()
@@ -92,5 +106,24 @@ public sealed unsafe class ActionBindingTests : IDisposable
         bridge.Plugins[0].Actions.StopWalk();
 
         s_stopCalled.Should().BeTrue();
+    }
+
+    [Fact]
+    public void Attack_invokes_the_generic_dispatch_with_the_serial()
+    {
+        var bridge = new HostBridge();
+        bridge.LoadPluginsForTest(_pluginsRoot);
+
+        var cb = new ClientBindings
+        {
+            GenericInvokeFn = (nint)(delegate* unmanaged[Cdecl]<int, nint, int, nint, int, int>)&GenericInvokeRecorder,
+        };
+        bridge.InstallClientBindingsForTest(cb);
+
+        bridge.Plugins[0].Actions.Attack(0xDEADBEEF);
+
+        s_attackOpcode.Should().Be(GenericOpcodes.Attack);
+        s_attackArgsLen.Should().Be(sizeof(uint));
+        s_attackSerial.Should().Be(0xDEADBEEFu);
     }
 }

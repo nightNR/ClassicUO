@@ -23,9 +23,27 @@ namespace ClassicUO.Game.Managers
                 case GenericOpcodes.ListOpenStatusBars:
                     return PluginStatusBarEvents.ListOpen(outBuf, outCap);
 
+                case GenericOpcodes.Attack:
+                    return InvokeAttack(argsPtr, argsLen);
+
                 default:
                     return -1; // unknown opcode
             }
+        }
+
+        private static int InvokeAttack(IntPtr argsPtr, int argsLen)
+        {
+            if (argsLen < sizeof(uint))
+                return -2; // args buffer too small
+
+            uint serial = *(uint*)argsPtr;
+
+            World world = Client.Game?.UO?.World;
+            if (world == null)
+                return -1;
+
+            GameActions.Attack(world, serial);
+            return 0;
         }
 
         private static int WriteSupportedOpcodes(IntPtr outBuf, int outCap)
@@ -34,6 +52,7 @@ namespace ClassicUO.Game.Managers
             [
                 GenericOpcodes.GetSupportedOpcodes,
                 GenericOpcodes.ListOpenStatusBars,
+                GenericOpcodes.Attack,
             ];
 
             int needed = opcodes.Length * sizeof(int);

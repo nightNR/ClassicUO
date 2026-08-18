@@ -226,6 +226,22 @@ internal sealed class GameActionsImpl : IGameActions
             _bridge.PostToGameThread(() => ((delegate* unmanaged[Cdecl]<void>)fn)());
     }
 
+    public unsafe void Attack(uint serial)
+    {
+        var fn = _bridge.ClientBindings.GenericInvokeFn;
+        if (fn == 0) return;
+        if (_bridge.IsGameThread)
+            InvokeAttack(fn, serial);
+        else
+            _bridge.PostToGameThread(() => InvokeAttack(fn, serial));
+    }
+
+    private static unsafe void InvokeAttack(nint fn, uint serial)
+    {
+        ((delegate* unmanaged[Cdecl]<int, nint, int, nint, int, int>)fn)(
+            GenericOpcodes.Attack, (nint)(&serial), sizeof(uint), 0, 0);
+    }
+
     public event Action<WalkState>? WalkProgress;
     internal void RaiseWalkProgress(WalkState state) => WalkProgress?.Invoke(state);
 }

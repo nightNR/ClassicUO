@@ -29,6 +29,16 @@ public static class GenericOpcodes
     /// since a partial list would silently hide bars.
     /// </summary>
     public const int ListOpenStatusBars = 1;
+
+    /// <summary>
+    /// Attacks a mobile the same way the client's own attack action does:
+    /// sends the attack-request packet AND updates cuo's local attack-target
+    /// state (last-attack/new-target-system serial), so client-side UI that
+    /// reacts to "who am I attacking" (e.g. the new-target-system frame)
+    /// picks it up even though the server never confirms it. Args: <c>uint</c>
+    /// serial. Result: none (0 bytes written on success).
+    /// </summary>
+    public const int Attack = 2;
 }
 
 /// <summary>

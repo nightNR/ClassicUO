@@ -47,6 +47,17 @@ public interface IGameActions
     void StopWalk();
 
     /// <summary>
+    /// Attacks a mobile the same way the client's own attack action does:
+    /// sends the attack-request packet and updates the client's local
+    /// attack-target state, so client-side UI that reacts to the current
+    /// attack target (e.g. the new-target-system frame) shows it — even
+    /// though the server never confirms an attack. Prefer this over sending
+    /// a raw attack packet directly, which leaves the client unaware you're
+    /// attacking. Auto-marshals to the game thread.
+    /// </summary>
+    void Attack(uint serial);
+
+    /// <summary>
     /// Raised on auto-walk state transitions. Fired on the game thread.
     /// </summary>
     event Action<WalkState>? WalkProgress;
