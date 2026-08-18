@@ -257,15 +257,34 @@ namespace ClassicUO.Game.Scenes
 
         private void UpdateObjectHandles(Entity obj, bool useObjectHandles)
         {
-            if (useObjectHandles && _world.NameOverHeadManager.IsAllowed(obj))
+            bool hasOverride = _world.NameOverHeadManager.TryGetOverride(obj.Serial, out bool forceVisible, out _);
+
+            // A plugin-forced hide wins over everything else, including the
+            // player's own filters and a manually-reopened handle.
+            if (hasOverride && !forceVisible)
             {
                 if (obj.ObjectHandlesStatus != ObjectHandlesStatus.CLOSED)
                 {
-                    if (obj.ObjectHandlesStatus == ObjectHandlesStatus.NONE)
-                    {
-                        obj.ObjectHandlesStatus = ObjectHandlesStatus.OPEN;
-                    }
+                    obj.ObjectHandlesStatus = ObjectHandlesStatus.CLOSED;
+                    obj.UpdateTextCoordsV();
+                }
 
+                return;
+            }
+
+            bool allowed = (useObjectHandles && _world.NameOverHeadManager.IsAllowed(obj)) || (hasOverride && forceVisible);
+
+            if (allowed)
+            {
+                if (obj.ObjectHandlesStatus == ObjectHandlesStatus.NONE ||
+                    // A plugin-forced show reopens a handle even if the player closed it manually.
+                    (hasOverride && obj.ObjectHandlesStatus == ObjectHandlesStatus.CLOSED))
+                {
+                    obj.ObjectHandlesStatus = ObjectHandlesStatus.OPEN;
+                }
+
+                if (obj.ObjectHandlesStatus != ObjectHandlesStatus.CLOSED)
+                {
                     obj.UpdateTextCoordsV();
                 }
             }
