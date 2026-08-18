@@ -39,6 +39,28 @@ public static class GenericOpcodes
     /// serial. Result: none (0 bytes written on success).
     /// </summary>
     public const int Attack = 2;
+
+    /// <summary>
+    /// Forces serial's nameplate (Object Handles name+HP box) visible at a
+    /// given opacity, or hidden, overriding the player's own name-overhead
+    /// filters/toggle and any manual close. Replaces any existing override
+    /// for the same serial. Args: <see cref="NameplateOverridePayload"/>.
+    /// Result: none.
+    /// </summary>
+    public const int SetNameplateOverride = 3;
+
+    /// <summary>
+    /// Removes the nameplate override for one serial, reverting to normal
+    /// (player-controlled) behavior. Args: <c>uint</c> serial. Result: none.
+    /// </summary>
+    public const int ClearNameplateOverride = 4;
+
+    /// <summary>
+    /// Removes every nameplate override, regardless of which plugin set it
+    /// (matches <c>ClearCharacters</c>/<c>ClearAreas</c>: no per-plugin
+    /// partitioning). Args: none. Result: none.
+    /// </summary>
+    public const int ClearAllNameplateOverrides = 5;
 }
 
 /// <summary>
@@ -91,4 +113,18 @@ public struct StatusBarChangedPayload
     public int GroupId;
     public short X;
     public short Y;
+}
+
+/// <summary>
+/// Wire payload for <see cref="GenericOpcodes.SetNameplateOverride"/>. Fixed
+/// layout, blitted directly — no serialization step on either side.
+/// </summary>
+[StructLayout(LayoutKind.Sequential)]
+public struct NameplateOverridePayload
+{
+    public uint Serial;
+    /// <summary>0 = force-hidden, 1 = force-visible.</summary>
+    public byte Visible;
+    /// <summary>0-100. Meaningful only when <see cref="Visible"/> is 1.</summary>
+    public byte OpacityPercent;
 }
