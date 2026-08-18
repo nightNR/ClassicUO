@@ -2,6 +2,7 @@
 
 using System;
 using ClassicUO.PluginAbi;
+using ClassicUO.Game;
 
 namespace ClassicUO.Game.Managers
 {
@@ -26,6 +27,15 @@ namespace ClassicUO.Game.Managers
                 case GenericOpcodes.Attack:
                     return InvokeAttack(argsPtr, argsLen);
 
+                case GenericOpcodes.SetNameplateOverride:
+                    return InvokeSetNameplateOverride(argsPtr, argsLen);
+
+                case GenericOpcodes.ClearNameplateOverride:
+                    return InvokeClearNameplateOverride(argsPtr, argsLen);
+
+                case GenericOpcodes.ClearAllNameplateOverrides:
+                    return InvokeClearAllNameplateOverrides();
+
                 default:
                     return -1; // unknown opcode
             }
@@ -46,6 +56,46 @@ namespace ClassicUO.Game.Managers
             return 0;
         }
 
+        private static int InvokeSetNameplateOverride(IntPtr argsPtr, int argsLen)
+        {
+            if (argsLen < sizeof(NameplateOverridePayload))
+                return -2; // args buffer too small
+
+            var payload = *(NameplateOverridePayload*)argsPtr;
+
+            World world = Client.Game?.UO?.World;
+            if (world == null)
+                return -1;
+
+            world.NameOverHeadManager.SetOverride(payload.Serial, payload.Visible != 0, payload.OpacityPercent);
+            return 0;
+        }
+
+        private static int InvokeClearNameplateOverride(IntPtr argsPtr, int argsLen)
+        {
+            if (argsLen < sizeof(uint))
+                return -2; // args buffer too small
+
+            uint serial = *(uint*)argsPtr;
+
+            World world = Client.Game?.UO?.World;
+            if (world == null)
+                return -1;
+
+            world.NameOverHeadManager.ClearOverride(serial);
+            return 0;
+        }
+
+        private static int InvokeClearAllNameplateOverrides()
+        {
+            World world = Client.Game?.UO?.World;
+            if (world == null)
+                return -1;
+
+            world.NameOverHeadManager.ClearAllOverrides();
+            return 0;
+        }
+
         private static int WriteSupportedOpcodes(IntPtr outBuf, int outCap)
         {
             ReadOnlySpan<int> opcodes =
@@ -53,6 +103,9 @@ namespace ClassicUO.Game.Managers
                 GenericOpcodes.GetSupportedOpcodes,
                 GenericOpcodes.ListOpenStatusBars,
                 GenericOpcodes.Attack,
+                GenericOpcodes.SetNameplateOverride,
+                GenericOpcodes.ClearNameplateOverride,
+                GenericOpcodes.ClearAllNameplateOverrides,
             ];
 
             int needed = opcodes.Length * sizeof(int);
