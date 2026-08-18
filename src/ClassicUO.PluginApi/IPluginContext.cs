@@ -44,6 +44,9 @@ public interface IPluginContext
     /// <summary>Plugin-driven object/area highlighting.</summary>
     IHighlight Highlight { get; }
 
+    /// <summary>Plugin-driven per-serial nameplate visibility/opacity override.</summary>
+    INameplates Nameplates { get; }
+
     /// <summary>Window title, cliloc translation, and other client-level services.</summary>
     IClient Client { get; }
 
