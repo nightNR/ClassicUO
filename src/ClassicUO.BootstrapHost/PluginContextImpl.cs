@@ -17,6 +17,7 @@ internal sealed class PluginContextImpl : IPluginContext
     private readonly GameActionsImpl _actions;
     private readonly StatusBarsImpl _statusBars;
     private readonly HighlightImpl _highlight;
+    private readonly NameplatesImpl _nameplates;
     private readonly ClientImpl _client;
     private readonly DispatcherImpl _dispatcher;
     private readonly BuffsImpl _buffs;
@@ -34,6 +35,7 @@ internal sealed class PluginContextImpl : IPluginContext
         _actions    = new GameActionsImpl(bridge);
         _statusBars = new StatusBarsImpl(bridge);
         _highlight  = new HighlightImpl(bridge);
+        _nameplates = new NameplatesImpl(bridge);
         _client     = new ClientImpl(bridge);
         _dispatcher = new DispatcherImpl(bridge);
         _buffs = new BuffsImpl(bridge);
@@ -51,6 +53,7 @@ internal sealed class PluginContextImpl : IPluginContext
     public IGameActions Actions => _actions;
     public IStatusBars StatusBars => _statusBars;
     public IHighlight Highlight => _highlight;
+    public INameplates Nameplates => _nameplates;
     public IClient Client => _client;
     public IDispatcher Game => _dispatcher;
     public IPluginBuffs Buffs => _buffs;
@@ -669,5 +672,69 @@ internal sealed class HighlightImpl : IHighlight
             ((delegate* unmanaged[Cdecl]<byte, void>)fn)(p);
         else
             _bridge.PostToGameThread(() => ((delegate* unmanaged[Cdecl]<byte, void>)fn)(p));
+    }
+}
+
+internal sealed class NameplatesImpl : INameplates
+{
+    private readonly HostBridge _bridge;
+    public NameplatesImpl(HostBridge bridge) { _bridge = bridge; }
+
+    public unsafe void SetOverride(uint serial, bool visible, byte opacityPercent = 100)
+    {
+        var fn = _bridge.ClientBindings.GenericInvokeFn;
+        if (fn == 0) return;
+
+        var payload = new NameplateOverridePayload
+        {
+            Serial = serial,
+            Visible = visible ? (byte)1 : (byte)0,
+            OpacityPercent = opacityPercent > 100 ? (byte)100 : opacityPercent,
+        };
+
+        if (_bridge.IsGameThread)
+            InvokeSetOverride(fn, payload);
+        else
+            _bridge.PostToGameThread(() => InvokeSetOverride(fn, payload));
+    }
+
+    private static unsafe void InvokeSetOverride(nint fn, NameplateOverridePayload payload)
+    {
+        ((delegate* unmanaged[Cdecl]<int, nint, int, nint, int, int>)fn)(
+            GenericOpcodes.SetNameplateOverride, (nint)(&payload), sizeof(NameplateOverridePayload), 0, 0);
+    }
+
+    public unsafe void ClearOverride(uint serial)
+    {
+        var fn = _bridge.ClientBindings.GenericInvokeFn;
+        if (fn == 0) return;
+
+        if (_bridge.IsGameThread)
+            InvokeClearOverride(fn, serial);
+        else
+            _bridge.PostToGameThread(() => InvokeClearOverride(fn, serial));
+    }
+
+    private static unsafe void InvokeClearOverride(nint fn, uint serial)
+    {
+        ((delegate* unmanaged[Cdecl]<int, nint, int, nint, int, int>)fn)(
+            GenericOpcodes.ClearNameplateOverride, (nint)(&serial), sizeof(uint), 0, 0);
+    }
+
+    public unsafe void ClearAllOverrides()
+    {
+        var fn = _bridge.ClientBindings.GenericInvokeFn;
+        if (fn == 0) return;
+
+        if (_bridge.IsGameThread)
+            InvokeClearAllOverrides(fn);
+        else
+            _bridge.PostToGameThread(() => InvokeClearAllOverrides(fn));
+    }
+
+    private static unsafe void InvokeClearAllOverrides(nint fn)
+    {
+        ((delegate* unmanaged[Cdecl]<int, nint, int, nint, int, int>)fn)(
+            GenericOpcodes.ClearAllNameplateOverrides, 0, 0, 0, 0);
     }
 }
