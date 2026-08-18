@@ -1,5 +1,6 @@
 ﻿// SPDX-License-Identifier: BSD-2-Clause
 
+using System.Collections.Generic;
 using ClassicUO.Game.Data;
 using ClassicUO.Game.GameObjects;
 using ClassicUO.Utility.Collections;
@@ -10,6 +11,8 @@ namespace ClassicUO.Game.Managers
     {
         private readonly Deque<CorpseInfo> _corpses = new Deque<CorpseInfo>();
         private readonly World _world;
+
+        public readonly HashSet<uint> OwnCorpses = new HashSet<uint>();
 
         public CorpseManager(World world)
         {
@@ -91,6 +94,7 @@ namespace ClassicUO.Game.Managers
         public void Clear()
         {
             _corpses.Clear();
+            OwnCorpses.Clear();
         }
     }
 
