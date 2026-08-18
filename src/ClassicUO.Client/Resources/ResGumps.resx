@@ -1642,6 +1642,9 @@ Client version: '{0}'</value>
   <data name="NewTargetSystem" xml:space="preserve">
     <value>Use new target system</value>
   </data>
+  <data name="NewTargetSystemUseNameOverhead" xml:space="preserve">
+    <value>Show target as name overhead instead of frame</value>
+  </data>
   <data name="ShowSextantCoordinates" xml:space="preserve">
     <value>Show sextant coordinates</value>
   </data>

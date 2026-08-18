@@ -452,6 +452,12 @@ namespace ClassicUO.Game.UI.Gumps
 
         private LineCHB _hpLineRed, _manaLineRed, _stamLineRed, _outline;
 
+        // Left/right edge arrows marking this bar's owner as the current attack
+        // target. Same gumps as the classic status gump's target markers.
+        private const ushort TARGET_ARROW_LEFT_GRAPHIC = 0x2622;
+        private const ushort TARGET_ARROW_RIGHT_GRAPHIC = 0x2626;
+        private GumpPic _targetArrowLeft, _targetArrowRight;
+
         // Centered current/max labels drawn over the bars (option-gated). Cached
         // values avoid rebuilding the RenderedText every frame.
         private Label _hpText, _manaText, _stamText, _distanceText;
@@ -492,6 +498,7 @@ namespace ClassicUO.Game.UI.Gumps
             _background = null;
             _hpLineRed = _manaLineRed = _stamLineRed = null;
             _hpText = _manaText = _stamText = _distanceText = null;
+            _targetArrowLeft = _targetArrowRight = null;
             _textHits = _textHitsMax = _textMana = _textManaMax = _textStam = _textStamMax = -1;
             _textDistance = -1;
 
@@ -838,10 +845,34 @@ namespace ClassicUO.Game.UI.Gumps
 
             UpdateStatLabels(entity);
             UpdateDistanceLabel(entity);
+            UpdateTargetArrows();
 
             ApplyPriorityOverlay();
 
             EmitChangedIfNeeded(entity);
+        }
+
+        // Shows the left/right edge arrows while this bar's owner is the
+        // player's current attack target (same "who am I attacking" state the
+        // new-target-system frame/nameplate reacts to).
+        private void UpdateTargetArrows()
+        {
+            if (_targetArrowLeft == null || _targetArrowRight == null)
+            {
+                return;
+            }
+
+            bool isCurrentTarget =
+                LocalSerial != 0
+                && LocalSerial != World.Player
+                && (
+                    World.TargetManager.LastTargetInfo.Serial == LocalSerial
+                    || World.TargetManager.LastAttack == LocalSerial
+                    || World.TargetManager.SelectedTarget == LocalSerial
+                    || World.TargetManager.NewTargetSystemSerial == LocalSerial
+                );
+
+            _targetArrowLeft.IsVisible = _targetArrowRight.IsVisible = isCurrentTarget;
         }
 
         // Refresh the current/max labels (option-gated; fields null when off).
@@ -1501,6 +1532,14 @@ namespace ClassicUO.Game.UI.Gumps
                     }
                 }
             }
+
+            Add(_targetArrowLeft = new GumpPic(0, 0, TARGET_ARROW_LEFT_GRAPHIC, 0) { AcceptMouseInput = false, CanMove = true, IsVisible = false });
+            Add(_targetArrowRight = new GumpPic(0, 0, TARGET_ARROW_RIGHT_GRAPHIC, 0) { AcceptMouseInput = false, CanMove = true, IsVisible = false });
+
+            _targetArrowLeft.X = -10;
+            _targetArrowLeft.Y = (Height - _targetArrowLeft.Height) / 2;
+            _targetArrowRight.X = Width - _targetArrowRight.Width + 10;
+            _targetArrowRight.Y = (Height - _targetArrowRight.Height) / 2;
         }
 
         public override bool Contains(int x, int y)

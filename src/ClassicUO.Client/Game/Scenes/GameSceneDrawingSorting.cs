@@ -269,6 +269,11 @@ namespace ClassicUO.Game.Scenes
                     obj.UpdateTextCoordsV();
                 }
             }
+            else if (obj.Serial == _healthLinesManager.ForcedOverheadSerial)
+            {
+                // HealthLinesManager owns this mobile's overhead this frame (new-target-system
+                // nameplate mode) — don't fight it just because the global name-overhead toggle is off.
+            }
             else if (obj.ObjectHandlesStatus != ObjectHandlesStatus.NONE)
             {
                 obj.ObjectHandlesStatus = ObjectHandlesStatus.NONE;

@@ -19,11 +19,17 @@ namespace ClassicUO.Game.Managers
         const ushort HP_GRAPHIC = 0x1069;
 
         private readonly World _world;
+        private uint _forcedOverheadSerial;
 
         public HealthLinesManager(World world) { _world = world; }
 
         public bool IsEnabled =>
             ProfileManager.CurrentProfile != null && ProfileManager.CurrentProfile.ShowMobilesHP;
+
+        // Read by GameSceneDrawingSorting.UpdateObjectHandles so its per-frame
+        // "no global name-overhead toggle -> force CLOSED" sweep doesn't fight
+        // the nameplate we force-open for the current attack target below.
+        public uint ForcedOverheadSerial => _forcedOverheadSerial;
 
         public void Draw(UltimaBatcher2D batcher, float layerDepth)
         {
@@ -37,8 +43,11 @@ namespace ClassicUO.Game.Managers
 
             int showWhen = ProfileManager.CurrentProfile.MobileHPShowWhen;
             var useNewTargetSystem = ProfileManager.CurrentProfile.UseNewTargetSystem;
+            var useNameOverheadStyle = useNewTargetSystem && ProfileManager.CurrentProfile.NewTargetSystemUseNameOverhead;
             var animations = Client.Game.UO.Animations;
             var isEnabled = IsEnabled;
+
+            UpdateForcedNameOverhead(useNameOverheadStyle ? _world.TargetManager.NewTargetSystemSerial : 0);
 
             foreach (Mobile mobile in _world.Mobiles.Values)
             {
@@ -170,7 +179,52 @@ namespace ClassicUO.Game.Managers
 
                 if ((isEnabled && mode >= 1) || newTargSystem || forceDraw)
                 {
-                    DrawHealthLine(batcher, mobile, p.X, p.Y, offsetY, passive, newTargSystem, layerDepth);
+                    DrawHealthLine(batcher, mobile, p.X, p.Y, offsetY, passive, newTargSystem && !useNameOverheadStyle, layerDepth);
+                }
+            }
+        }
+
+        // "New Target System" can show a name-overhead nameplate over the current
+        // attack target instead of the colored OSI gump frame. That reuses the
+        // same on/off mechanism as "Always show name overheads"
+        // (Entity.ObjectHandlesStatus) rather than a bespoke gump, so it's opened
+        // and closed here as the target changes.
+        private void UpdateForcedNameOverhead(uint targetSerial)
+        {
+            if (targetSerial == _forcedOverheadSerial)
+            {
+                if (targetSerial != 0)
+                {
+                    Mobile mobile = _world.Mobiles.Get(targetSerial);
+
+                    if (mobile != null && mobile.ObjectHandlesStatus != ObjectHandlesStatus.CLOSED)
+                    {
+                        mobile.UpdateTextCoordsV();
+                    }
+                }
+
+                return;
+            }
+
+            if (_forcedOverheadSerial != 0)
+            {
+                Mobile previous = _world.Mobiles.Get(_forcedOverheadSerial);
+
+                if (previous != null && previous.ObjectHandlesStatus != ObjectHandlesStatus.CLOSED)
+                {
+                    previous.ObjectHandlesStatus = ObjectHandlesStatus.NONE;
+                }
+            }
+
+            _forcedOverheadSerial = targetSerial;
+
+            if (targetSerial != 0)
+            {
+                Mobile mobile = _world.Mobiles.Get(targetSerial);
+
+                if (mobile != null && mobile.ObjectHandlesStatus == ObjectHandlesStatus.NONE)
+                {
+                    mobile.ObjectHandlesStatus = ObjectHandlesStatus.OPEN;
                 }
             }
         }

@@ -2989,7 +2989,16 @@ namespace ClassicUO.Resources {
                 return ResourceManager.GetString("NewTargetSystem", resourceCulture);
             }
         }
-        
+
+        /// <summary>
+        ///   Looks up a localized string similar to Show target as name overhead instead of frame.
+        /// </summary>
+        public static string NewTargetSystemUseNameOverhead {
+            get {
+                return ResourceManager.GetString("NewTargetSystemUseNameOverhead", resourceCulture);
+            }
+        }
+
         /// <summary>
         ///   Looks up a localized string similar to &gt;&gt;.
         /// </summary>

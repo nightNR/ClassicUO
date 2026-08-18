@@ -119,7 +119,7 @@ namespace ClassicUO.Game.UI.Gumps
         private ClickableColorBox _innocentColorPickerBox, _friendColorPickerBox, _crimialColorPickerBox, _canAttackColorPickerBox, _enemyColorPickerBox, _murdererColorPickerBox, _neutralColorPickerBox, _beneficColorPickerBox, _harmfulColorPickerBox;
         private HSliderBar _lightBar;
         private Checkbox _buffBarTime, _buffBarShowId, _uiButtonsSingleClick, _queryBeforAttackCheckbox, _queryBeforeBeneficialCheckbox, _spellColoringCheckbox, _spellFormatCheckbox, _enableFastSpellsAssign;
-        private Checkbox _newTargetSystem, _showDPSCheckbox;
+        private Checkbox _newTargetSystem, _newTargetSystemUseNameOverhead, _showDPSCheckbox;
 
         // macro
         private MacroControl _macroControl;
@@ -2760,6 +2760,16 @@ namespace ClassicUO.Game.UI.Gumps
 
             startY += _newTargetSystem.Height + 2;
 
+            _newTargetSystemUseNameOverhead = AddCheckBox(
+                rightArea,
+                ResGumps.NewTargetSystemUseNameOverhead,
+                _currentProfile.NewTargetSystemUseNameOverhead,
+                startX + 20,
+                startY
+            );
+
+            startY += _newTargetSystemUseNameOverhead.Height + 2;
+
             _holdDownKeyTab = AddCheckBox
             (
                 rightArea,
@@ -4439,6 +4449,7 @@ namespace ClassicUO.Game.UI.Gumps
             _currentProfile.MobileHPType = _hpComboBox.SelectedIndex;
             _currentProfile.MobileHPShowWhen = _hpComboBoxShowWhen.SelectedIndex;
             _currentProfile.UseNewTargetSystem = _newTargetSystem.IsChecked;
+            _currentProfile.NewTargetSystemUseNameOverhead = _newTargetSystemUseNameOverhead.IsChecked;
             _currentProfile.HoldDownKeyTab = _holdDownKeyTab.IsChecked;
             _currentProfile.HoldDownKeyAltToCloseAnchored = _holdDownKeyAlt.IsChecked;
 
