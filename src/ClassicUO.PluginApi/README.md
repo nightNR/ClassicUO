@@ -268,34 +268,37 @@ Example:
 
 ## Nameplates
 
-`ctx.Nameplates` lets a plugin force a specific mobile's or item's nameplate
+`context.Nameplates` lets a plugin force a specific mobile's or item's nameplate
 ("Object Handles" name+HP box) visible at a given opacity, or force it hidden,
 overriding the client's own nameplate filter for that serial. Only one override
 is active per serial at a time; setting a new one replaces the previous.
 
 `SetOverride(uint serial, bool visible, byte opacityPercent)` — Forces the
 nameplate for `serial` visible (rendered at `opacityPercent`, clamped 0-100) or
-hidden, regardless of the player's nameplate filter settings.
+hidden, regardless of the player's nameplate filter settings. `opacityPercent`
+is only meaningful when `visible` is `true`; use `visible: false` to hide a
+nameplate rather than `opacityPercent: 0`, which leaves it invisible but still
+clickable.
 
 `ClearOverride(uint serial)` — Removes the override for `serial`, if any,
 letting the client's normal filter rules decide whether the nameplate shows.
 
-`ClearAllOverrides()` — Removes every override this call knows about,
-regardless of which plugin set it.
+`ClearAllOverrides()` — Removes every override currently set, regardless of
+which plugin set it (there is no per-plugin partitioning).
 
 Example:
 
     // Force a mobile's nameplate visible at 50% opacity:
-    ctx.Nameplates.SetOverride(mobileSerial, visible: true, opacityPercent: 50);
+    context.Nameplates.SetOverride(mobileSerial, visible: true, opacityPercent: 50);
 
     // Force a different mobile's nameplate hidden entirely:
-    ctx.Nameplates.SetOverride(otherSerial, visible: false, opacityPercent: 0);
+    context.Nameplates.SetOverride(otherSerial, visible: false);
 
     // Let normal filter rules resume for a serial:
-    ctx.Nameplates.ClearOverride(mobileSerial);
+    context.Nameplates.ClearOverride(mobileSerial);
 
-    // Drop every override this plugin has set:
-    ctx.Nameplates.ClearAllOverrides();
+    // Drop every override, from any plugin:
+    context.Nameplates.ClearAllOverrides();
 
 ## Sample
 
