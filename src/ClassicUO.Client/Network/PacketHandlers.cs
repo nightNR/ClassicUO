@@ -3717,9 +3717,19 @@ namespace ClassicUO.Network
             uint corpseSerial = p.ReadUInt32BE();
             uint running = p.ReadUInt32BE();
 
+            if (serial == world.Player)
+            {
+                if (SerialHelper.IsValid(corpseSerial))
+                {
+                    world.CorpseManager.OwnCorpses.Add(corpseSerial);
+                }
+
+                return;
+            }
+
             Mobile owner = world.Mobiles.Get(serial);
 
-            if (owner == null || serial == world.Player)
+            if (owner == null)
             {
                 return;
             }
