@@ -139,7 +139,14 @@ namespace ClassicUO.Game.GameObjects
                     Socket.Send_NameRequest(Serial);
                 }
 
-                UIManager.Add(new NameOverheadGump(World, this));
+                var nameplateGump = new NameOverheadGump(World, this);
+
+                if (World.NameOverHeadManager.TryGetOverride(Serial, out bool overrideVisible, out byte opacityPercent) && overrideVisible)
+                {
+                    nameplateGump.Alpha = opacityPercent / 100f;
+                }
+
+                UIManager.Add(nameplateGump);
             }
 
 
