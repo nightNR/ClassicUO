@@ -21,8 +21,9 @@ namespace ClassicUO.Game.Managers
         Enemy = 1 << 6,
         Murderer = 1 << 7,
         Invulnerable = 1 << 8,
+        MyCorpse = 1 << 9,
         AllMobiles = Innocent | Ally | Gray | Criminal | Enemy | Murderer | Invulnerable,
-        All = Items | Corpses | AllMobiles
+        All = Items | Corpses | AllMobiles | MyCorpse
     }
 
     internal sealed class NameOverHeadManager
@@ -56,7 +57,12 @@ namespace ClassicUO.Game.Managers
                 if (entity is Item item)
                 {
                     if (item.IsCorpse)
+                    {
+                        if (_world.CorpseManager.OwnCorpses.Contains(item.Serial) && TypeAllowed.HasFlag(NameOverheadTypeAllowed.MyCorpse))
+                            return true;
+
                         return TypeAllowed.HasFlag(NameOverheadTypeAllowed.Corpses);
+                    }
 
                     if (!GameObject.CanBeDrawn(entity.World, item.DisplayedGraphic))
                         return false;
