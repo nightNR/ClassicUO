@@ -60,13 +60,18 @@ namespace ClassicUO.UnitTests.Game.Managers
         }
 
         [Fact]
-        public void DoesNotCancel_WhenHoveredObjectMatchesMask()
+        public void FallsBackToCancel_WhenMatchedObjectResolutionSendsNothing()
         {
-            // Full packet-send confirmation requires world.InGame (Player + Map),
-            // which needs a real profile/session and is out of scope for a unit
-            // test (see the design spec's "manual in-game verification" note).
-            // This asserts the dispatcher took the confirm branch (not cancel):
-            // Target(...) itself no-ops without InGame, but does NOT cancel.
+            // Full packet-send confirmation requires world.InGame (Player + Map), which needs
+            // a real profile/session and is out of scope for a unit test (see the design
+            // spec's "manual in-game verification" note). Without InGame, Target(uint serial)
+            // hits its own silent no-op (world.Get(serial) can't resolve, so its
+            // `if (entity != null)` branch never runs and nothing is sent) - the same class of
+            // real-world race as an entity leaving the world between being hovered and
+            // resolved, or a TextObject whose Owner was already cleared. A plugin request must
+            // never be left hanging because of that: CheckPluginHoverTarget's guard notices
+            // nothing answered the request and falls back to CancelTarget(), so IsTargeting
+            // still ends up false here - a real reply was always sent, just the fallback one.
             var world = new World();
             var sut = new TargetManager(world);
             sut.SetTargeting(CursorTarget.PluginHoverTarget, 1, TargetType.Neutral, HighlightObjectTypes.Item);
@@ -74,7 +79,7 @@ namespace ClassicUO.UnitTests.Game.Managers
 
             sut.CheckPluginHoverTarget(item);
 
-            Assert.True(sut.IsTargeting);
+            Assert.False(sut.IsTargeting);
         }
     }
 }

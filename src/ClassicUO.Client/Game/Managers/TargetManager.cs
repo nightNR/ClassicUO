@@ -464,11 +464,26 @@ namespace ClassicUO.Game.Managers
                 return;
             }
 
+            // Every path that actually answers a target request (TargetPacket, the entity
+            // branch of Target(uint), CancelTarget) ends by clearing IsTargeting via
+            // ClearTargetingWithoutTargetCancelPacket()/CancelTarget() - so if IsTargeting is
+            // still true and this is still the same request after the resolve attempt below,
+            // nothing was actually sent. That happens more than it should: TryResolveObject
+            // silently returns false for a TextObject whose Owner was already nulled out, and
+            // Target(uint serial) does nothing at all when the entity has already left the
+            // world (both real races, not hypothetical) - and any future silent-return added
+            // to either method would reproduce the same hang without this guard. A plugin
+            // request must always get *some* reply, so fall back to an explicit cancel
+            // whenever nothing else already answered it, instead of enumerating every possible
+            // silent-failure branch individually.
+            uint cursorId = _targetCursorId;
+
             if (hovered != null && MatchesAcceptedTypes(hovered, PluginHoverAcceptedTypes))
             {
                 TryResolveObject(hovered);
             }
-            else
+
+            if (IsTargeting && TargetingState == CursorTarget.PluginHoverTarget && _targetCursorId == cursorId)
             {
                 CancelTarget();
             }
