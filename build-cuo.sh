@@ -75,6 +75,24 @@ dotnet publish "$CLIENT_PROJECT" "${PUBLISH_ARGS[@]}" \
 say "$LIB built"
 ls -la "$CUO_LIB"
 
+# ZLib.cs P/Invokes DllImport("libz") on unix. There's no NuGet-bundled native for
+# it (unlike SDL3/FAudio/FNA3D) — it relies on the OS's zlib. Ubuntu ships the
+# runtime lib (libz.so.1, via zlib1g) but NOT the unversioned libz.so symlink
+# (that's only in the zlib1g-dev package), so on a clean install .NET's unix
+# native-library probing (which tries {name}.so, lib{name}.so, ... in the app's
+# own base directory first) fails with DllNotFoundException even though
+# libz.so.1 is right there on the system. Ship our own libz.so next to cuo.so
+# so app-local probing finds it regardless of what the target has installed.
+if [[ "$RID" == linux-* ]]; then
+  LIBZ_SRC="$(ldconfig -p 2>/dev/null | grep -m1 'libz\.so\.1 ' | awk '{print $NF}')"
+  if [ -n "$LIBZ_SRC" ] && [ -f "$LIBZ_SRC" ]; then
+    cp -L "$LIBZ_SRC" "$OUTPUT_DIR/libz.so"
+    say "Bundled libz.so ($LIBZ_SRC) -> $OUTPUT_DIR/libz.so"
+  else
+    echo "WARNING: libz.so.1 not found via ldconfig — libz.so NOT bundled; client will DllNotFoundException on targets without zlib1g-dev." >&2
+  fi
+fi
+
 if [ -n "$DEPLOY" ]; then
   mkdir -p "$DEPLOY"
   cp "$CUO_LIB" "$DEPLOY/"
