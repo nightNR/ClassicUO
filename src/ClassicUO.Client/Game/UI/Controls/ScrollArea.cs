@@ -17,6 +17,7 @@ namespace ClassicUO.Game.UI.Controls
     {
         private bool _isNormalScroll;
         private readonly ScrollBarBase _scrollBar;
+        private int _pendingScrollValue = -1;
 
         public ScrollArea
         (
@@ -67,6 +68,19 @@ namespace ClassicUO.Game.UI.Controls
         public int ScrollMinValue => _scrollBar.MinValue;
         public int ScrollMaxValue => _scrollBar.MaxValue;
 
+        public void SetScrollValueAfterLayout(int value)
+        {
+            _pendingScrollValue = Math.Max(0, value);
+        }
+
+        public void Resize(int width, int height)
+        {
+            Width = width;
+            Height = height;
+            _scrollBar.X = Width - 14;
+            _scrollBar.Height = height;
+        }
+
 
         public Rectangle ScissorRectangle;
 
@@ -76,6 +90,13 @@ namespace ClassicUO.Game.UI.Controls
             base.Update();
 
             CalculateScrollBarMaxValue();
+
+            if (_pendingScrollValue >= 0)
+            {
+                _scrollBar.Value = _pendingScrollValue;
+                _pendingScrollValue = -1;
+                CalculateScrollBarMaxValue();
+            }
 
             if (ScrollbarBehaviour == ScrollbarBehaviour.ShowAlways)
             {
@@ -104,27 +125,33 @@ namespace ClassicUO.Game.UI.Controls
             ScrollBarBase scrollbar = (ScrollBarBase)Children[0];
             scrollbar.AddToRenderLists(renderLists, x + scrollbar.X, y + scrollbar.Y, ref layerDepthRef);
             float layerDepth = layerDepthRef;
+            int scrollValue = scrollbar.Value;
+            RenderLists childRenderLists = new();
+
+            // Build the clipped children now so their consumed layer depths propagate
+            // back to the parent. Building them inside the deferred draw callback made
+            // later top-level content (notably container single-click text) retain a
+            // lower depth and appear behind grid cells.
+            for (int i = 1; i < Children.Count; i++)
+            {
+                Control child = Children[i];
+
+                if (!child.IsVisible)
+                {
+                    continue;
+                }
+
+                int finalY = y + child.Y - scrollValue + ScissorRectangle.Y;
+                child.AddToRenderLists(childRenderLists, x + child.X, finalY, ref layerDepth);
+            }
+
+            layerDepthRef = layerDepth;
 
             renderLists.AddGumpNoAtlas(
                 batcher =>
                 {
                     if (batcher.ClipBegin(x + ScissorRectangle.X, y + ScissorRectangle.Y, Width - 14 + ScissorRectangle.Width, Height + ScissorRectangle.Height))
                     {
-                        RenderLists childRenderLists = new();
-
-                        for (int i = 1; i < Children.Count; i++)
-                        {
-                            Control child = Children[i];
-
-                            if (!child.IsVisible)
-                            {
-                                continue;
-                            }
-
-                            int finalY = y + child.Y - scrollbar.Value + ScissorRectangle.Y;
-
-                            child.AddToRenderLists(childRenderLists, x + child.X, finalY, ref layerDepth);
-                        }
                         childRenderLists.DrawRenderLists(batcher, sbyte.MaxValue);
                         batcher.ClipEnd();
                     }

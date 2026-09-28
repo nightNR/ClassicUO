@@ -1934,6 +1934,12 @@ namespace ClassicUO.Resources {
             }
         }
 
+        public static string GridContainerUsePagination {
+            get {
+                return ResourceManager.GetString("GridContainerUsePagination", resourceCulture);
+            }
+        }
+
         /// <summary>
         ///   Looks up a localized string similar to [Guild]: .
         /// </summary>

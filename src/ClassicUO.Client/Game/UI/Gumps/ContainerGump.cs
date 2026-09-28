@@ -27,6 +27,13 @@ namespace ClassicUO.Game.UI.Gumps
         private bool _isMinimized;
         private GridContainerView _gridView;
         private int _gridPage;
+        private int _gridScroll;
+        private Button _gridResizeButton;
+        private bool _gridResizeClicked;
+        private Point _gridResizeStart;
+
+        private const int GRID_MIN_WIDTH = 72;
+        private const int GRID_MIN_HEIGHT = 58;
 
         internal const int CORPSES_GUMP = 0x0009;
 
@@ -261,13 +268,77 @@ namespace ClassicUO.Game.UI.Gumps
                     ? TOGGLE_HEADER_HEIGHT
                     : 0;
 
-            _gridView = new GridContainerView(this) { X = 0, Y = headerHeight };
+            var profile = ProfileManager.CurrentProfile;
+            bool usePagination = profile?.GridContainerUsePagination == true;
+            int gridWidth = GridContainerLayout.GridWidth();
+            int gridHeight = GridContainerLayout.GridHeight();
+
+            if (!usePagination
+                && profile?.GridContainerSizes != null
+                && profile.GridContainerSizes.TryGetValue(LocalSerial, out GridContainerSize savedSize))
+            {
+                gridWidth = Math.Max(GRID_MIN_WIDTH, savedSize.Width);
+                gridHeight = Math.Max(GRID_MIN_HEIGHT, savedSize.Height);
+            }
+
+            _gridView = new GridContainerView(this, usePagination, gridWidth, gridHeight)
+            {
+                X = 0,
+                Y = headerHeight
+            };
             Add(_gridView);
             _gridView.Rebuild();
             _gridView.SetPage(_gridPage);
+            _gridView.SetScrollValue(_gridScroll);
 
             Width = _gridView.Width;
             Height = _gridView.Height + headerHeight;
+
+            if (!usePagination)
+            {
+                _gridResizeButton = new Button(0, 0x837, 0x838, 0x838)
+                {
+                    X = Width,
+                    Y = Height
+                };
+                _gridResizeButton.X = Width - _gridResizeButton.Width + 2;
+                _gridResizeButton.Y = Height - _gridResizeButton.Height + 2;
+                _gridResizeButton.MouseDown += GridResizeButtonOnMouseDown;
+                _gridResizeButton.MouseUp += GridResizeButtonOnMouseUp;
+                Add(_gridResizeButton);
+            }
+        }
+
+        private void GridResizeButtonOnMouseDown(object sender, MouseEventArgs e)
+        {
+            if (e.Button == MouseButtonType.Left)
+            {
+                _gridResizeClicked = true;
+                _gridResizeStart = new Point(Width, Height);
+            }
+        }
+
+        private void GridResizeButtonOnMouseUp(object sender, MouseEventArgs e)
+        {
+            if (e.Button == MouseButtonType.Left)
+            {
+                _gridResizeClicked = false;
+                SaveGridSize();
+            }
+        }
+
+        private void SaveGridSize()
+        {
+            var profile = ProfileManager.CurrentProfile;
+
+            if (profile == null || _gridView == null || profile.GridContainerUsePagination)
+            {
+                return;
+            }
+
+            profile.GridContainerSizes ??= new();
+            profile.GridContainerSizes[LocalSerial] = new GridContainerSize(_gridView.Width, _gridView.Height);
+            profile.Save(World, ProfileManager.ProfilePath);
         }
 
         private void AddToggleButtonIfNeeded()
@@ -650,6 +721,23 @@ namespace ClassicUO.Game.UI.Gumps
 
         public override void Update()
         {
+            if (_gridResizeClicked && _gridView != null)
+            {
+                Point offset = Mouse.LDragOffset;
+                int headerHeight = _gridView.Y;
+                int width = Math.Max(GRID_MIN_WIDTH, _gridResizeStart.X + offset.X);
+                int height = Math.Max(GRID_MIN_HEIGHT + headerHeight, _gridResizeStart.Y + offset.Y);
+
+                if (Width != width || Height != height)
+                {
+                    Width = width;
+                    Height = height;
+                    _gridView.Resize(width, height - headerHeight);
+                    _gridResizeButton.X = Width - _gridResizeButton.Width + 2;
+                    _gridResizeButton.Y = Height - _gridResizeButton.Height + 2;
+                }
+            }
+
             base.Update();
 
             if (IsDisposed)
@@ -700,6 +788,7 @@ namespace ClassicUO.Game.UI.Gumps
             if (_gridView != null)
             {
                 _gridPage = _gridView.CurrentPage;
+                _gridScroll = _gridView.ScrollValue;
             }
 
             Clear();
@@ -927,7 +1016,10 @@ namespace ClassicUO.Game.UI.Gumps
                 {
                     Item child = (Item)i;
 
-                    if (child.Container == item)
+                    if (
+                        child.Container == item
+                        && !World.ContainerManager.IsPinned(child.Serial)
+                    )
                     {
                         UIManager.GetGump<ContainerGump>(child)?.Dispose();
                     }
@@ -939,6 +1031,13 @@ namespace ClassicUO.Game.UI.Gumps
 
         protected override void CloseWithRightClick()
         {
+            // A pin promises that this container remains available. The pin can be
+            // removed with its P shortcut before the gump is closed normally.
+            if (World.ContainerManager.IsPinned(LocalSerial))
+            {
+                return;
+            }
+
             base.CloseWithRightClick();
 
             if (_data.ClosedSound != 0)

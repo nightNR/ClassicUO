@@ -4124,6 +4124,17 @@ namespace ClassicUO.Game.UI.Gumps
 
             startY += _gridContainerLightBg.Height + 2 + 10;
 
+            _gridContainerUsePagination = AddCheckBox
+            (
+                rightArea,
+                ResGumps.GridContainerUsePagination,
+                _currentProfile.GridContainerUsePagination,
+                startX,
+                startY
+            );
+
+            startY += _gridContainerUsePagination.Height + 2 + 10;
+
             NiceButton button = new NiceButton
             (
                 startX,
@@ -5156,6 +5167,16 @@ namespace ClassicUO.Game.UI.Gumps
 
                 // Rebuild open grid containers so the new panel color applies live (BuildGump
                 // recreates the GridContainerView, which re-reads PanelColor()).
+                foreach (ContainerGump containerGump in UIManager.Gumps.OfType<ContainerGump>())
+                {
+                    containerGump.RequestUpdateContents();
+                }
+            }
+
+            if (_currentProfile.GridContainerUsePagination != _gridContainerUsePagination.IsChecked)
+            {
+                _currentProfile.GridContainerUsePagination = _gridContainerUsePagination.IsChecked;
+
                 foreach (ContainerGump containerGump in UIManager.Gumps.OfType<ContainerGump>())
                 {
                     containerGump.RequestUpdateContents();

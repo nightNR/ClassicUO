@@ -16,6 +16,9 @@ namespace ClassicUO.UnitTests.Game.UI
             Assert.False(p.ContainerToggleDefaultGrid);
             Assert.NotNull(p.ContainerGridStates);
             Assert.Empty(p.ContainerGridStates);
+            Assert.False(p.GridContainerUsePagination);
+            Assert.NotNull(p.GridContainerSizes);
+            Assert.Empty(p.GridContainerSizes);
         }
     }
 }
