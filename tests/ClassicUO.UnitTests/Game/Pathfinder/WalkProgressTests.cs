@@ -87,6 +87,42 @@ namespace ClassicUO.UnitTests.Game.Pathfinder
         }
 
         [Fact]
+        public void Server_teleport_mid_walk_stops_the_walk()
+        {
+            // Teleporter tile: the server never confirms the step onto (2,2), it relocates the
+            // player straight to (10,10). Continuing would replan from (10,10) back toward the
+            // old goal — possibly walking back through the teleporter.
+            var states = Capture(pf => pf.OnServerRelocated(1, 1, 10, 10));
+            Assert.Equal(new[] { WalkState.Stopped }, states);
+        }
+
+        [Fact]
+        public void One_tile_resync_does_not_stop_the_walk()
+        {
+            // A denied step snaps the player back by at most one tile — ordinary walk jitter.
+            var states = Capture(pf => pf.OnServerRelocated(5, 5, 4, 5));
+            Assert.Empty(states);
+        }
+
+        [Fact]
+        public void Relocation_without_active_walk_emits_nothing()
+        {
+            var states = new List<WalkState>();
+            void Handler(WalkState s) => states.Add(s);
+            ClassicUO.Game.Pathfinder.WalkProgress += Handler;
+            try
+            {
+                NewPathfinder().OnServerRelocated(1, 1, 10, 10);
+            }
+            finally
+            {
+                ClassicUO.Game.Pathfinder.WalkProgress -= Handler;
+            }
+
+            Assert.Empty(states);
+        }
+
+        [Fact]
         public void ResetAutoWalk_does_not_emit_but_clears_AutoWalking()
         {
             ClassicUO.Game.Pathfinder captured = null;

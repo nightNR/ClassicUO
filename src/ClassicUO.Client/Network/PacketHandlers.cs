@@ -6525,7 +6525,10 @@ namespace ClassicUO.Network
 
                 world.Player.Walker.ResendPacketResync = false;
                 world.Player.CloseRangedGumps();
+                int oldX = world.Player.X;
+                int oldY = world.Player.Y;
                 world.Player.SetInWorldTile(x, y, z);
+                world.Player.Pathfinder.OnServerRelocated(oldX, oldY, x, y);
                 world.Player.UpdateAbilities();
             }
         }

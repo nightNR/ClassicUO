@@ -44,7 +44,7 @@ namespace ClassicUO.Game
         private readonly List<AStarPathSearch.Step> _path = new List<AStarPathSearch.Step>();
         private int _pointIndex, _pathSize;
         private bool _run;
-        private int _goalX, _goalY, _goalDistance;
+        private int _goalX, _goalY, _goalZ, _goalDistance;
         private int _replanX, _replanY, _replansWithoutMovement;
         private int _pathStartX, _pathStartY;
         private bool _hasWalkGoal, _isReplan;
@@ -789,7 +789,8 @@ namespace ClassicUO.Game
 
             _pathStartX = startX;
             _pathStartY = startY;
-            _search.Begin(startX, startY, startZ, x, y, distance, ExpandWalkable);
+            _goalZ = z;
+            _search.Begin(startX, startY, startZ, x, y, distance, ExpandWalkable, PATHFINDER_MAX_NODES, z);
             _searching = true;
 
             AStarSearch.Status status = _search.Step(FrameBudget(firstCall: true));
@@ -871,7 +872,7 @@ namespace ClassicUO.Game
             _world.Player.GetEndPosition(out int startX, out int startY, out sbyte startZ, out _);
             _pathStartX = startX;
             _pathStartY = startY;
-            _search.Begin(startX, startY, startZ, _goalX, _goalY, _goalDistance, ExpandWalkable);
+            _search.Begin(startX, startY, startZ, _goalX, _goalY, _goalDistance, ExpandWalkable, PATHFINDER_MAX_NODES, _goalZ);
             _searching = true;
             _isReplan = true;
             AutoWalking = true;
@@ -982,6 +983,27 @@ namespace ClassicUO.Game
         public void StopAutoWalk()
         {
             EndAutoWalk(WalkState.Stopped);
+        }
+
+        /// <summary>
+        /// Called when the server places the player (0x20) at a new tile. A jump of more than one
+        /// tile mid-walk is a server-side relocation — typically a teleporter tile, whose step is
+        /// never confirmed because the server moves the player straight to the destination. The
+        /// walk's goal is stale at that point: replanning would walk back toward it (possibly
+        /// through the teleporter again), so the walk ends as Stopped and the caller decides.
+        /// A one-tile snap is ordinary denied-step resync and leaves the walk running.
+        /// </summary>
+        internal void OnServerRelocated(int oldX, int oldY, int newX, int newY)
+        {
+            if (!AutoWalking)
+            {
+                return;
+            }
+
+            if (Math.Max(Math.Abs(newX - oldX), Math.Abs(newY - oldY)) > 1)
+            {
+                StopAutoWalk();
+            }
         }
 
         internal void ResetAutoWalk()
