@@ -10,6 +10,8 @@
 #define LIGHTS 9
 #define EFFECT_HUED 10
 #define TEXT_RGB 11
+#define CIRCLE_PROGRESS 12
+#define CIRCLE_PROGRESS_HUED 13
 #define GUMP 20
 
 const static float3 LIGHT_DIRECTION = float3(0.0f, 1.0f, 1.0f);
@@ -24,6 +26,9 @@ float4x4 WorldMatrix;
 float2 Viewport;
 float Brightlight;
 float CircleOfTransparencyRadius;
+float CircleProgress;
+float CircleHalfStroke;
+float CircleFeather;
 
 sampler DrawSampler : register(s0);
 sampler HueSampler0 : register(s1);
@@ -115,6 +120,50 @@ float4 PixelShader_Hue(PS_INPUT IN) : COLOR0
 
 	float hue = IN.Hue.x;
 
+	if (mode == CIRCLE_PROGRESS || mode == CIRCLE_PROGRESS_HUED)
+	{
+		// UV space is [-1, 1], so a one-pixel feather is 2 / diameter.
+		float2 p = IN.TexCoord.xy * 2.0f - 1.0f;
+		float dist = length(p);
+		float halfStroke = CircleHalfStroke;
+		float feather = CircleFeather;
+		float ring = saturate((halfStroke - abs(dist - (1.0f - halfStroke))) / feather + 0.5f);
+
+		// atan2(x, -y) makes zero point up and positive angles run clockwise.
+		float angle = atan2(p.x, -p.y);
+		if (angle < 0.0f)
+			angle += 6.28318530718f;
+		float angle01 = angle / 6.28318530718f;
+		float progress = CircleProgress;
+		float angularFeather = feather / (6.28318530718f * max(dist, 0.25f));
+		float fullCircle = progress >= 0.99999f ? 1.0f : 0.0f;
+		float sweep = fullCircle > 0.5f
+			? 1.0f
+			: saturate((progress - angle01) / angularFeather + 0.5f);
+		float shape = ring * sweep;
+
+		// Round caps keep short remaining arcs from looking like clipped wedges.
+		if (fullCircle < 0.5f)
+		{
+			float centerRadius = 1.0f - halfStroke;
+			float endAngle = progress * 6.28318530718f;
+			float2 startCenter = float2(0.0f, -centerRadius);
+			float2 endCenter = float2(sin(endAngle), -cos(endAngle)) * centerRadius;
+			float startCap = saturate((halfStroke - length(p - startCenter)) / feather + 0.5f);
+			float endCap = saturate((halfStroke - length(p - endCenter)) / feather + 0.5f);
+			shape = max(shape, max(startCap, endCap));
+		}
+
+		alpha *= shape;
+		if (alpha < 0.01f)
+			discard;
+
+		if (mode == CIRCLE_PROGRESS_HUED)
+			color.rgb = get_rgb(1.0f, hue);
+
+		return color * alpha;
+	}
+
 	if (mode >= GUMP)
 	{
 		mode -= GUMP;
@@ -205,4 +254,3 @@ technique HueTechnique
 		PixelShader = compile ps_3_0 PixelShader_Hue();
 	}
 }
-

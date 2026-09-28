@@ -1803,6 +1803,27 @@ namespace ClassicUO.Game.Managers
                         }
                         break;
                     }
+
+                case MacroType.TestCircleTimer:
+                    // Developer-facing smoke test for the plugin screen-timer path.
+                    // Reusing the id restarts the same timer on repeated key presses.
+                    ScreenTimers.AddOrUpdate(
+                        id: -1,
+                        shape: TimerShape.Circle,
+                        durationMs: 10_000,
+                        hue: 0x0035,
+                        groupId: 0,
+                        x: 0,
+                        y: 0,
+                        width: 0,
+                        height: 0,
+                        label: "Timer test",
+                        showTime: true,
+                        now: Time.Ticks,
+                        anchorKind: AnchorKind.Self,
+                        anchorOffsetY: -8
+                    );
+                    break;
             }
 
 
@@ -2351,7 +2372,8 @@ namespace ClassicUO.Game.Managers
         CloseCorpses,
         UseObject,
         LookAtMouse,
-        UseCounterBarSlot
+        UseCounterBarSlot,
+        TestCircleTimer
     }
 
     internal enum MacroSubType

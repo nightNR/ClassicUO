@@ -580,6 +580,52 @@ namespace ClassicUO.Renderer
             );
         }
 
+        /// <summary>
+        /// Draws an anti-aliased circular progress ring in a single quad. The
+        /// basic UO shader derives both the annulus and clockwise sweep from UVs.
+        /// </summary>
+        public void DrawCircleProgress
+        (
+            Texture2D texture,
+            Rectangle destinationRectangle,
+            Vector3 color,
+            float progress,
+            float stroke,
+            float depth
+        )
+        {
+            if (destinationRectangle.Width <= 0 || destinationRectangle.Height <= 0 ||
+                progress <= 0f || stroke <= 0f)
+            {
+                return;
+            }
+
+            // These are effect-wide values, so isolate this quad from the regular
+            // sprite batch and from circles carrying different progress values.
+            Flush();
+            float diameter = Math.Min(destinationRectangle.Width, destinationRectangle.Height);
+            _basicUOEffect.CircleProgress.SetValue(Math.Min(progress, 1f));
+            _basicUOEffect.CircleHalfStroke.SetValue(Math.Min(stroke / diameter, 0.49f));
+            _basicUOEffect.CircleFeather.SetValue(2f / diameter);
+
+            if (!PushSprite(texture))
+            {
+                return;
+            }
+
+            ref PositionNormalTextureColor4 sprite = ref _vertexInfo[_numSprites - 1];
+            SetVertex(
+                ref sprite,
+                0f, 0f, 1f, 1f,
+                destinationRectangle.X, destinationRectangle.Y,
+                destinationRectangle.Width, destinationRectangle.Height,
+                color,
+                0f, 0f, 0f, 1f, depth, 0
+            );
+
+            Flush();
+        }
+
 
 
 

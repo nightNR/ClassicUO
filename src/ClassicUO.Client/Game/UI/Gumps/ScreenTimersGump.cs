@@ -31,16 +31,6 @@ namespace ClassicUO.Game.UI.Gumps
         // Neutral (no recolor) hue vector for the gray backdrop / black border.
         private static readonly Vector3 _neutralHue = ShaderHueTranslator.GetHueVector(0, false, 1f, true);
 
-        // Faint, always-present ring track behind the circle timer's progress arc.
-        private static readonly Vector3 _trackHue = ShaderHueTranslator.GetHueVector(0, false, 0.3f, true);
-
-        // Soft-edged round stamps used to build the circle timer's ring, keyed by
-        // pixel diameter. Built at the exact on-screen size (not scaled up/down at
-        // draw time) so the feather always covers a real screen pixel or so - scaling
-        // a single oversized texture down to a thin stroke would squeeze the feather
-        // to sub-pixel width and read as a hard edge again.
-        private static readonly Dictionary<int, Texture2D> _softDotCache = new Dictionary<int, Texture2D>();
-
         // Cached RenderedText per timer id. Like BuffControlEntry we build the glyph
         // layout once and only rebuild it when the displayed value actually changes,
         // instead of calling RenderedText.Create every frame (which would churn the
@@ -241,19 +231,23 @@ namespace ClassicUO.Game.UI.Gumps
 
                 case TimerShape.Circle:
                 {
-                    // Thin ring track plus a colored progress arc on top, matching a
-                    // standard circular-progress widget. The arc depletes clockwise
-                    // from 12 o'clock and shrinks away to nothing as time runs out;
-                    // the faint track stays put as a constant guide.
-                    float radius = Math.Min(w, h) / 2f - ArcStroke / 2f;
+                    // Render a square quad centered in the configured bounds. The
+                    // shader derives a stable, anti-aliased annulus and sweep from UVs.
+                    int diameter = Math.Min(w, h);
+                    int circleX = (int)(ccx - diameter / 2f);
+                    int circleY = (int)(ccy - diameter / 2f);
+                    var circleBounds = new Rectangle(circleX, circleY, diameter, diameter);
+                    float stroke = Math.Clamp(diameter * StrokeDiameterRatio, MinArcStroke, MaxArcStroke);
                     float frac = Math.Clamp(remaining, 0f, 1f);
+                    Vector3 trackHue = ShaderHueTranslator.GetCircleProgressHueVector(0, TrackAlpha);
+                    Vector3 arcHue = ShaderHueTranslator.GetCircleProgressHueVector(e.Hue);
                     renderLists.AddGumpNoAtlas(batcher =>
                     {
                         batcher.SetSampler(SamplerState.LinearClamp);
-                        DrawArc(batcher, ccx, ccy, radius, 1f, _trackHue, TrackStroke, depth);
+                        batcher.DrawCircleProgress(_fillTexture, circleBounds, trackHue, 1f, stroke * TrackStrokeRatio, depth);
                         if (frac > 0f)
                         {
-                            DrawArc(batcher, ccx, ccy, radius, frac, hued, ArcStroke, depth);
+                            batcher.DrawCircleProgress(_fillTexture, circleBounds, arcHue, frac, stroke, depth);
                         }
                         batcher.SetSampler(null);
                         return true;
@@ -311,104 +305,11 @@ namespace ClassicUO.Game.UI.Gumps
             }
         }
 
-        // Stroke width of the progress arc / faint background track, in pixels.
-        private const float ArcStroke = 4f;
-        private const float TrackStroke = 2f;
-
-        // Spacing between soft-dot stamps along the arc path, as a fraction of the
-        // stroke width. Below ~0.5 the stamps overlap enough that no gaps show.
-        private const float StampSpacingFactor = 0.4f;
-
-        // Draws a clockwise arc starting at 12 o'clock and sweeping `frac` of a full
-        // turn by stamping the soft-edged round texture densely along the path. The
-        // batcher has no native arc/AA primitive, so smoothness comes from stamp
-        // overlap plus linear sampling of each stamp's alpha falloff.
-        private static void DrawArc(UltimaBatcher2D batcher, float cx, float cy, float radius, float frac, Vector3 color, float stroke, float depth)
-        {
-            if (radius <= 0f || frac <= 0f)
-            {
-                return;
-            }
-
-            const float TwoPi = MathF.PI * 2f;
-            float sweep = frac * TwoPi;
-            float arcLength = Math.Max(1f, radius * sweep);
-            float spacing = Math.Max(1f, stroke * StampSpacingFactor);
-            int steps = Math.Max(1, (int)MathF.Ceiling(arcLength / spacing));
-
-            Texture2D dot = GetSoftDot(stroke);
-            Vector2 origin = new Vector2(dot.Width / 2f, dot.Height / 2f);
-
-            for (int i = 0; i <= steps; i++)
-            {
-                float t = sweep * (i / (float)steps);
-                Vector2 p = PointOnCircle(cx, cy, radius, t);
-                batcher.Draw(dot, p, null, color, 0f, origin, 1f, SpriteEffects.None, depth);
-            }
-        }
-
-        // Screen-pixel width of the alpha falloff at a stamp's edge. Kept constant
-        // in screen space (not texture space) regardless of stroke width.
-        private const float DotFeather = 1.2f;
-
-        private static Texture2D GetSoftDot(float diameter)
-        {
-            int size = Math.Max(3, (int)MathF.Ceiling(diameter) + 1);
-            if (!_softDotCache.TryGetValue(size, out Texture2D tex))
-            {
-                tex = BuildSoftDotTexture(_fillTexture.GraphicsDevice, size);
-                _softDotCache[size] = tex;
-            }
-            return tex;
-        }
-
-        // Builds a white, round texture whose alpha falls off smoothly over the last
-        // ~DotFeather px to the edge, so stamping it (drawn at native size, no extra
-        // scale) yields an anti-aliased circular brush instead of a hard-edged square.
-        private static Texture2D BuildSoftDotTexture(GraphicsDevice device, int size)
-        {
-            var data = new Color[size * size];
-            float center = size / 2f;
-            float outerR = size / 2f;
-            float innerR = Math.Max(0f, outerR - DotFeather);
-
-            for (int y = 0; y < size; y++)
-            {
-                for (int x = 0; x < size; x++)
-                {
-                    float dx = x + 0.5f - center;
-                    float dy = y + 0.5f - center;
-                    float dist = MathF.Sqrt(dx * dx + dy * dy);
-
-                    float a;
-                    if (dist <= innerR)
-                    {
-                        a = 1f;
-                    }
-                    else if (dist >= outerR)
-                    {
-                        a = 0f;
-                    }
-                    else
-                    {
-                        a = 1f - (dist - innerR) / (outerR - innerR);
-                    }
-
-                    data[y * size + x] = new Color(255, 255, 255, (byte)(a * 255f));
-                }
-            }
-
-            var texture = new Texture2D(device, size, size, false, SurfaceFormat.Color);
-            texture.SetData(data);
-            return texture;
-        }
-
-        // Angle 0 = top (12 o'clock); increasing angle sweeps clockwise in screen
-        // space (y grows downward).
-        private static Vector2 PointOnCircle(float cx, float cy, float radius, float angle)
-        {
-            return new Vector2(cx + radius * MathF.Sin(angle), cy - radius * MathF.Cos(angle));
-        }
+        private const float StrokeDiameterRatio = 0.075f;
+        private const float MinArcStroke = 2f;
+        private const float MaxArcStroke = 6f;
+        private const float TrackStrokeRatio = 0.5f;
+        private const float TrackAlpha = 0.3f;
 
         private RenderedText GetOrBuildText(in ScreenTimerEntry e, int secs, bool wantTime)
         {
