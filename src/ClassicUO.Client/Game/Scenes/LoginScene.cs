@@ -478,7 +478,8 @@ namespace ClassicUO.Game.Scenes
         {
             PopupMessage = null;
 
-            if (Characters != null && CurrentLoginStep != LoginSteps.CharacterCreation)
+            if (Characters != null && CurrentLoginStep != LoginSteps.CharacterCreation
+                && CurrentLoginStep != LoginSteps.CharacterSelection)
             {
                 CurrentLoginStep = LoginSteps.LoginInToServer;
             }

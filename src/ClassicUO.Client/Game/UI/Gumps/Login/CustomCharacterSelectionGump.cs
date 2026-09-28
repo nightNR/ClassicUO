@@ -6,6 +6,7 @@ using ClassicUO.Game.Scenes;
 using ClassicUO.Game.UI.Controls;
 using ClassicUO.Game.UI.Login;
 using Microsoft.Xna.Framework;
+using SDL3;
 
 namespace ClassicUO.Game.UI.Gumps.Login
 {
@@ -100,6 +101,16 @@ namespace ClassicUO.Game.UI.Gumps.Login
         }
 
         public override void OnKeyboardReturn(int textID, string text) => Proceed(_scene, _list.SelectedSlot);
+
+        // Enter with no row explicitly clicked: CharacterList defaults SelectedRow to the
+        // first slot, so this confirms that default (matches CharacterSelectionGump's Enter behavior).
+        protected override void OnKeyDown(SDL.SDL_Keycode key, SDL.SDL_Keymod mod)
+        {
+            if (key == SDL.SDL_Keycode.SDLK_RETURN || key == SDL.SDL_Keycode.SDLK_KP_ENTER)
+            {
+                Proceed(_scene, _list.SelectedSlot);
+            }
+        }
     }
 }
 #endif
