@@ -19,6 +19,8 @@ namespace ClassicUO.Renderer
         public const byte SHADER_LIGHTS = 9;
         public const byte SHADER_EFFECT_HUED = 10;
         public const byte SHADER_TEXT_RGB = 11;
+        public const byte SHADER_CIRCLE_PROGRESS = 12;
+        public const byte SHADER_CIRCLE_PROGRESS_HUED = 13;
 
         private const byte GUMP_OFFSET = 20;
 
@@ -81,6 +83,16 @@ namespace ClassicUO.Renderer
             }
 
             return hueVector;
+        }
+
+        /// <summary>
+        /// Builds the hue payload used by the analytic circular-progress shader.
+        /// </summary>
+        public static Vector3 GetCircleProgressHueVector(int hue, float alpha = 1f)
+        {
+            Vector3 result = GetHueVector(hue, false, alpha, true);
+            result.Y = hue == 0 ? SHADER_CIRCLE_PROGRESS : SHADER_CIRCLE_PROGRESS_HUED;
+            return result;
         }
     }
 }
