@@ -37,7 +37,7 @@ namespace ClassicUO.Game.UI.Gumps
         private InputField _autoOpenCorpseRange;
 
         //experimental
-        private Checkbox _autoOpenDoors, _autoOpenCorpse, _skipEmptyCorpse, _disableTabBtn, _disableCtrlQWBtn, _disableDefaultHotkeys, _disableArrowBtn, _disableAutoMove, _overrideContainerLocation, _smoothDoors, _showTargetRangeIndicator, _customBars, _customBarsBBG, _statValuesOnBars, _showDistanceOnHealthBar, _saveHealthbars, _saveGumpsRelativeToCenter;
+        private Checkbox _autoOpenDoors, _autoOpenCorpse, _skipEmptyCorpse, _disableTabBtn, _disableCtrlQWBtn, _disableDefaultHotkeys, _disableArrowBtn, _disableAutoMove, _overrideContainerLocation, _smoothDoors, _allowDiagonalCornerCutting, _showTargetRangeIndicator, _customBars, _customBarsBBG, _statValuesOnBars, _showDistanceOnHealthBar, _saveHealthbars, _saveGumpsRelativeToCenter;
         private Checkbox _nameOverheadAlwaysOn, _nameOverheadShowHpBar;
         private HSliderBar _cellSize;
         private Checkbox _containerScaleItems, _containerDoubleClickToLoot, _relativeDragAnDropItems, _useLargeContianersGumps, _highlightContainersWhenMouseIsOver, _allowItemsOutsideContainerBounds;
@@ -54,6 +54,7 @@ namespace ClassicUO.Game.UI.Gumps
         private Checkbox _hueContainerGumps;
         private Checkbox _containerToggleDefaultGrid;
         private Checkbox _gridContainerLightBg;
+        private Checkbox _gridContainerUsePagination;
 
 
         //counters
@@ -619,6 +620,18 @@ namespace ClassicUO.Game.UI.Gumps
                     null,
                     ResGumps.SmoothDoors,
                     _currentProfile.SmoothDoors,
+                    startX,
+                    startY
+                )
+            );
+
+            section.Add
+            (
+                _allowDiagonalCornerCutting = AddCheckBox
+                (
+                    null,
+                    "Allow diagonal corner-cutting (some shards allow this)",
+                    _currentProfile.AllowDiagonalCornerCutting,
                     startX,
                     startY
                 )
@@ -4239,6 +4252,7 @@ namespace ClassicUO.Game.UI.Gumps
                     _autoOpenCorpse.IsChecked = false;
                     _autoOpenDoors.IsChecked = false;
                     _smoothDoors.IsChecked = false;
+                    _allowDiagonalCornerCutting.IsChecked = false;
                     _skipEmptyCorpse.IsChecked = false;
                     _saveHealthbars.IsChecked = false;
                     _use_smooth_boat_movement.IsChecked = false;
@@ -4979,6 +4993,7 @@ namespace ClassicUO.Game.UI.Gumps
             _currentProfile.DisableAutoMove = _disableAutoMove.IsChecked;
             _currentProfile.AutoOpenDoors = _autoOpenDoors.IsChecked;
             _currentProfile.SmoothDoors = _smoothDoors.IsChecked;
+            _currentProfile.AllowDiagonalCornerCutting = _allowDiagonalCornerCutting.IsChecked;
             _currentProfile.SaveGumpsRelativeToCenter = _saveGumpsRelativeToCenter.IsChecked;
             _currentProfile.AutoOpenCorpses = _autoOpenCorpse.IsChecked;
             _currentProfile.AutoOpenCorpseRange = int.Parse(_autoOpenCorpseRange.Text);
