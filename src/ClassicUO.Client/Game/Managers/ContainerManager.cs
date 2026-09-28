@@ -20,6 +20,7 @@ namespace ClassicUO.Game.Managers
             new Dictionary<ushort, ContainerData>();
 
         private readonly World _world;
+        private readonly List<ContainerReloadPath> _reloadPaths = new List<ContainerReloadPath>();
 
         public ContainerManager(World world)
         {
@@ -95,6 +96,113 @@ namespace ClassicUO.Game.Managers
             {
                 profile.PinnedContainerSerials.Remove(serial);
             }
+        }
+
+        // Preserve the path to each pinned container before a death update clears the
+        // local contents of the player's backpack.
+        public void SavePinnedBackpackPaths()
+        {
+            _reloadPaths.Clear();
+
+            Item backpack = _world.Player?.FindItemByLayer(Layer.Backpack);
+
+            if (backpack == null)
+            {
+                return;
+            }
+
+            foreach (Gump gump in UIManager.Gumps)
+            {
+                if (!(gump is ContainerGump) || !IsPinned(gump.LocalSerial))
+                {
+                    continue;
+                }
+
+                Item item = _world.Items.Get(gump.LocalSerial);
+
+                if (item == null)
+                {
+                    continue;
+                }
+
+                var serials = new List<uint>();
+                var visited = new HashSet<uint>();
+
+                while (item != null && visited.Add(item.Serial))
+                {
+                    serials.Add(item.Serial);
+
+                    if (item.Serial == backpack.Serial)
+                    {
+                        serials.Reverse();
+                        _reloadPaths.Add(new ContainerReloadPath(serials));
+                        break;
+                    }
+
+                    item = _world.Items.Get(item.Container);
+                }
+            }
+        }
+
+        // Reopen each saved path one level at a time.  A nested container cannot be
+        // relied on to have its contents resent until its parent has been opened.
+        public void RestorePinnedBackpackPaths()
+        {
+            var containersToOpen = new HashSet<uint>();
+
+            foreach (ContainerReloadPath path in _reloadPaths)
+            {
+                containersToOpen.Add(path.Serials[0]);
+            }
+
+            foreach (uint serial in containersToOpen)
+            {
+                GameActions.DoubleClick(_world, serial);
+            }
+        }
+
+        // A child can be opened only after the server has sent its parent contents.
+        // Receiving OpenContainer alone is too early: it clears the old contents first.
+        public void OnContainerContentsReceived(uint serial)
+        {
+            var containersToOpen = new HashSet<uint>();
+
+            for (int i = _reloadPaths.Count - 1; i >= 0; i--)
+            {
+                ContainerReloadPath path = _reloadPaths[i];
+
+                if (path.Serials[path.CurrentIndex] != serial)
+                {
+                    continue;
+                }
+
+                path.CurrentIndex++;
+
+                if (path.CurrentIndex == path.Serials.Count)
+                {
+                    _reloadPaths.RemoveAt(i);
+                }
+                else
+                {
+                    containersToOpen.Add(path.Serials[path.CurrentIndex]);
+                }
+            }
+
+            foreach (uint nextSerial in containersToOpen)
+            {
+                GameActions.DoubleClick(_world, nextSerial);
+            }
+        }
+
+        private sealed class ContainerReloadPath
+        {
+            public ContainerReloadPath(List<uint> serials)
+            {
+                Serials = serials;
+            }
+
+            public List<uint> Serials { get; }
+            public int CurrentIndex { get; set; }
         }
 
         public void CalculateContainerPosition(uint serial, ushort g)
