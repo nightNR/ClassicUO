@@ -121,4 +121,5 @@ public readonly struct StatusBarChangeInfo
     public int GroupId { get; }
     public int X { get; }
     public int Y { get; }
+    
 }
