@@ -22,7 +22,8 @@ namespace ClassicUO.Game.Data
             0
         );
 
-        internal static Dictionary<string, SpellDefinition> WordToTargettype = new Dictionary<string, SpellDefinition>();
+        internal static Dictionary<string, SpellDefinition> WordToTargettype = new Dictionary<string, SpellDefinition>(StringComparer.OrdinalIgnoreCase);
+        private static bool _watchedSpellsInitialized;
 
 
         public SpellDefinition
@@ -127,6 +128,40 @@ namespace ClassicUO.Game.Data
             {
                 WordToTargettype[Name] = this;
             }
+        }
+
+        /// <summary>
+        /// Resolves a server-sent Words of Power message to its spell definition.
+        /// Spell schools are initialized lazily, so this must force their initialization
+        /// before consulting the lookup used by overhead spell formatting.
+        /// </summary>
+        internal static bool TryGetByPowerWords(string powerWords, out SpellDefinition spell)
+        {
+            EnsureWatchedSpellsInitialized();
+
+            spell = EmptySpell;
+
+            return !string.IsNullOrWhiteSpace(powerWords)
+                && WordToTargettype.TryGetValue(powerWords.Trim(), out spell);
+        }
+
+        private static void EnsureWatchedSpellsInitialized()
+        {
+            if (_watchedSpellsInitialized)
+            {
+                return;
+            }
+
+            _ = SpellsMagery.GetAllSpells;
+            _ = SpellsNecromancy.GetAllSpells;
+            _ = SpellsChivalry.GetAllSpells;
+            _ = SpellsBushido.GetAllSpells;
+            _ = SpellsNinjitsu.GetAllSpells;
+            _ = SpellsSpellweaving.GetAllSpells;
+            _ = SpellsMysticism.GetAllSpells;
+            _ = SpellsMastery.GetAllSpells;
+
+            _watchedSpellsInitialized = true;
         }
 
 

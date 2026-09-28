@@ -153,9 +153,12 @@ namespace ClassicUO.Game.Managers
                     break;
 
                 case MessageType.Spell:
+                // Sphere-style shards send Words of Power as Limit3Spell rather than
+                // Spell. They still need the same user-configured formatting and hue.
+                case MessageType.Limit3Spell:
                 {
                     //server hue color per default
-                    if (!string.IsNullOrEmpty(text) && SpellDefinition.WordToTargettype.TryGetValue(text, out SpellDefinition spell))
+                    if (SpellDefinition.TryGetByPowerWords(text, out SpellDefinition spell))
                     {
                         if (currentProfile != null && currentProfile.EnabledSpellFormat && !string.IsNullOrWhiteSpace(currentProfile.SpellDisplayFormat))
                         {
@@ -196,15 +199,17 @@ namespace ClassicUO.Game.Managers
                 case MessageType.Yell:
                 case MessageType.Regular:
                 case MessageType.Label:
-                case MessageType.Limit3Spell:
-
                     if (parent == null)
                     {
                         break;
                     }
 
                     // If person who send that message is in ignores list - but filter out Spell Text
-                    if (_world.IgnoreManager.IgnoredCharsList.Contains(parent.Name) && type != MessageType.Spell)
+                    if (
+                        _world.IgnoreManager.IgnoredCharsList.Contains(parent.Name)
+                        && type != MessageType.Spell
+                        && type != MessageType.Limit3Spell
+                    )
                         break;
 
                     string overheadText = (textType == TextType.OBJECT && parent != null)
