@@ -1856,6 +1856,42 @@ namespace ClassicUO.Game.UI.Gumps
             }
         }
 
+        /// <summary>Macro entry point: toggles the marker category (or imported file) with the given name.</summary>
+        internal static void ToggleMarkerCategory(World world, string name)
+        {
+            name = name?.Trim();
+
+            if (string.IsNullOrEmpty(name))
+            {
+                GameActions.Print(world, "Marker category macro needs a category name.", 0x2A);
+
+                return;
+            }
+
+            WMapMarkerFile file = _markerFiles.FirstOrDefault(f => string.Equals(f.Name, name, StringComparison.OrdinalIgnoreCase));
+
+            if (file == null)
+            {
+                MarkerCategory cat = UserMarkers.Categories.FirstOrDefault(c => string.Equals(c.Name, name, StringComparison.OrdinalIgnoreCase));
+
+                if (cat == null)
+                {
+                    GameActions.Print(world, $"Marker category '{name}' not found.", 0x2A);
+
+                    return;
+                }
+
+                UserMarkers.SetCategoryEnabled(cat.Id, !cat.Enabled);
+                GameActions.Print(world, $"Markers '{cat.Name}': {(cat.Enabled ? "on" : "off")}", 0x2A);
+
+                return;
+            }
+
+            bool hide = file.Category != null ? file.Category.Enabled : !file.Hidden;
+            SetMarkerFileHidden(file, hide);
+            GameActions.Print(world, $"Markers '{file.Name}': {(hide ? "off" : "on")}", 0x2A);
+        }
+
         /// <summary>Rebuilds the leading user-category entries of <see cref="_markerFiles"/> from the store (order, names, enabled).</summary>
         internal static void SyncUserCategoryFiles()
         {
@@ -2088,7 +2124,7 @@ namespace ClassicUO.Game.UI.Gumps
 
                 if (lastMarker != null)
                 {
-                    DrawMarkerString(batcher, lastMarker, gX, gY, halfWidth, halfHeight, layerDepth);
+                    DrawMarkerString(batcher, lastMarker, gX, gY, halfWidth, halfHeight, layerDepth, true);
                 }
             }
 
@@ -2600,7 +2636,7 @@ namespace ClassicUO.Game.UI.Gumps
             return drawSingleName;
         }
 
-        private void DrawMarkerString(UltimaBatcher2D batcher, WMapMarker marker, int x, int y, int width, int height, float layerDepth)
+        private void DrawMarkerString(UltimaBatcher2D batcher, WMapMarker marker, int x, int y, int width, int height, float layerDepth, bool withNote = false)
         {
             int sx = marker.X - _center.X;
             int sy = marker.Y - _center.Y;
@@ -2617,7 +2653,9 @@ namespace ClassicUO.Game.UI.Gumps
             rot.X += x + width;
             rot.Y += y + height;
 
-            Vector2 size = _markerFont.MeasureString(marker.Name);
+            string text = withNote && !string.IsNullOrWhiteSpace(marker.Note) ? $"{marker.Name} - {marker.Note}" : marker.Name;
+
+            Vector2 size = _markerFont.MeasureString(text);
 
             if (rot.X + size.X / 2 > x + Width - 8)
             {
@@ -2661,7 +2699,7 @@ namespace ClassicUO.Game.UI.Gumps
             batcher.DrawString
             (
                 _markerFont,
-                marker.Name,
+                text,
                 xx + 1,
                 yy + 1,
                 hueVector,
@@ -2673,7 +2711,7 @@ namespace ClassicUO.Game.UI.Gumps
             batcher.DrawString
             (
                 _markerFont,
-                marker.Name,
+                text,
                 xx,
                 yy,
                 hueVector,
