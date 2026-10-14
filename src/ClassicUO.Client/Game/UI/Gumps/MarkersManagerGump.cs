@@ -317,6 +317,8 @@ namespace ClassicUO.Game.UI.Gumps
 
         private void RebuildMarkers()
         {
+            int scroll = _markerArea?.ScrollValue ?? 0;
+
             if (_markerArea != null)
             {
                 Remove(_markerArea);
@@ -339,6 +341,7 @@ namespace ClassicUO.Game.UI.Gumps
             }
 
             Add(_markerArea);
+            _markerArea.SetScrollValueAfterLayout(scroll);
 
             _pageLabel.Text = $"Page {_page + 1}/{pages}   ({_filtered.Count} markers)";
             UpdateSelectedLabel();
@@ -360,6 +363,46 @@ namespace ClassicUO.Game.UI.Gumps
             _sortCombo = new Combobox(RIGHT_X + 362, 64, 120, SortModes, _sortMode);
             _sortCombo.OnOptionSelected += (s, i) => { _sortMode = i; _page = 0; RebuildMarkers(); };
             Add(_sortCombo);
+        }
+
+        private WMapMarker _anchor;
+
+        /// <summary>OS-style row click: plain = select only this, Ctrl = toggle, Shift = range from anchor (Ctrl+Shift = add range).</summary>
+        private void ClickRow(WMapMarker marker)
+        {
+            List<WMapMarker> page = _filtered.Skip(_page * PAGE_SIZE).Take(PAGE_SIZE).Select(r => r.Marker).ToList();
+
+            if (Keyboard.Shift && _anchor != null && page.Contains(_anchor))
+            {
+                int a = page.IndexOf(_anchor), b = page.IndexOf(marker);
+
+                if (!Keyboard.Ctrl)
+                {
+                    _selection.Clear();
+                }
+
+                for (int i = Math.Min(a, b); i <= Math.Max(a, b); i++)
+                {
+                    _selection.Add(page[i]);
+                }
+            }
+            else if (Keyboard.Ctrl)
+            {
+                if (!_selection.Remove(marker))
+                {
+                    _selection.Add(marker);
+                }
+
+                _anchor = marker;
+            }
+            else
+            {
+                _selection.Clear();
+                _selection.Add(marker);
+                _anchor = marker;
+            }
+
+            RebuildMarkers();
         }
 
         private void UpdateSelectedLabel()
@@ -752,21 +795,13 @@ namespace ClassicUO.Game.UI.Gumps
                 }
 
                 // selection / hover area over the name
-                _hit = new HitBox(24, 0, 258, ROW_H - 1, BuildTooltip(), selected ? 0.3f : 0f);
+                _hit = new RowHit(24, 0, 258, ROW_H - 1, BuildTooltip(), selected);
                 _hit.MouseUp += (s, e) =>
                 {
-                    if (e.Button != MouseButtonType.Left)
+                    if (e.Button == MouseButtonType.Left)
                     {
-                        return;
+                        gump.ClickRow(marker);
                     }
-
-                    if (!gump._selection.Remove(marker))
-                    {
-                        gump._selection.Add(marker);
-                    }
-
-                    _hit.Alpha = gump._selection.Contains(marker) ? 0.3f : 0f;
-                    gump.UpdateSelectedLabel();
                 };
 
                 Add(_hit);
@@ -816,6 +851,44 @@ namespace ClassicUO.Game.UI.Gumps
 
                         break;
                 }
+            }
+        }
+
+        /// <summary>Row highlight: always drawn when selected, lighter tint while hovered.</summary>
+        private sealed class RowHit : HitBox
+        {
+            private static readonly Texture2D SelTexture = SolidColorTextureCache.GetTexture(new Color(70, 120, 200));
+            private readonly bool _selected;
+
+            public RowHit(int x, int y, int w, int h, string tooltip, bool selected) : base(x, y, w, h, tooltip, 0.15f)
+            {
+                _selected = selected;
+            }
+
+            public override bool AddToRenderLists(RenderLists renderLists, int x, int y, ref float layerDepthRef)
+            {
+                if (IsDisposed)
+                {
+                    return false;
+                }
+
+                if (_selected || MouseIsOver)
+                {
+                    float layerDepth = layerDepthRef;
+                    Texture2D tex = _selected ? SelTexture : _texture;
+                    Vector3 hueVector = ShaderHueTranslator.GetHueVector(0, false, _selected ? (MouseIsOver ? 0.55f : 0.4f) : Alpha, true);
+                    int w = Width, h = Height;
+
+                    renderLists.AddGumpNoAtlas(batcher =>
+                    {
+                        batcher.Draw(tex, new Vector2(x, y), new Rectangle(0, 0, w, h), hueVector, layerDepth);
+
+                        return true;
+                    });
+                }
+
+                // no children; HitBox's own hover draw is intentionally skipped
+                return true;
             }
         }
 
