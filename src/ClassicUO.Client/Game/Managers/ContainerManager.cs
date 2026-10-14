@@ -65,6 +65,9 @@ namespace ClassicUO.Game.Managers
             }
         }
 
+        /// <summary>Drops the cached set so it is rebuilt from the (new) profile on next access.</summary>
+        public void ResetPinned() => _pinned = null;
+
         public bool IsPinned(uint serial) => serial != 0 && PinnedSet.Contains(serial);
 
         public void SetPinned(uint serial, bool pinned)

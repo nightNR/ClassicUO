@@ -24,7 +24,14 @@ namespace ClassicUO.Configuration
         /// <summary>Set by a plugin (e.g. Phoenix) to force a named profile for the next load; wins over the assignment table.</summary>
         public static string OverrideProfileName { get; set; }
 
+        /// <summary>Raised after the active profile was swapped while in game (argument: new profile name).</summary>
+        public static event Action<string> ProfileChanged;
+
+        internal static void RaiseProfileChanged() => ProfileChanged?.Invoke(ActiveProfileName);
+
         private static string _rootPath;
+
+        internal static void ResetRootCache() => _rootPath = null;
         internal static string RootPath
         {
             get
@@ -53,34 +60,37 @@ namespace ClassicUO.Configuration
             string path = ResolveProfileDir(username, servername, charactername, charPath, out string profileName);
             string fileToLoad = Path.Combine(path, "profile.json");
 
-            CharacterPath = charPath;
-            ProfilePath = path;
-            ActiveProfileName = profileName;
-            CurrentProfile = ConfigurationResolver.Load<Profile>(fileToLoad, ProfileJsonContext.DefaultToUse.Profile) ?? NewFromDefault();
+            // Build the new profile completely before publishing it, so a broken file leaves the active profile untouched.
+            Profile loaded = ConfigurationResolver.Load<Profile>(fileToLoad, ProfileJsonContext.DefaultToUse.Profile) ?? NewFromDefault();
 
             // per-character data; when the file is missing the values read from a legacy profile.json stay in place
             CharacterState state = ConfigurationResolver.Load<CharacterState>(Path.Combine(charPath, "character_state.json"), ProfileJsonContext.DefaultToUse.CharacterState);
-            state?.ApplyTo(CurrentProfile);
+            state?.ApplyTo(loaded);
 
-            CurrentProfile.Username = username;
-            CurrentProfile.ServerName = servername;
-            CurrentProfile.CharacterName = charactername;
+            loaded.Username = username;
+            loaded.ServerName = servername;
+            loaded.CharacterName = charactername;
 
-            ValidateFields(CurrentProfile);
+            ValidateFields(loaded);
 
             // New per-profile atlas state, then migrate legacy ChatFont/TooltipFont
             // slot bytes into LocationFonts (once — only if not already present).
             ClassicUO.Resources.AtlasFontRegistry.Reset();
-            MigrateLegacyFont(CurrentProfile, FontLocation.Chat, CurrentProfile.ChatFont);
-            MigrateLegacyFont(CurrentProfile, FontLocation.Tooltip, CurrentProfile.TooltipFont);
+            MigrateLegacyFont(loaded, FontLocation.Chat, loaded.ChatFont);
+            MigrateLegacyFont(loaded, FontLocation.Tooltip, loaded.TooltipFont);
 
             // Reset() just freed every dynamic slot, so any legacy byte pointing at a
             // dynamic TTF slot from a previous session is now stale/unregistered.
             // Re-resolve through LocationFonts (which re-registers the slot via
             // TryResolve) and re-sync the legacy bytes so renderers that still read
             // ChatFont/TooltipFont directly see a live slot.
-            CurrentProfile.ChatFont = CurrentProfile.ResolveFont(FontLocation.Chat).slot;
-            CurrentProfile.TooltipFont = CurrentProfile.ResolveFont(FontLocation.Tooltip).slot;
+            loaded.ChatFont = loaded.ResolveFont(FontLocation.Chat).slot;
+            loaded.TooltipFont = loaded.ResolveFont(FontLocation.Tooltip).slot;
+
+            CharacterPath = charPath;
+            ProfilePath = path;
+            ActiveProfileName = profileName;
+            CurrentProfile = loaded;
         }
 
         /// <summary>
