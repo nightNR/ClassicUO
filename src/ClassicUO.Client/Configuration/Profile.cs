@@ -22,6 +22,8 @@ namespace ClassicUO.Configuration
     //[JsonSourceGenerationOptions(WriteIndented = true, PropertyNamingPolicy = JsonKnownNamingPolicy.Unspecified)]
     [JsonSerializable(typeof(GlobalProfile), GenerationMode = JsonSourceGenerationMode.Metadata)]
     [JsonSerializable(typeof(Profile), GenerationMode = JsonSourceGenerationMode.Metadata)]
+    [JsonSerializable(typeof(CharacterState), GenerationMode = JsonSourceGenerationMode.Metadata)]
+    [JsonSerializable(typeof(System.Collections.Generic.Dictionary<string, string>), GenerationMode = JsonSourceGenerationMode.Metadata)]
     [JsonSerializable(typeof(ClassicUO.Game.UI.Gumps.ChatHistoryEntry), GenerationMode = JsonSourceGenerationMode.Metadata)]
     [JsonSerializable(typeof(ClassicUO.Game.Managers.AliasEntry), GenerationMode = JsonSourceGenerationMode.Metadata)]
     [JsonSerializable(typeof(ClassicUO.Configuration.PluginAnchorGroupDef), GenerationMode = JsonSourceGenerationMode.Metadata)]
@@ -262,13 +264,19 @@ namespace ClassicUO.Configuration
         public bool DisableCtrlQWBtn { get; set; }
         public bool ChatUseArrowsForHistory { get; set; } = true;
         public int ChatHistoryLength { get; set; } = 20;
-        public List<ChatHistoryEntry> ChatHistory { get; set; } = new List<ChatHistoryEntry>();
+        // Per-character data (see CharacterState): kept on Profile for the call sites, persisted in character_state.json.
+        // The Legacy* shadows only read values from old profile.json files; they are never written (getter returns null).
+        [JsonIgnore] public List<ChatHistoryEntry> ChatHistory { get; set; } = new List<ChatHistoryEntry>();
+        [JsonPropertyName("chat_history"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public List<ChatHistoryEntry> LegacyChatHistory { get => null; set { if (value != null) ChatHistory = value; } }
         public bool AliasesEnabled { get; set; } = true;
         public List<ClassicUO.Game.Managers.AliasEntry> CharacterAliases { get; set; } = new List<ClassicUO.Game.Managers.AliasEntry>();
         public bool DisableAutoMove { get; set; }
         public bool EnableDragSelect { get; set; }
         public int DragSelectModifierKey { get; set; } // 0 = none, 1 = control, 2 = shift
-        public List<uint> PinnedContainerSerials { get; set; } = new List<uint>();
+        [JsonIgnore] public List<uint> PinnedContainerSerials { get; set; } = new List<uint>();
+        [JsonPropertyName("pinned_container_serials"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public List<uint> LegacyPinnedContainerSerials { get => null; set { if (value != null) PinnedContainerSerials = value; } }
         public bool OverrideContainerLocation { get; set; }
 
         public int OverrideContainerLocationSetting { get; set; } // 0 = container position, 1 = top right of screen, 2 = last dragged position, 3 = remember every container
@@ -338,7 +346,9 @@ namespace ClassicUO.Configuration
         public bool ShowNewMobileNameIncoming { get; set; } = true;
         public bool ShowNewCorpseNameIncoming { get; set; } = true;
 
-        public uint GrabBagSerial { get; set; }
+        [JsonIgnore] public uint GrabBagSerial { get; set; }
+        [JsonPropertyName("grab_bag_serial"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public uint? LegacyGrabBagSerial { get => null; set { if (value.HasValue) GrabBagSerial = value.Value; } }
 
         public int GridLootType { get; set; } // 0 = none, 1 = only grid, 2 = both
 
@@ -351,7 +361,9 @@ namespace ClassicUO.Configuration
         public bool GridContainerUsePagination { get; set; }
 
         // User-selected grid size, remembered independently for each container serial.
-        public Dictionary<uint, GridContainerSize> GridContainerSizes { get; set; } = new();
+        [JsonIgnore] public Dictionary<uint, GridContainerSize> GridContainerSizes { get; set; } = new();
+        [JsonPropertyName("grid_container_sizes"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public Dictionary<uint, GridContainerSize> LegacyGridContainerSizes { get => null; set { if (value != null) GridContainerSizes = value; } }
 
         public bool ReduceFPSWhenInactive { get; set; } = true;
 
@@ -383,7 +395,9 @@ namespace ClassicUO.Configuration
 
         // Explicit per-serial choice in Toggle mode. true = grid, false = standard.
         // Absent key => fall back to ContainerToggleDefaultGrid.
-        public Dictionary<uint, bool> ContainerGridStates { get; set; } = new();
+        [JsonIgnore] public Dictionary<uint, bool> ContainerGridStates { get; set; } = new();
+        [JsonPropertyName("container_grid_states"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public Dictionary<uint, bool> LegacyContainerGridStates { get => null; set { if (value != null) ContainerGridStates = value; } }
 
         public bool HighlightContainerWhenSelected { get; set; }
 
@@ -471,9 +485,10 @@ namespace ClassicUO.Configuration
             Log.Trace($"Saving path:\t\t{path}");
 
             ProfileManager.Save(this, path);
+            ProfileManager.SaveCharacterState(this);
 
-            // Save opened gumps
-            SaveGumps(world, path);
+            // Save opened gumps (serial-bound, so they live with the character, not the shared profile)
+            SaveGumps(world, ProfileManager.CharacterPath);
 
             Log.Trace("Saving done!");
         }
@@ -610,7 +625,7 @@ namespace ClassicUO.Configuration
             world.SkillsGroupManager.Load();
 
             // load gumps
-            string gumpsXmlPath = Path.Combine(path, "gumps.xml");
+            string gumpsXmlPath = Path.Combine(ProfileManager.CharacterPath, "gumps.xml");
 
             if (File.Exists(gumpsXmlPath))
             {
