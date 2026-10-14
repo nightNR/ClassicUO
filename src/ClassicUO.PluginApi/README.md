@@ -300,6 +300,35 @@ Example:
     // Drop every override, from any plugin:
     context.Nameplates.ClearAllOverrides();
 
+## Profiles
+
+`context.Profiles` ties the client's named profiles to the plugin's own. The client owns the
+character -> profile assignments; a plugin can only *ask* for a profile.
+
+```csharp
+context.Profiles.CharacterSelected += c =>
+{
+    // login screen: the character was picked, its profile is not resolved yet
+    context.Profiles.Switch("Raid");                       // QueuedForLogin: used for this login
+};
+
+context.Profiles.Changed += name => Log($"client profile is now {name}");
+
+// in game, e.g. after the plugin's own profile changed (game thread only):
+context.Game.Post(() =>
+{
+    if (context.Profiles.Switch("Crafting") == ProfileSwitchResult.UnknownProfile)
+        Log("no such client profile");
+});
+```
+
+- `Switch(name)` in game saves the current profile, loads the target and rebuilds the UI. It is a
+  session override (cleared on logout); `Switch(name, assignToCharacter: true)` also stores it as the
+  character's profile. Before login it queues an override for the next login.
+- `List()`, `Switch` and `ClearOverride()` are game-thread only; `Active`/`Changed` are safe anywhere.
+- `Changed` fires after a login load and after a live switch (once the UI is rebuilt).
+- Older clients do not list the profile opcodes; calls then return `ProfileSwitchResult.Failed`/empty.
+
 ## Sample
 
 A worked example lives at

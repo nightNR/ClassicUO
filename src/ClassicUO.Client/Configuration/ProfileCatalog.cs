@@ -71,6 +71,89 @@ namespace ClassicUO.Configuration
             return !string.IsNullOrWhiteSpace(name) && Directory.Exists(ProfileDir(root, SanitizeName(name)));
         }
 
+        public static int AssignedCount(string root, string name)
+        {
+            return LoadAssignments(root).Values.Count(v => string.Equals(v, name, StringComparison.OrdinalIgnoreCase));
+        }
+
+        /// <summary>Characters (account|server|character keys) currently assigned to <paramref name="name"/>.</summary>
+        public static List<string> AssignedCharacters(string root, string name)
+        {
+            return LoadAssignments(root).Where(kv => string.Equals(kv.Value, name, StringComparison.OrdinalIgnoreCase)).Select(kv => kv.Key).OrderBy(k => k, StringComparer.OrdinalIgnoreCase).ToList();
+        }
+
+        /// <summary>Copies the shared files of <paramref name="source"/> into a new profile. False if source is missing or target exists.</summary>
+        public static bool Duplicate(string root, string source, string target)
+        {
+            target = SanitizeName(target);
+
+            if (!Exists(root, source) || Exists(root, target))
+            {
+                return false;
+            }
+
+            string src = ProfileDir(root, SanitizeName(source));
+            string dst = ProfileDir(root, target);
+            Directory.CreateDirectory(dst);
+
+            foreach (string file in ProfileFiles)
+            {
+                if (File.Exists(Path.Combine(src, file)))
+                {
+                    File.Copy(Path.Combine(src, file), Path.Combine(dst, file), true);
+                }
+            }
+
+            return true;
+        }
+
+        /// <summary>Renames a profile and re-points its assignments. False if missing or the new name is taken.</summary>
+        public static bool Rename(string root, string oldName, string newName)
+        {
+            newName = SanitizeName(newName);
+
+            if (!Exists(root, oldName) || (Exists(root, newName) && !string.Equals(newName, oldName, StringComparison.OrdinalIgnoreCase)))
+            {
+                return false;
+            }
+
+            oldName = SanitizeName(oldName);
+            string from = ProfileDir(root, oldName);
+            string to = ProfileDir(root, newName);
+
+            if (!string.Equals(from, to, StringComparison.Ordinal))
+            {
+                // two-step move so a case-only rename also works on case-insensitive file systems
+                string tmp = from + ".rename";
+                Directory.Move(from, tmp);
+                Directory.Move(tmp, to);
+            }
+
+            Dictionary<string, string> assignments = LoadAssignments(root);
+
+            foreach (string key in assignments.Where(kv => string.Equals(kv.Value, oldName, StringComparison.OrdinalIgnoreCase)).Select(kv => kv.Key).ToList())
+            {
+                assignments[key] = newName;
+            }
+
+            SaveAssignments(root, assignments);
+
+            return true;
+        }
+
+        /// <summary>Deletes a profile that no character is assigned to.</summary>
+        public static bool Delete(string root, string name)
+        {
+            if (!Exists(root, name) || AssignedCount(root, name) > 0)
+            {
+                return false;
+            }
+
+            Directory.Delete(ProfileDir(root, SanitizeName(name)), true);
+
+            return true;
+        }
+
         public static string SanitizeName(string name)
         {
             char[] invalid = Path.GetInvalidFileNameChars();
