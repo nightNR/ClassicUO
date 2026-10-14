@@ -52,4 +52,7 @@ public interface IProfiles
     /// <see cref="Switch"/> if the plugin wants a specific profile for this login.
     /// </summary>
     event Action<CharacterSelection>? CharacterSelected;
+
+    /// <summary>A named profile was created, renamed or deleted; re-read <see cref="List"/>.</summary>
+    event Action? ListChanged;
 }

@@ -312,6 +312,8 @@ context.Profiles.CharacterSelected += c =>
     context.Profiles.Switch("Raid");                       // QueuedForLogin: used for this login
 };
 
+context.Profiles.ListChanged += () => RefreshMyProfileDropdown();   // created/renamed/deleted in the client
+
 context.Profiles.Changed += name => Log($"client profile is now {name}");
 
 // in game, e.g. after the plugin's own profile changed (game thread only):

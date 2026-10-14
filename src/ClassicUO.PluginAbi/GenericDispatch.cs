@@ -115,6 +115,12 @@ public static class GenericEventIds
     /// Payload: UTF-8 <c>account\nserver\ncharacter</c>.
     /// </summary>
     public const int CharacterSelected = 5;
+
+    /// <summary>
+    /// The set of named profiles changed (created, renamed or deleted). No payload; re-query with
+    /// <see cref="GenericOpcodes.ListProfiles"/>.
+    /// </summary>
+    public const int ProfileListChanged = 6;
 }
 
 /// <summary>Bitmask for <see cref="StatusBarChangedPayload.Flags"/>.</summary>

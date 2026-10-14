@@ -137,6 +137,7 @@ namespace ClassicUO.Game.UI.Gumps
                         {
                             _selected = ProfileCatalog.SanitizeName(name);
                             Say($"Created '{_selected}'.");
+                            PluginProfiles.RaiseListChanged();
                             Rebuild();
                         }
                         else
@@ -159,6 +160,7 @@ namespace ClassicUO.Game.UI.Gumps
                         if (ProfileCatalog.Rename(Root, oldName, name))
                         {
                             _selected = ProfileCatalog.SanitizeName(name);
+                            PluginProfiles.RaiseListChanged();
                             Rebuild();
                         }
                         else
@@ -183,6 +185,7 @@ namespace ClassicUO.Game.UI.Gumps
                         if (yes && ProfileCatalog.Delete(Root, toDelete))
                         {
                             Say($"Deleted '{toDelete}'.");
+                            PluginProfiles.RaiseListChanged();
                             Rebuild();
                         }
                     }));

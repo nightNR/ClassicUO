@@ -19,6 +19,8 @@ namespace ClassicUO.Game.Managers
 
         public static void RaiseChanged(string profileName) => Raise(GenericEventIds.ProfileChanged, Encoding.UTF8.GetBytes(profileName ?? ""));
 
+        public static void RaiseListChanged() => Raise(GenericEventIds.ProfileListChanged, Array.Empty<byte>());
+
         public static void RaiseCharacterSelected(string account, string server, string character)
         {
             Raise(GenericEventIds.CharacterSelected, Encoding.UTF8.GetBytes($"{account}\n{server}\n{character}"));
