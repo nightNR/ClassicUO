@@ -528,6 +528,7 @@ internal sealed class ProfilesImpl : IProfiles
 
     public event Action<string>? Changed;
     public event Action<CharacterSelection>? CharacterSelected;
+    public event Action? ListChanged;
 
     public string? Active => _active;
 
@@ -538,6 +539,10 @@ internal sealed class ProfilesImpl : IProfiles
             case GenericEventIds.ProfileChanged:
                 _active = Encoding.UTF8.GetString(payload);
                 Changed?.Invoke(_active);
+                break;
+
+            case GenericEventIds.ProfileListChanged:
+                ListChanged?.Invoke();
                 break;
 
             case GenericEventIds.CharacterSelected:
