@@ -47,6 +47,9 @@ public interface IPluginContext
     /// <summary>Plugin-driven per-serial nameplate visibility/opacity override.</summary>
     INameplates Nameplates { get; }
 
+    /// <summary>Client profiles: list, switch (also live), and change notifications.</summary>
+    IProfiles Profiles { get; }
+
     /// <summary>Window title, cliloc translation, and other client-level services.</summary>
     IClient Client { get; }
 

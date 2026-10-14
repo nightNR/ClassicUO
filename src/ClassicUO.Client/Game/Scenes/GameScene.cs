@@ -264,7 +264,7 @@ namespace ClassicUO.Game.Scenes
             PluginAnchorGroupManager.Rebuild(_world);
 
             Log.Info($"Switched to profile '{name}'");
-            ProfileManager.RaiseProfileChanged();
+            PluginProfiles.RaiseChanged(ProfileManager.ActiveProfileName);
 
             return true;
         }

@@ -427,6 +427,7 @@ namespace ClassicUO.Game.Scenes
         {
             if (CurrentLoginStep == LoginSteps.CharacterSelection)
             {
+                PluginProfiles.RaiseCharacterSelected(Account, _world.ServerName, Characters[index]);
                 LastCharacterManager.Save(Account, _world.ServerName, Characters[index]);
 
                 CurrentLoginStep = LoginSteps.EnteringBritania;
@@ -454,6 +455,7 @@ namespace ClassicUO.Game.Scenes
                 }
             }
 
+            PluginProfiles.RaiseCharacterSelected(Account, _world.ServerName, character.Name);
             LastCharacterManager.Save(Account, _world.ServerName, character.Name);
 
             NetClient.Socket.Send_CreateCharacter(character,

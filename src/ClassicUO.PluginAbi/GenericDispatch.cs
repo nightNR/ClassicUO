@@ -61,6 +61,30 @@ public static class GenericOpcodes
     /// partitioning). Args: none. Result: none.
     /// </summary>
     public const int ClearAllNameplateOverrides = 5;
+
+    /// <summary>
+    /// Lists the client's named profiles. Args: none. Result: UTF-8 names separated by <c>'\n'</c>
+    /// (no trailing separator; 0 bytes when there are none). -2 when the output buffer is too small.
+    /// </summary>
+    public const int ListProfiles = 6;
+
+    /// <summary>
+    /// Name of the profile currently active for the logged-in character. Args: none. Result: UTF-8 name,
+    /// 0 bytes when the character still uses a legacy per-character profile or nothing is loaded yet.
+    /// </summary>
+    public const int GetActiveProfile = 7;
+
+    /// <summary>
+    /// Switches the client profile. Args: <c>byte</c> flags (bit 0 = also store as the character's assigned
+    /// profile) followed by the UTF-8 profile name. In game the switch is applied immediately (game thread only);
+    /// before login it is queued as an override for the next login (flags ignored). Result: none; returns
+    /// 0 = applied now, 1 = queued for the next login, -2 = args too small, -3 = unknown profile, -4 = switch failed.
+    /// A runtime override lasts for the session and is cleared on logout.
+    /// </summary>
+    public const int SwitchProfile = 8;
+
+    /// <summary>Drops a queued/session profile override so the character's assigned profile applies again on next load. Args: none. Result: none.</summary>
+    public const int ClearProfileOverride = 9;
 }
 
 /// <summary>
@@ -78,6 +102,19 @@ public static class GenericEventIds
 
     /// <summary>A status bar's tracked state changed. Payload: <see cref="StatusBarChangedPayload"/>.</summary>
     public const int StatusBarChanged = 3;
+
+    /// <summary>
+    /// The active profile changed: after a login load or a live switch (fired once the UI is rebuilt).
+    /// Payload: UTF-8 profile name.
+    /// </summary>
+    public const int ProfileChanged = 4;
+
+    /// <summary>
+    /// The player picked/created a character on the login screen, before the profile is resolved. A host can answer
+    /// with <see cref="GenericOpcodes.SwitchProfile"/> to override the profile for this login.
+    /// Payload: UTF-8 <c>account\nserver\ncharacter</c>.
+    /// </summary>
+    public const int CharacterSelected = 5;
 }
 
 /// <summary>Bitmask for <see cref="StatusBarChangedPayload.Flags"/>.</summary>

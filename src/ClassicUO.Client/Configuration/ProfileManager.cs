@@ -24,11 +24,6 @@ namespace ClassicUO.Configuration
         /// <summary>Set by a plugin (e.g. Phoenix) to force a named profile for the next load; wins over the assignment table.</summary>
         public static string OverrideProfileName { get; set; }
 
-        /// <summary>Raised after the active profile was swapped while in game (argument: new profile name).</summary>
-        public static event Action<string> ProfileChanged;
-
-        internal static void RaiseProfileChanged() => ProfileChanged?.Invoke(ActiveProfileName);
-
         private static string _rootPath;
 
         internal static void ResetRootCache() => _rootPath = null;
