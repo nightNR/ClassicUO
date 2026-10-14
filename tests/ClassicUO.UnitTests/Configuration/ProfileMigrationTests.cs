@@ -69,10 +69,10 @@ namespace ClassicUO.UnitTests.Configuration
             Assert.Equal(33, loaded.ChatHistoryLength);
             Assert.Equal("<macros>Alice</macros>", File.ReadAllText(Path.Combine(ProfileCatalog.ProfileDir(_root, "Alice"), "macros.xml")));
 
-            // originals untouched, gumps.xml stays with the character
+            // originals untouched; the layout part of gumps.xml is copied to the profile, the character file stays
             Assert.True(File.Exists(Path.Combine(a, "profile.json")));
             Assert.True(File.Exists(Path.Combine(a, "gumps.xml")));
-            Assert.False(File.Exists(Path.Combine(ProfileCatalog.ProfileDir(_root, "Alice"), "gumps.xml")));
+            Assert.True(File.Exists(Path.Combine(ProfileCatalog.ProfileDir(_root, "Alice"), "gumps.xml")));
 
             // backup exists
             Assert.NotEmpty(Directory.GetDirectories(_parent, "Profiles_backup_*"));

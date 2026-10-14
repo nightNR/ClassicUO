@@ -18,10 +18,15 @@ namespace ClassicUO.Configuration
         public const string AssignmentsFile = "assignments.json";
         public const string MarkerFile = "profiles_v2.marker";
 
-        /// <summary>Files that make up a shared profile. gumps.xml and character_state.json stay with the character.</summary>
+        public const string GumpsFile = "gumps.xml";
+
+        /// <summary>
+        /// Files that make up a shared profile. gumps.xml here is the layout part only; serial-bound gumps and
+        /// character_state.json stay with the character.
+        /// </summary>
         public static readonly string[] ProfileFiles =
         {
-            "profile.json", "macros.xml", "infobar.xml", "skillsgroups.xml", "statusbar_colors.xml", "ignore_list.xml"
+            "profile.json", "macros.xml", "infobar.xml", "skillsgroups.xml", "statusbar_colors.xml", "ignore_list.xml", GumpsFile
         };
 
         public static string NamedRoot(string root) => Path.Combine(root, NamedFolder);

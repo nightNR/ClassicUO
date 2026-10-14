@@ -101,13 +101,28 @@ namespace ClassicUO.Configuration
                 // the shared profile no longer carries per-character fields (they are JsonIgnore'd)
                 ConfigurationResolver.Save(profile, Path.Combine(target, "profile.json"), ProfileJsonContext.DefaultToUse.Profile);
 
-                foreach (string file in ProfileCatalog.ProfileFiles.Skip(1))
+                foreach (string file in ProfileCatalog.ProfileFiles.Skip(1).Where(f => f != ProfileCatalog.GumpsFile))
                 {
                     string src = Path.Combine(dir, file);
 
                     if (File.Exists(src))
                     {
                         File.Copy(src, Path.Combine(target, file), true);
+                    }
+                }
+
+                // layout gumps move to the profile; the character file stays untouched and is read with a filter
+                string legacyGumps = Path.Combine(dir, ProfileCatalog.GumpsFile);
+
+                if (File.Exists(legacyGumps))
+                {
+                    try
+                    {
+                        GumpScopes.SplitLayout(legacyGumps, Path.Combine(target, ProfileCatalog.GumpsFile));
+                    }
+                    catch (Exception e)
+                    {
+                        Log.Error($"Cannot split {legacyGumps}: {e.Message}");
                     }
                 }
 
