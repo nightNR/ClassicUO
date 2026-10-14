@@ -159,6 +159,116 @@ namespace ClassicUO.Game.Scenes
             Plugin.OnConnected();
         }
 
+        /// <summary>
+        /// Switches the active profile of the logged-in character without relogging. Saves the current profile,
+        /// loads <paramref name="name"/>, re-applies profile-driven managers and rebuilds the UI from it.
+        /// <paramref name="assign"/> stores the choice as the character's profile; otherwise it is a session override.
+        /// Must be called on the game thread.
+        /// </summary>
+        public bool SwitchProfile(string name, bool assign)
+        {
+            Profile old = ProfileManager.CurrentProfile;
+
+            if (IsDestroyed || old == null || !_world.InGame || !ProfileCatalog.Exists(ProfileManager.RootPath, name))
+            {
+                return false;
+            }
+
+            name = ProfileCatalog.SanitizeName(name);
+
+            if (string.Equals(name, ProfileManager.ActiveProfileName, StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+
+            string user = old.Username, server = old.ServerName, character = old.CharacterName;
+            string previousOverride = ProfileManager.OverrideProfileName;
+
+            // 1. persist everything of the current profile (same set as Unload)
+            old.GameWindowPosition = new Point(Camera.Bounds.X, Camera.Bounds.Y);
+            old.GameWindowSize = new Point(Camera.Bounds.Width, Camera.Bounds.Height);
+            old.DefaultScale = Camera.Zoom;
+            UIManager.GetGump<WorldMapGump>()?.SaveSettings();
+            old.Save(_world, ProfileManager.ProfilePath);
+            _world.Macros.Save();
+            _world.InfoBars.Save();
+            _world.StatusbarColorManager.Save();
+
+            // 2. load the new profile (the active one stays in place if this throws)
+            try
+            {
+                if (assign)
+                {
+                    Dictionary<string, string> assignments = ProfileCatalog.LoadAssignments(ProfileManager.RootPath);
+                    assignments[ProfileCatalog.AssignmentKey(user, server, character)] = name;
+                    ProfileCatalog.SaveAssignments(ProfileManager.RootPath, assignments);
+                    ProfileManager.OverrideProfileName = null;
+                }
+                else
+                {
+                    ProfileManager.OverrideProfileName = name;
+                }
+
+                ProfileManager.Load(server, user, character);
+            }
+            catch (Exception e)
+            {
+                Log.Error($"Cannot switch to profile '{name}': {e}");
+                ProfileManager.OverrideProfileName = previousOverride;
+
+                return false;
+            }
+
+            // 3. re-apply what the profile drives
+            Profile profile = ProfileManager.CurrentProfile;
+
+            _world.Macros.Clear();
+            _world.Macros.Load();
+            _world.InfoBars.Clear();
+            _world.InfoBars.Load();
+            _world.AliasManager.Initialize();
+            _world.StatusbarColorManager.Initialize();
+            _world.ContainerManager.ResetPinned();
+
+            Camera.Zoom = profile.DefaultScale;
+            Camera.Bounds.X = Math.Max(0, profile.GameWindowPosition.X);
+            Camera.Bounds.Y = Math.Max(0, profile.GameWindowPosition.Y);
+            Camera.Bounds.Width = Math.Max(0, profile.GameWindowSize.X);
+            Camera.Bounds.Height = Math.Max(0, profile.GameWindowSize.Y);
+
+            UIManager.ContainerScale = profile.ContainersScale / 100f;
+            Data.MovementSpeed.FastRotation = profile.FastRotation;
+            Client.Game.SetWindowBorderless(profile.WindowBorderless);
+
+            // 4. rebuild the UI exactly like login does: core gumps first, then the saved layout
+            UIManager.Clear();
+            UIManager.Add(new WorldViewportGump(_world, this), false);
+
+            if (!profile.TopbarGumpIsDisabled)
+            {
+                TopBarGump.Create(_world);
+            }
+
+            UIManager.Add(new ScreenTimersGump(_world));
+
+            List<Gump> gumps = profile.ReadGumps(_world, ProfileManager.ProfilePath);
+
+            if (gumps != null)
+            {
+                foreach (Gump gump in gumps)
+                {
+                    UIManager.Add(gump);
+                }
+            }
+
+            PluginAnchorGroupManager.Rebuild(_world);
+
+            Log.Info($"Switched to profile '{name}'");
+            PluginProfiles.RaiseChanged(ProfileManager.ActiveProfileName);
+
+            return true;
+        }
+
         private void ChatOnMessageReceived(object sender, MessageEventArgs e)
         {
             if (e.Type == MessageType.Command)
@@ -318,6 +428,7 @@ namespace ClassicUO.Game.Scenes
             _world.Macros.Clear();
             _world.InfoBars.Save();
             ProfileManager.UnLoadProfile();
+            ProfileManager.OverrideProfileName = null; // a runtime override only lasts for the session
 
             StaticFilters.CleanCaveTextures();
             StaticFilters.CleanTreeTextures();

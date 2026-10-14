@@ -1299,6 +1299,27 @@ namespace ClassicUO.Game.UI.Gumps
                 GameActions.Print(World, ResGeneral.DefaultProfileSet);
             };
 
+            NiceButton manageProfiles;
+
+            section4.Add
+            (
+                manageProfiles = new NiceButton
+                (
+                    startX,
+                    startY,
+                    section4.Width - 18,
+                    25,
+                    ButtonAction.Default,
+                    "Manage profiles..."
+                )
+                { IsSelectable = true, IsSelected = true }
+            );
+            manageProfiles.MouseUp += (s, e) =>
+            {
+                UIManager.GetGump<ProfilesManagerGump>()?.Dispose();
+                UIManager.Add(new ProfilesManagerGump(World));
+            };
+
 
             SettingsSection section5 = AddSettingsSection(box, "Terrain & Statics");
             section5.Y = section4.Bounds.Bottom + 40;

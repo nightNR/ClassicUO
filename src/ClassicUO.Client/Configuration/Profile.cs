@@ -22,6 +22,8 @@ namespace ClassicUO.Configuration
     //[JsonSourceGenerationOptions(WriteIndented = true, PropertyNamingPolicy = JsonKnownNamingPolicy.Unspecified)]
     [JsonSerializable(typeof(GlobalProfile), GenerationMode = JsonSourceGenerationMode.Metadata)]
     [JsonSerializable(typeof(Profile), GenerationMode = JsonSourceGenerationMode.Metadata)]
+    [JsonSerializable(typeof(CharacterState), GenerationMode = JsonSourceGenerationMode.Metadata)]
+    [JsonSerializable(typeof(System.Collections.Generic.Dictionary<string, string>), GenerationMode = JsonSourceGenerationMode.Metadata)]
     [JsonSerializable(typeof(ClassicUO.Game.UI.Gumps.ChatHistoryEntry), GenerationMode = JsonSourceGenerationMode.Metadata)]
     [JsonSerializable(typeof(ClassicUO.Game.Managers.AliasEntry), GenerationMode = JsonSourceGenerationMode.Metadata)]
     [JsonSerializable(typeof(ClassicUO.Configuration.PluginAnchorGroupDef), GenerationMode = JsonSourceGenerationMode.Metadata)]
@@ -262,13 +264,19 @@ namespace ClassicUO.Configuration
         public bool DisableCtrlQWBtn { get; set; }
         public bool ChatUseArrowsForHistory { get; set; } = true;
         public int ChatHistoryLength { get; set; } = 20;
-        public List<ChatHistoryEntry> ChatHistory { get; set; } = new List<ChatHistoryEntry>();
+        // Per-character data (see CharacterState): kept on Profile for the call sites, persisted in character_state.json.
+        // The Legacy* shadows only read values from old profile.json files; they are never written (getter returns null).
+        [JsonIgnore] public List<ChatHistoryEntry> ChatHistory { get; set; } = new List<ChatHistoryEntry>();
+        [JsonPropertyName("chat_history"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public List<ChatHistoryEntry> LegacyChatHistory { get => null; set { if (value != null) ChatHistory = value; } }
         public bool AliasesEnabled { get; set; } = true;
         public List<ClassicUO.Game.Managers.AliasEntry> CharacterAliases { get; set; } = new List<ClassicUO.Game.Managers.AliasEntry>();
         public bool DisableAutoMove { get; set; }
         public bool EnableDragSelect { get; set; }
         public int DragSelectModifierKey { get; set; } // 0 = none, 1 = control, 2 = shift
-        public List<uint> PinnedContainerSerials { get; set; } = new List<uint>();
+        [JsonIgnore] public List<uint> PinnedContainerSerials { get; set; } = new List<uint>();
+        [JsonPropertyName("pinned_container_serials"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public List<uint> LegacyPinnedContainerSerials { get => null; set { if (value != null) PinnedContainerSerials = value; } }
         public bool OverrideContainerLocation { get; set; }
 
         public int OverrideContainerLocationSetting { get; set; } // 0 = container position, 1 = top right of screen, 2 = last dragged position, 3 = remember every container
@@ -338,7 +346,9 @@ namespace ClassicUO.Configuration
         public bool ShowNewMobileNameIncoming { get; set; } = true;
         public bool ShowNewCorpseNameIncoming { get; set; } = true;
 
-        public uint GrabBagSerial { get; set; }
+        [JsonIgnore] public uint GrabBagSerial { get; set; }
+        [JsonPropertyName("grab_bag_serial"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public uint? LegacyGrabBagSerial { get => null; set { if (value.HasValue) GrabBagSerial = value.Value; } }
 
         public int GridLootType { get; set; } // 0 = none, 1 = only grid, 2 = both
 
@@ -351,7 +361,9 @@ namespace ClassicUO.Configuration
         public bool GridContainerUsePagination { get; set; }
 
         // User-selected grid size, remembered independently for each container serial.
-        public Dictionary<uint, GridContainerSize> GridContainerSizes { get; set; } = new();
+        [JsonIgnore] public Dictionary<uint, GridContainerSize> GridContainerSizes { get; set; } = new();
+        [JsonPropertyName("grid_container_sizes"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public Dictionary<uint, GridContainerSize> LegacyGridContainerSizes { get => null; set { if (value != null) GridContainerSizes = value; } }
 
         public bool ReduceFPSWhenInactive { get; set; } = true;
 
@@ -383,7 +395,9 @@ namespace ClassicUO.Configuration
 
         // Explicit per-serial choice in Toggle mode. true = grid, false = standard.
         // Absent key => fall back to ContainerToggleDefaultGrid.
-        public Dictionary<uint, bool> ContainerGridStates { get; set; } = new();
+        [JsonIgnore] public Dictionary<uint, bool> ContainerGridStates { get; set; } = new();
+        [JsonPropertyName("container_grid_states"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public Dictionary<uint, bool> LegacyContainerGridStates { get => null; set { if (value != null) ContainerGridStates = value; } }
 
         public bool HighlightContainerWhenSelected { get; set; }
 
@@ -471,30 +485,67 @@ namespace ClassicUO.Configuration
             Log.Trace($"Saving path:\t\t{path}");
 
             ProfileManager.Save(this, path);
+            ProfileManager.SaveCharacterState(this);
 
-            // Save opened gumps
-            SaveGumps(world, path);
+            // Save opened gumps (serial-bound, so they live with the character, not the shared profile)
+            SaveGumps(world, path, ProfileManager.CharacterPath);
 
             Log.Trace("Saving done!");
         }
 
-        private void SaveGumps(World world, string path)
+        private static bool SameFolder(string a, string b)
         {
-            string gumpsXmlPath = Path.Combine(path, "gumps.xml");
+            char[] seps = { Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar };
 
-            using (XmlTextWriter xml = new XmlTextWriter(gumpsXmlPath, Encoding.UTF8)
+            return string.Equals(Path.GetFullPath(a).TrimEnd(seps), Path.GetFullPath(b).TrimEnd(seps), StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static XmlTextWriter OpenGumpsWriter(string file)
+        {
+            var xml = new XmlTextWriter(file, Encoding.UTF8)
             {
                 Formatting = Formatting.Indented,
                 IndentChar = '\t',
                 Indentation = 1
-            })
-            {
-                xml.WriteStartDocument(true);
-                xml.WriteStartElement("gumps");
-                xml.WriteAttributeString("save_w", Client.Game.ClientBounds.Width.ToString());
-                xml.WriteAttributeString("save_h", Client.Game.ClientBounds.Height.ToString());
+            };
 
-                UIManager.AnchorManager.Save(xml);
+            xml.WriteStartDocument(true);
+            xml.WriteStartElement("gumps");
+            xml.WriteAttributeString("save_w", Client.Game.ClientBounds.Width.ToString());
+            xml.WriteAttributeString("save_h", Client.Game.ClientBounds.Height.ToString());
+
+            return xml;
+        }
+
+        private static void CloseGumpsWriter(XmlTextWriter xml)
+        {
+            xml.WriteEndElement();
+            xml.WriteEndDocument();
+            xml.Close();
+        }
+
+        /// <summary>
+        /// Layout gumps go to the shared profile folder, serial-bound ones (containers, ...) to the character folder.
+        /// When both folders are the same (legacy per-character profile) everything goes to one file as before.
+        /// </summary>
+        private void SaveGumps(World world, string profilePath, string characterPath)
+        {
+            bool single = SameFolder(profilePath, characterPath);
+            uint playerSerial = world.Player?.Serial ?? 0;
+
+            XmlTextWriter profileXml = OpenGumpsWriter(Path.Combine(profilePath, "gumps.xml"));
+            XmlTextWriter charXml = single ? profileXml : OpenGumpsWriter(Path.Combine(characterPath, "gumps.xml"));
+
+            try
+            {
+                if (single)
+                {
+                    UIManager.AnchorManager.Save(profileXml);
+                }
+                else
+                {
+                    UIManager.AnchorManager.Save(profileXml, charXml, playerSerial);
+                }
 
                 LinkedList<Gump> gumps = new LinkedList<Gump>();
 
@@ -523,7 +574,7 @@ namespace ClassicUO.Configuration
                                 item = world.Items.Get(item.Container);
                             }
 
-                            SaveItemsGumpRecursive(item, xml, gumps);
+                            SaveItemsGumpRecursive(item, charXml, gumps);
 
                             if (first.List != null)
                             {
@@ -536,9 +587,17 @@ namespace ClassicUO.Configuration
                         }
                     }
 
-                    xml.WriteStartElement("gump");
-                    gump.Save(xml);
-                    xml.WriteEndElement();
+                    XmlTextWriter target = !single && GumpScopes.IsCharacterBound(gump.GumpType, gump.LocalSerial, playerSerial) ? charXml : profileXml;
+
+                    target.WriteStartElement("gump");
+                    gump.Save(target);
+
+                    if (!single && GumpScopes.IsSelf(gump.GumpType, gump.LocalSerial, playerSerial))
+                    {
+                        target.WriteAttributeString(GumpScopes.SelfAttribute, "1");
+                    }
+
+                    target.WriteEndElement();
 
                     if (first.List != null)
                     {
@@ -547,11 +606,16 @@ namespace ClassicUO.Configuration
 
                     first = gumps.First;
                 }
-
-                xml.WriteEndElement();
-                xml.WriteEndDocument();
             }
+            finally
+            {
+                CloseGumpsWriter(profileXml);
 
+                if (!single)
+                {
+                    CloseGumpsWriter(charXml);
+                }
+            }
 
             world.SkillsGroupManager.Save();
         }
@@ -609,9 +673,23 @@ namespace ClassicUO.Configuration
             // load skillsgroup
             world.SkillsGroupManager.Load();
 
-            // load gumps
-            string gumpsXmlPath = Path.Combine(path, "gumps.xml");
+            // layout first (shared profile), then the serial-bound gumps of the character on top
+            ReadGumpsFile(world, Path.Combine(path, "gumps.xml"), gumps, false);
 
+            if (!SameFolder(path, ProfileManager.CharacterPath))
+            {
+                ReadGumpsFile(world, Path.Combine(ProfileManager.CharacterPath, "gumps.xml"), gumps, true);
+            }
+
+            return gumps;
+        }
+
+        /// <param name="characterFile">
+        /// The per-character file: only serial-bound entries are read, so a legacy all-in-one file does not duplicate
+        /// the layout that was moved to the profile.
+        /// </param>
+        private void ReadGumpsFile(World world, string gumpsXmlPath, List<Gump> gumps, bool characterFile)
+        {
             if (File.Exists(gumpsXmlPath))
             {
                 XmlDocument doc = new XmlDocument();
@@ -624,7 +702,7 @@ namespace ClassicUO.Configuration
                 {
                     Log.Error(ex.ToString());
 
-                    return gumps;
+                    return;
                 }
 
                 XmlElement root = doc["gumps"];
@@ -640,7 +718,7 @@ namespace ClassicUO.Configuration
 
                     foreach (XmlElement xml in root.ChildNodes /*.GetElementsByTagName("gump")*/)
                     {
-                        if (xml.Name != "gump")
+                        if (xml.Name != "gump" || (characterFile && !GumpScopes.ElementIsEntityBound(xml)))
                         {
                             continue;
                         }
@@ -651,6 +729,16 @@ namespace ClassicUO.Configuration
                             int x = int.Parse(xml.GetAttribute(nameof(x)));
                             int y = int.Parse(xml.GetAttribute(nameof(y)));
                             uint serial = uint.Parse(xml.GetAttribute(nameof(serial)));
+
+                            if (xml.GetAttribute(GumpScopes.SelfAttribute) == "1")
+                            {
+                                if (world.Player == null)
+                                {
+                                    continue;
+                                }
+
+                                serial = world.Player.Serial;
+                            }
 
                             Gump gump = null;
 
@@ -819,6 +907,11 @@ namespace ClassicUO.Configuration
 
                     foreach (XmlElement group in root.GetElementsByTagName("anchored_group_gump"))
                     {
+                        if (characterFile && !GumpScopes.ElementIsEntityBound(group))
+                        {
+                            continue;
+                        }
+
                         int matrix_width = int.Parse(group.GetAttribute("matrix_w"));
                         int matrix_height = int.Parse(group.GetAttribute("matrix_h"));
 
@@ -833,6 +926,11 @@ namespace ClassicUO.Configuration
                                 int x = int.Parse(xml.GetAttribute("x"));
                                 int y = int.Parse(xml.GetAttribute("y"));
                                 uint serial = uint.Parse(xml.GetAttribute("serial"));
+
+                                if (xml.GetAttribute(GumpScopes.SelfAttribute) == "1" && world.Player != null)
+                                {
+                                    serial = world.Player.Serial;
+                                }
 
                                 int matrix_x = int.Parse(xml.GetAttribute("matrix_x"));
                                 int matrix_y = int.Parse(xml.GetAttribute("matrix_y"));
@@ -904,8 +1002,6 @@ namespace ClassicUO.Configuration
                     }
                 }
             }
-
-            return gumps;
         }
     }
 }

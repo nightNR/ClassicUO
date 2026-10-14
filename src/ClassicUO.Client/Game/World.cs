@@ -235,6 +235,7 @@ namespace ClassicUO.Game
             {
                 string lastChar = LastCharacterManager.GetLastCharacter(LoginScene.Account, ServerName);
                 ProfileManager.Load(ServerName, LoginScene.Account, lastChar);
+                PluginProfiles.RaiseChanged(ProfileManager.ActiveProfileName);
             }
 
             if (Player != null)

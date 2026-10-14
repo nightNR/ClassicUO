@@ -35,6 +35,18 @@ namespace ClassicUO.Game.Managers
                 case GenericOpcodes.ClearAllNameplateOverrides:
                     return InvokeClearAllNameplateOverrides();
 
+                case GenericOpcodes.ListProfiles:
+                    return PluginProfiles.List(outBuf, outCap);
+
+                case GenericOpcodes.GetActiveProfile:
+                    return PluginProfiles.Active(outBuf, outCap);
+
+                case GenericOpcodes.SwitchProfile:
+                    return PluginProfiles.Switch(argsPtr, argsLen);
+
+                case GenericOpcodes.ClearProfileOverride:
+                    return PluginProfiles.ClearOverride();
+
                 default:
                     return -1; // unknown opcode
             }
@@ -105,6 +117,10 @@ namespace ClassicUO.Game.Managers
                 GenericOpcodes.SetNameplateOverride,
                 GenericOpcodes.ClearNameplateOverride,
                 GenericOpcodes.ClearAllNameplateOverrides,
+                GenericOpcodes.ListProfiles,
+                GenericOpcodes.GetActiveProfile,
+                GenericOpcodes.SwitchProfile,
+                GenericOpcodes.ClearProfileOverride,
             ];
 
             int needed = opcodes.Length * sizeof(int);
