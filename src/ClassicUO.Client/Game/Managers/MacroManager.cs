@@ -1804,6 +1804,11 @@ namespace ClassicUO.Game.Managers
                         break;
                     }
 
+                case MacroType.ToggleMapMarkerCategory:
+                    WorldMapGump.ToggleMarkerCategory(_world, ((MacroObjectString)macro).Text);
+
+                    break;
+
                 case MacroType.TestCircleTimer:
                     // Developer-facing smoke test for the plugin screen-timer path.
                     // Reusing the id restarts the same timer on repeated key presses.
@@ -2080,6 +2085,7 @@ namespace ClassicUO.Game.Managers
                 case MacroType.ModifyUpdateRange:
                 case MacroType.RazorMacro:
                 case MacroType.UseCounterBarSlot:
+                case MacroType.ToggleMapMarkerCategory:
                     obj = new MacroObjectString(code, MacroSubType.MSC_NONE);
 
                     break;
@@ -2255,6 +2261,7 @@ namespace ClassicUO.Game.Managers
                 case MacroType.ModifyUpdateRange:
                 case MacroType.RazorMacro:
                 case MacroType.UseCounterBarSlot:
+                case MacroType.ToggleMapMarkerCategory:
                     SubMenuType = 2;
 
                     break;
@@ -2373,7 +2380,8 @@ namespace ClassicUO.Game.Managers
         UseObject,
         LookAtMouse,
         UseCounterBarSlot,
-        TestCircleTimer
+        TestCircleTimer,
+        ToggleMapMarkerCategory
     }
 
     internal enum MacroSubType
