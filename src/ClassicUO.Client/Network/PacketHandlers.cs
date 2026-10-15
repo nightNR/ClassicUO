@@ -1566,10 +1566,10 @@ namespace ClassicUO.Network
                     if (!it.IsCorpse && graphic != 0xFFFF)
                     {
                         ClearContainerAndRemoveItems(world, it);
+                        world.ContainerManager.OnContainerOpened(serial);
                     }
                 }
             }
-
         }
 
         private static void UpdateContainedItem(World world, ref StackDataReader p)
@@ -1594,7 +1594,6 @@ namespace ClassicUO.Network
             ushort hue = p.ReadUInt16BE();
 
             AddItemToContainer(world, serial, graphic, amount, x, y, hue, containerSerial);
-            world.ContainerManager.OnContainerContentsReceived(containerSerial);
         }
 
         private static void DenyMoveItem(World world, ref StackDataReader p)

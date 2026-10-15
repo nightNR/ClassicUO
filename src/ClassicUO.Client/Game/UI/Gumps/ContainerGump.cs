@@ -18,6 +18,7 @@ namespace ClassicUO.Game.UI.Gumps
     internal class ContainerGump : TextContainerGump
     {
         private long _corpseEyeTicks;
+        private long _nextPathSync;
         private ContainerData _data;
         private int _eyeCorspeOffset;
         private GumpPic _eyeGumpPic;
@@ -273,7 +274,15 @@ namespace ClassicUO.Game.UI.Gumps
             int gridWidth = GridContainerLayout.GridWidth();
             int gridHeight = GridContainerLayout.GridHeight();
 
-            if (!usePagination
+            if (!usePagination && _gridResizeClicked)
+            {
+                // The gump was rebuilt (e.g. a container update) while the resize anchor is held:
+                // keep the size being dragged instead of falling back to the last saved one.
+                Point drag = Mouse.LDragOffset;
+                gridWidth = Math.Max(GRID_MIN_WIDTH, _gridResizeStart.X + drag.X);
+                gridHeight = Math.Max(GRID_MIN_HEIGHT, _gridResizeStart.Y + drag.Y - headerHeight);
+            }
+            else if (!usePagination
                 && profile?.GridContainerSizes != null
                 && profile.GridContainerSizes.TryGetValue(LocalSerial, out GridContainerSize savedSize))
             {
@@ -721,6 +730,15 @@ namespace ClassicUO.Game.UI.Gumps
 
         public override void Update()
         {
+            if (_gridResizeClicked && !Mouse.LButtonPressed)
+            {
+                // The button that got the press can be destroyed by a rebuild before its MouseUp
+                // arrives, which would leave the anchor glued to the cursor. The physical button
+                // state is the authority: end the resize and persist the size here.
+                _gridResizeClicked = false;
+                SaveGridSize();
+            }
+
             if (_gridResizeClicked && _gridView != null)
             {
                 Point offset = Mouse.LDragOffset;
@@ -760,6 +778,18 @@ namespace ClassicUO.Game.UI.Gumps
                 Dispose();
 
                 return;
+            }
+
+            if (
+                _nextPathSync < Time.Ticks
+                && World.Player != null
+                && !World.Player.IsDead
+                && World.ContainerManager.IsPinned(LocalSerial)
+            )
+            {
+                // Keep the pinned container's path to the backpack current so it survives death.
+                _nextPathSync = (long)Time.Ticks + 2000;
+                World.ContainerManager.RememberPinnedChain(LocalSerial);
             }
 
             if (

@@ -9,6 +9,7 @@ using ClassicUO.Game.UI.Gumps;
 using ClassicUO.Assets;
 using ClassicUO.Renderer;
 using ClassicUO.Utility;
+using ClassicUO.Utility.Logging;
 using Microsoft.Xna.Framework;
 using System;
 
@@ -21,6 +22,8 @@ namespace ClassicUO.Game.Managers
 
         private readonly World _world;
         private readonly List<ContainerReloadPath> _reloadPaths = new List<ContainerReloadPath>();
+        private readonly Dictionary<uint, List<uint>> _knownChains = new Dictionary<uint, List<uint>>();
+        private readonly HashSet<uint> _silentOpen = new HashSet<uint>();
 
         public ContainerManager(World world)
         {
@@ -66,7 +69,11 @@ namespace ClassicUO.Game.Managers
         }
 
         /// <summary>Drops the cached set so it is rebuilt from the (new) profile on next access.</summary>
-        public void ResetPinned() => _pinned = null;
+        public void ResetPinned()
+        {
+            _pinned = null;
+            _knownChains.Clear();
+        }
 
         public bool IsPinned(uint serial) => serial != 0 && PinnedSet.Contains(serial);
 
@@ -78,6 +85,11 @@ namespace ClassicUO.Game.Managers
             }
 
             bool changed = pinned ? PinnedSet.Add(serial) : PinnedSet.Remove(serial);
+
+            if (!pinned)
+            {
+                _knownChains.Remove(serial);
+            }
 
             if (!changed)
             {
@@ -101,18 +113,53 @@ namespace ClassicUO.Game.Managers
             }
         }
 
-        // Preserve the path to each pinned container before a death update clears the
-        // local contents of the player's backpack.
+        // Chain (backpack first, pinned container last) of every pinned container, refreshed while
+        // the player is alive.  Death destroys unpinned bags together with the pinned containers
+        // inside them and resets their Container, so the live chain cannot be trusted at that point.
+        public void RememberPinnedChain(uint serial)
+        {
+            List<uint> chain = BuildLiveChain(serial);
+
+            if (chain != null)
+            {
+                _knownChains[serial] = chain;
+            }
+        }
+
+        private List<uint> BuildLiveChain(uint serial)
+        {
+            Item backpack = _world.Player?.FindItemByLayer(Layer.Backpack);
+            Item item = _world.Items.Get(serial);
+
+            if (backpack == null || item == null)
+            {
+                return null;
+            }
+
+            var chain = new List<uint>();
+            var visited = new HashSet<uint>();
+
+            while (item != null && visited.Add(item.Serial))
+            {
+                chain.Add(item.Serial);
+
+                if (item.Serial == backpack.Serial)
+                {
+                    chain.Reverse();
+
+                    return chain;
+                }
+
+                item = _world.Items.Get(item.Container);
+            }
+
+            return null;
+        }
+
+        // Preserve the path to each pinned container before death clears local contents.
         public void SavePinnedBackpackPaths()
         {
             _reloadPaths.Clear();
-
-            Item backpack = _world.Player?.FindItemByLayer(Layer.Backpack);
-
-            if (backpack == null)
-            {
-                return;
-            }
 
             foreach (Gump gump in UIManager.Gumps)
             {
@@ -121,29 +168,17 @@ namespace ClassicUO.Game.Managers
                     continue;
                 }
 
-                Item item = _world.Items.Get(gump.LocalSerial);
+                List<uint> chain = BuildLiveChain(gump.LocalSerial);
 
-                if (item == null)
+                if (chain == null && !_knownChains.TryGetValue(gump.LocalSerial, out chain))
                 {
+                    Log.Warn($"[PinRestore] death: no path for pinned 0x{gump.LocalSerial:X8}");
+
                     continue;
                 }
 
-                var serials = new List<uint>();
-                var visited = new HashSet<uint>();
-
-                while (item != null && visited.Add(item.Serial))
-                {
-                    serials.Add(item.Serial);
-
-                    if (item.Serial == backpack.Serial)
-                    {
-                        serials.Reverse();
-                        _reloadPaths.Add(new ContainerReloadPath(serials));
-                        break;
-                    }
-
-                    item = _world.Items.Get(item.Container);
-                }
+                Log.Info($"[PinRestore] death: saved path {FormatChain(chain)}");
+                _reloadPaths.Add(new ContainerReloadPath(new List<uint>(chain)));
             }
         }
 
@@ -151,16 +186,49 @@ namespace ClassicUO.Game.Managers
         // relied on to have its contents resent until its parent has been opened.
         public void RestorePinnedBackpackPaths()
         {
+            if (_reloadPaths.Count == 0)
+            {
+                return;
+            }
+
+            _silentOpen.Clear();
             var containersToOpen = new HashSet<uint>();
 
             foreach (ContainerReloadPath path in _reloadPaths)
             {
+                // Intermediate bags the user did not have open are opened only to receive
+                // their contents, and their gump is closed again afterwards.
+                for (int i = 0; i < path.Serials.Count - 1; i++)
+                {
+                    uint serial = path.Serials[i];
+
+                    if (!IsPinned(serial) && UIManager.GetGump<ContainerGump>(serial) == null)
+                    {
+                        _silentOpen.Add(serial);
+                    }
+                }
+
                 containersToOpen.Add(path.Serials[0]);
             }
+
+            Log.Info($"[PinRestore] resurrection: restoring {_reloadPaths.Count} path(s)");
 
             foreach (uint serial in containersToOpen)
             {
                 GameActions.DoubleClick(_world, serial);
+            }
+        }
+
+        // The server answers our double click with OpenContainer first.  Only contents that
+        // follow it are the reply; unsolicited contents packets must not advance a path.
+        public void OnContainerOpened(uint serial)
+        {
+            foreach (ContainerReloadPath path in _reloadPaths)
+            {
+                if (path.Serials[path.CurrentIndex] == serial)
+                {
+                    path.Opened = true;
+                }
             }
         }
 
@@ -169,20 +237,24 @@ namespace ClassicUO.Game.Managers
         public void OnContainerContentsReceived(uint serial)
         {
             var containersToOpen = new HashSet<uint>();
+            bool advanced = false;
 
             for (int i = _reloadPaths.Count - 1; i >= 0; i--)
             {
                 ContainerReloadPath path = _reloadPaths[i];
 
-                if (path.Serials[path.CurrentIndex] != serial)
+                if (!path.Opened || path.Serials[path.CurrentIndex] != serial)
                 {
                     continue;
                 }
 
+                advanced = true;
+                path.Opened = false;
                 path.CurrentIndex++;
 
                 if (path.CurrentIndex == path.Serials.Count)
                 {
+                    Log.Info($"[PinRestore] restored {FormatChain(path.Serials)}");
                     _reloadPaths.RemoveAt(i);
                 }
                 else
@@ -191,10 +263,25 @@ namespace ClassicUO.Game.Managers
                 }
             }
 
+            if (!advanced)
+            {
+                return;
+            }
+
+            if (_silentOpen.Remove(serial) && !IsPinned(serial))
+            {
+                UIManager.GetGump<ContainerGump>(serial)?.Dispose();
+            }
+
             foreach (uint nextSerial in containersToOpen)
             {
                 GameActions.DoubleClick(_world, nextSerial);
             }
+        }
+
+        private static string FormatChain(List<uint> chain)
+        {
+            return string.Join(" > ", chain.ConvertAll(s => $"0x{s:X8}"));
         }
 
         private sealed class ContainerReloadPath
@@ -206,6 +293,7 @@ namespace ClassicUO.Game.Managers
 
             public List<uint> Serials { get; }
             public int CurrentIndex { get; set; }
+            public bool Opened { get; set; }
         }
 
         public void CalculateContainerPosition(uint serial, ushort g)
