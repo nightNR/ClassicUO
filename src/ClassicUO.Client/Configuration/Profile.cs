@@ -346,6 +346,13 @@ namespace ClassicUO.Configuration
         // default dark. Off = dark (unchanged for existing users).
         public bool GridContainerLightBackground { get; set; }
 
+        // Keep the historical fixed-size paged grid when enabled. When disabled,
+        // grid containers are scrollable and resizable (the default).
+        public bool GridContainerUsePagination { get; set; }
+
+        // User-selected grid size, remembered independently for each container serial.
+        public Dictionary<uint, GridContainerSize> GridContainerSizes { get; set; } = new();
+
         public bool ReduceFPSWhenInactive { get; set; } = true;
 
         public bool OverrideAllFonts { get; set; }

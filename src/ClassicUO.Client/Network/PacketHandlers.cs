@@ -1569,6 +1569,7 @@ namespace ClassicUO.Network
                     }
                 }
             }
+
         }
 
         private static void UpdateContainedItem(World world, ref StackDataReader p)
@@ -1593,6 +1594,7 @@ namespace ClassicUO.Network
             ushort hue = p.ReadUInt16BE();
 
             AddItemToContainer(world, serial, graphic, amount, x, y, hue, containerSerial);
+            world.ContainerManager.OnContainerContentsReceived(containerSerial);
         }
 
         private static void DenyMoveItem(World world, ref StackDataReader p)
@@ -2108,6 +2110,7 @@ namespace ClassicUO.Network
             }
 
             ushort count = p.ReadUInt16BE();
+            uint containerSerial = 0;
 
             for (int i = 0; i < count; i++)
             {
@@ -2122,7 +2125,7 @@ namespace ClassicUO.Network
                     p.Skip(1);
                 }
 
-                uint containerSerial = p.ReadUInt32BE();
+                containerSerial = p.ReadUInt32BE();
                 ushort hue = p.ReadUInt16BE();
 
                 if (i == 0)
@@ -2136,6 +2139,11 @@ namespace ClassicUO.Network
                 }
 
                 AddItemToContainer(world, serial, graphic, amount, x, y, hue, containerSerial);
+            }
+
+            if (containerSerial != 0)
+            {
+                world.ContainerManager.OnContainerContentsReceived(containerSerial);
             }
         }
 
@@ -2828,10 +2836,24 @@ namespace ClassicUO.Network
 
             if (serial == world.Player)
             {
+                bool oldDead = mobile.IsDead;
                 mobile.Flags = flags;
                 mobile.Graphic = graphic;
                 mobile.CheckGraphicChange();
                 mobile.FixHue(hue);
+
+                if (oldDead != mobile.IsDead)
+                {
+                    if (mobile.IsDead)
+                    {
+                        world.ContainerManager.SavePinnedBackpackPaths();
+                    }
+                    else
+                    {
+                        world.ContainerManager.RestorePinnedBackpackPaths();
+                    }
+                }
+
                 // TODO: x,y,z, direction cause elastic effect, ignore 'em for the moment
             }
             else
@@ -2951,6 +2973,7 @@ namespace ClassicUO.Network
                 {
                     if (world.Player.IsDead)
                     {
+                        world.ContainerManager.SavePinnedBackpackPaths();
                         // NOTE: This packet causes some weird issue on sphere servers.
                         //       When the character dies, this packet trigger a "reset" and
                         //       somehow it messes up the packet reading server side
@@ -2960,6 +2983,7 @@ namespace ClassicUO.Network
                     else
                     {
                         world.ChangeSeason(world.OldSeason, world.OldMusicIndex);
+                        world.ContainerManager.RestorePinnedBackpackPaths();
                     }
                 }
 
@@ -6494,11 +6518,13 @@ namespace ClassicUO.Network
                 {
                     if (world.Player.IsDead)
                     {
+                        world.ContainerManager.SavePinnedBackpackPaths();
                         world.ChangeSeason(Game.Managers.Season.Desolation, 42);
                     }
                     else
                     {
                         world.ChangeSeason(world.OldSeason, world.OldMusicIndex);
+                        world.ContainerManager.RestorePinnedBackpackPaths();
                     }
                 }
 

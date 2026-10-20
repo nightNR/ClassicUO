@@ -57,6 +57,28 @@ namespace ClassicUO.Game.UI.Controls
             return (x, y, page);
         }
 
+        public static int ColumnsForWidth(int width, bool reserveScrollbar)
+        {
+            int available = width - CELL_MARGIN - (reserveScrollbar ? 14 : 0);
+            int cols = available / STRIDE;
+            return cols < 1 ? 1 : cols;
+        }
+
+        public static int RowsForHeight(int height)
+        {
+            int rows = (height - CELL_MARGIN) / STRIDE;
+            return rows < 1 ? 1 : rows;
+        }
+
+        public static (int x, int y) CellPosition(int index, int columns)
+        {
+            columns = columns < 1 ? 1 : columns;
+            return (
+                CELL_MARGIN + index % columns * STRIDE,
+                CELL_MARGIN + index / columns * STRIDE
+            );
+        }
+
         public static int GridWidth()
         {
             return CELL_MARGIN + Columns() * STRIDE;

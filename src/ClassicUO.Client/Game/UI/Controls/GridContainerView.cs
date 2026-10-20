@@ -23,20 +23,23 @@ namespace ClassicUO.Game.UI.Controls
         private readonly NiceButton _buttonPrev;
         private readonly NiceButton _buttonNext;
         private readonly Label _pageLabel;
+        private readonly ScrollArea _scrollArea;
+        private readonly bool _usePagination;
 
         private int _currentPage;
         private int _pageCount = 1;
 
-        public GridContainerView(ContainerGump host)
+        public GridContainerView(ContainerGump host, bool usePagination, int width, int height)
         {
             _host = host;
+            _usePagination = usePagination;
 
             CanMove = true;
             AcceptMouseInput = true;
             WantUpdateSize = false;
 
-            Width = GridContainerLayout.GridWidth();
-            Height = GridContainerLayout.GridHeight() + GridContainerLayout.RESERVED_BOTTOM;
+            Width = usePagination ? GridContainerLayout.GridWidth() : width;
+            Height = usePagination ? GridContainerLayout.GridHeight() + GridContainerLayout.RESERVED_BOTTOM : height;
 
             _background = new AlphaBlendControl
             {
@@ -45,6 +48,15 @@ namespace ClassicUO.Game.UI.Controls
                 BaseColor = PanelColor()
             };
             Add(_background);
+
+            if (!usePagination)
+            {
+                _scrollArea = new ScrollArea(0, 0, Width, Height, true)
+                {
+                    ScrollbarBehaviour = ScrollbarBehaviour.ShowAlways
+                };
+                Add(_scrollArea);
+            }
 
             _buttonPrev = new NiceButton(
                 4,
@@ -57,7 +69,8 @@ namespace ClassicUO.Game.UI.Controls
             {
                 ButtonParameter = 0,
                 IsSelectable = false,
-                IsVisible = false
+                IsVisible = false,
+                IsEnabled = usePagination
             };
 
             _buttonNext = new NiceButton(
@@ -71,7 +84,8 @@ namespace ClassicUO.Game.UI.Controls
             {
                 ButtonParameter = 1,
                 IsSelectable = false,
-                IsVisible = false
+                IsVisible = false,
+                IsEnabled = usePagination
             };
 
             _buttonPrev.MouseUp += (s, e) => { if (e.Button == MouseButtonType.Left) ChangePageBy(-1); };
@@ -85,6 +99,8 @@ namespace ClassicUO.Game.UI.Controls
                 X = Width / 2 - 5,
                 Y = Height - GridContainerLayout.RESERVED_BOTTOM + 5
             };
+
+            _pageLabel.IsVisible = usePagination;
 
             Add(_pageLabel);
         }
@@ -100,6 +116,101 @@ namespace ClassicUO.Game.UI.Controls
         public uint ContainerSerial => _host.LocalSerial;
 
         public int CurrentPage => _currentPage;
+
+        public int ScrollValue => _usePagination ? 0 : _scrollArea.ScrollValue;
+
+        public void SetScrollValue(int value)
+        {
+            if (!_usePagination)
+            {
+                _scrollArea.SetScrollValueAfterLayout(value);
+            }
+        }
+
+        public void RequestSingleClick(uint serial)
+        {
+            if (World.DelayedObjectClickManager.IsEnabled)
+            {
+                return;
+            }
+
+            Point off = Mouse.LDragOffset;
+            World.DelayedObjectClickManager.Set(
+                serial,
+                Mouse.Position.X - off.X - _host.ScreenCoordinateX,
+                Mouse.Position.Y - off.Y - _host.ScreenCoordinateY,
+                Time.Ticks + Mouse.MOUSE_DELAY_DOUBLE_CLICK
+            );
+        }
+
+        public bool TryDropHeldItem(uint targetSerial = 0)
+        {
+            if (!Client.Game.UO.GameCursor.ItemHold.Enabled
+                || Client.Game.UO.GameCursor.ItemHold.IsFixedPosition)
+            {
+                return false;
+            }
+
+            Item container = World.Items.Get(ContainerSerial);
+            Entity root = container == null ? null : World.Get(container.RootContainer);
+
+            if (root == null || root.Distance > Constants.DRAG_ITEMS_DISTANCE)
+            {
+                Client.Game.Audio.PlaySound(0x0051);
+                return true;
+            }
+
+            uint dropContainer = ContainerSerial;
+            int x = 0xFFFF;
+            int y = 0xFFFF;
+            Item target = World.Items.Get(targetSerial);
+
+            if (target != null)
+            {
+                if (target.ItemData.IsContainer)
+                {
+                    dropContainer = target.Serial;
+                }
+                else if (target.ItemData.IsStackable
+                         && target.Graphic == Client.Game.UO.GameCursor.ItemHold.Graphic)
+                {
+                    dropContainer = target.Serial;
+                    x = target.X;
+                    y = target.Y;
+                }
+            }
+
+            GameActions.DropItem(
+                Client.Game.UO.GameCursor.ItemHold.Serial,
+                x,
+                y,
+                0,
+                dropContainer
+            );
+
+            Mouse.CancelDoubleClick = true;
+            return true;
+        }
+
+        public void Resize(int width, int height)
+        {
+            if (_usePagination || (Width == width && Height == height))
+            {
+                return;
+            }
+
+            int oldColumns = GridContainerLayout.ColumnsForWidth(Width, true);
+            Width = width;
+            Height = height;
+            _background.Width = width;
+            _background.Height = height;
+            _scrollArea.Resize(width, height);
+
+            if (oldColumns != GridContainerLayout.ColumnsForWidth(width, true))
+            {
+                Rebuild();
+            }
+        }
 
         public void SetPage(int page)
         {
@@ -124,7 +235,9 @@ namespace ClassicUO.Game.UI.Controls
 
         public void Rebuild()
         {
-            foreach (GridContainerItem cell in Children.OfType<GridContainerItem>().ToList())
+            Control itemParent = _usePagination ? this : _scrollArea;
+
+            foreach (GridContainerItem cell in itemParent.Children.OfType<GridContainerItem>().ToList())
             {
                 cell.Dispose();
             }
@@ -164,7 +277,19 @@ namespace ClassicUO.Game.UI.Controls
                     continue;
                 }
 
-                var (cx, cy, page) = GridContainerLayout.CellPosition(index);
+                int cx;
+                int cy;
+                int page;
+
+                if (_usePagination)
+                {
+                    (cx, cy, page) = GridContainerLayout.CellPosition(index);
+                }
+                else
+                {
+                    (cx, cy) = GridContainerLayout.CellPosition(index, GridContainerLayout.ColumnsForWidth(Width, true));
+                    page = 0;
+                }
 
                 GridContainerItem cell = new GridContainerItem(this, item.Serial, GridContainerLayout.CELL_SIZE)
                 {
@@ -172,12 +297,19 @@ namespace ClassicUO.Game.UI.Controls
                     Y = cy
                 };
 
-                Add(cell, page + 1);
+                if (_usePagination)
+                {
+                    Add(cell, page + 1);
+                }
+                else
+                {
+                    _scrollArea.Add(cell);
+                }
 
                 index++;
             }
 
-            _pageCount = GridContainerLayout.PageCount(index);
+            _pageCount = _usePagination ? GridContainerLayout.PageCount(index) : 1;
 
             if (_currentPage >= _pageCount)
             {
@@ -210,6 +342,12 @@ namespace ClassicUO.Game.UI.Controls
 
         private void ApplyPage()
         {
+            if (!_usePagination)
+            {
+                ActivePage = 0;
+                return;
+            }
+
             ActivePage = _currentPage + 1;
 
             _buttonPrev.IsVisible = _currentPage > 0;
@@ -228,20 +366,8 @@ namespace ClassicUO.Game.UI.Controls
             }
 
             // Empty grid background is a drop target for a held item.
-            if (
-                Client.Game.UO.GameCursor.ItemHold.Enabled
-                && !Client.Game.UO.GameCursor.ItemHold.IsFixedPosition
-            )
+            if (TryDropHeldItem())
             {
-                GameActions.DropItem(
-                    Client.Game.UO.GameCursor.ItemHold.Serial,
-                    0xFFFF,
-                    0xFFFF,
-                    0,
-                    ContainerSerial
-                );
-
-                Mouse.CancelDoubleClick = true;
                 return;
             }
 

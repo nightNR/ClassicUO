@@ -120,25 +120,14 @@ namespace ClassicUO.Game.UI.Controls
 
             // Held item released over a cell -> drop into this container (grid has no
             // meaningful slot coordinates; 0xFFFF/0xFFFF lets the server place it).
-            if (
-                Client.Game.UO.GameCursor.ItemHold.Enabled
-                && !Client.Game.UO.GameCursor.ItemHold.IsFixedPosition
-            )
+            if (_view.TryDropHeldItem(LocalSerial))
             {
-                GameActions.DropItem(
-                    Client.Game.UO.GameCursor.ItemHold.Serial,
-                    0xFFFF,
-                    0xFFFF,
-                    0,
-                    _view.ContainerSerial
-                );
-
-                Mouse.CancelDoubleClick = true;
                 return;
             }
 
             // Single click: route through the delayed-click manager, same as ItemGump.
             SelectedObject.Object = _view.World.Get(LocalSerial);
+            _view.RequestSingleClick(LocalSerial);
             base.OnMouseUp(x, y, button);
         }
 
@@ -207,8 +196,11 @@ namespace ClassicUO.Game.UI.Controls
             return false;
         }
 
-        // Mirrors ItemGump.AttemptPickUp (honors RelativeDragAndDropItems /
-        // ScaleItemsInsideContainers offsets). is_gump is always false for container art.
+        // Grid art is centered inside a synthetic cell rather than drawn at its original
+        // container coordinates. A relative offset based on the cell's screen position
+        // would therefore be hundreds of pixels off after scrolling or moving the gump.
+        // Always pick it up centered on the cursor; this also keeps a later standard-view
+        // container drop from inheriting an invalid ItemHold.MouseOffset.
         private void AttemptPickUp()
         {
             Item item = _view.World.Items.Get(LocalSerial);
@@ -233,22 +225,7 @@ namespace ClassicUO.Game.UI.Controls
                 centerY = (int)(centerY * scale);
             }
 
-            if (
-                ProfileManager.CurrentProfile != null
-                && ProfileManager.CurrentProfile.RelativeDragAndDropItems
-            )
-            {
-                Point p = new Point(
-                    centerX - (Mouse.Position.X - ScreenCoordinateX),
-                    centerY - (Mouse.Position.Y - ScreenCoordinateY)
-                );
-
-                GameActions.PickUp(_view.World, LocalSerial, centerX, centerY, offset: p);
-            }
-            else
-            {
-                GameActions.PickUp(_view.World, LocalSerial, centerX, centerY);
-            }
+            GameActions.PickUp(_view.World, LocalSerial, centerX, centerY);
         }
 
         public override bool AddToRenderLists(RenderLists renderLists, int x, int y, ref float layerDepthRef)
@@ -308,6 +285,25 @@ namespace ClassicUO.Game.UI.Controls
                             hueVector,
                             layerDepth
                         );
+
+                        if (!item.IsMulti
+                            && !item.IsCoin
+                            && item.Amount > 1
+                            && item.ItemData.IsStackable)
+                        {
+                            batcher.Draw(
+                                texture,
+                                new Rectangle(x + point.X + 5, y + point.Y + 5, size.X, size.Y),
+                                new Rectangle(
+                                    sourceRectangle.X + rect.X,
+                                    sourceRectangle.Y + rect.Y,
+                                    rect.Width,
+                                    rect.Height
+                                ),
+                                hueVector,
+                                layerDepth
+                            );
+                        }
                         return true;
                     }
                 );

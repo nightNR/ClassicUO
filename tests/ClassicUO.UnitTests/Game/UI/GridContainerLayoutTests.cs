@@ -75,5 +75,22 @@ namespace ClassicUO.UnitTests.Game.UI
             Assert.Equal(4, y);
             Assert.Equal(1, page);
         }
+
+        [Theory]
+        [InlineData(72, 1)]
+        [InlineData(126, 2)]
+        [InlineData(180, 3)]
+        public void ColumnsForWidth_AccountsForScrollbar(int width, int expected)
+        {
+            Assert.Equal(expected, GridContainerLayout.ColumnsForWidth(width, true));
+        }
+
+        [Fact]
+        public void DynamicCellPosition_UsesRequestedColumnCount()
+        {
+            var (x, y) = GridContainerLayout.CellPosition(3, 3);
+            Assert.Equal(4, x);
+            Assert.Equal(58, y);
+        }
     }
 }
