@@ -232,7 +232,19 @@ namespace ClassicUO.Game.UI.Gumps
                     StatusGumpBase.GetStatusGump()?.Dispose();
                 }
 
-                if (ProfileManager.CurrentProfile.CustomBarsToggled)
+                if (HealthBarFactory.IsModern(ProfileManager.CurrentProfile))
+                {
+                    Point modernSize = HealthBarFactory.ModernSize(false);
+
+                    UIManager.Add(
+                        gump = new HealthBarGumpModern(World, entity)
+                        {
+                            X = Mouse.Position.X - (modernSize.X >> 1),
+                            Y = Mouse.Position.Y - (modernSize.Y >> 1)
+                        }
+                    );
+                }
+                else if (ProfileManager.CurrentProfile.CustomBarsToggled)
                 {
                     Rectangle rect = new Rectangle(
                         0,

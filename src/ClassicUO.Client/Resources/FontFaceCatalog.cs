@@ -24,6 +24,7 @@ namespace ClassicUO.Resources
             new FontFace("cinzel",        "Cinzel",          "Cinzel.ttf"),
             new FontFace("cormorant",     "Cormorant",       "Cormorant.ttf"),
             new FontFace("inter",         "Inter",           "Inter.ttf"),
+            new FontFace("interbold",     "Inter Bold",      "InterBold.ttf"),
             new FontFace("sourcesans",    "Source Sans",     "SourceSans.ttf"),
             new FontFace("clfuoclassic",  "CLF-UoClassic",   "CLFUoClassic.ttf"),
             new FontFace("imfellenglish", "IM Fell English", "IMFellEnglish.ttf"),

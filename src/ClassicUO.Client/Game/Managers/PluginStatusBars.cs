@@ -371,7 +371,7 @@ namespace ClassicUO.Game.Managers
             // opens (e.g. out-of-range mobile), never silently dropped.
             BaseHealthBarGump bar = entity != null
                 ? HealthBarFactory.Create(world, entity)
-                : new HealthBarGumpCustom(world, serial);
+                : HealthBarFactory.CreateForSerial(world, serial);
             bar.X = seedX;
             bar.Y = seedY;
 

@@ -7,9 +7,10 @@ namespace ClassicUO.UnitTests.Resources
     public class FontFaceCatalogTests
     {
         [Fact]
-        public void Faces_ContainsSevenKnownFaces()
+        public void Faces_ContainsEightKnownFaces()
         {
-            Assert.Equal(7, FontFaceCatalog.Faces.Count);
+            Assert.Equal(8, FontFaceCatalog.Faces.Count);
+            Assert.Contains(FontFaceCatalog.Faces, f => f.Id == "interbold");
             Assert.Contains(FontFaceCatalog.Faces, f => f.Id == "inter");
             Assert.Contains(FontFaceCatalog.Faces, f => f.Id == "cinzel");
         }

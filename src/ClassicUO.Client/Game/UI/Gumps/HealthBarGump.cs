@@ -2337,11 +2337,45 @@ namespace ClassicUO.Game.UI.Gumps
             return profile != null && profile.CustomBarsToggled;
         }
 
+        public static bool IsModern(Configuration.Profile profile)
+        {
+            return profile != null && profile.ModernBarsToggled;
+        }
+
         public static BaseHealthBarGump Create(World world, GameObjects.Entity entity)
         {
-            return ShouldUseCustomBar(Configuration.ProfileManager.CurrentProfile)
+            Configuration.Profile profile = Configuration.ProfileManager.CurrentProfile;
+
+            if (IsModern(profile))
+            {
+                return new HealthBarGumpModern(world, entity);
+            }
+
+            return ShouldUseCustomBar(profile)
                 ? new HealthBarGumpCustom(world, entity)
                 : new HealthBarGump(world, entity);
+        }
+
+        public static BaseHealthBarGump CreateForSerial(World world, uint serial)
+        {
+            Configuration.Profile profile = Configuration.ProfileManager.CurrentProfile;
+
+            if (IsModern(profile))
+            {
+                return new HealthBarGumpModern(world, serial);
+            }
+
+            return ShouldUseCustomBar(profile)
+                ? new HealthBarGumpCustom(world, serial)
+                : new HealthBarGump(world, serial);
+        }
+
+        /// <summary>Size of a freshly created modern bar (single-row, or the 3-row player/party layout).</summary>
+        public static Point ModernSize(bool multiRow)
+        {
+            Configuration.Profile profile = Configuration.ProfileManager.CurrentProfile;
+
+            return HealthBarGumpModern.DefaultSize(profile, multiRow, !multiRow && profile != null && profile.ShowDistanceOnHealthBar);
         }
     }
 }

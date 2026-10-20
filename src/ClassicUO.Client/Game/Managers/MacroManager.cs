@@ -702,7 +702,11 @@ namespace ClassicUO.Game.Managers
                                             if (ProfileManager.CurrentProfile.StatusGumpBarMutuallyExclusive)
                                                 status.Dispose();
 
-                                            if (ProfileManager.CurrentProfile.CustomBarsToggled)
+                                            if (HealthBarFactory.IsModern(ProfileManager.CurrentProfile))
+                                            {
+                                                UIManager.Add(new HealthBarGumpModern(_world, _world.Player) { X = status.ScreenCoordinateX, Y = status.ScreenCoordinateY });
+                                            }
+                                            else if (ProfileManager.CurrentProfile.CustomBarsToggled)
                                             {
                                                 UIManager.Add(new HealthBarGumpCustom(_world, _world.Player) { X = status.ScreenCoordinateX, Y = status.ScreenCoordinateY });
                                             }

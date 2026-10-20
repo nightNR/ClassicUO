@@ -1724,4 +1724,70 @@ start your first counter</value>
   <data name="JournalFileWithSerial" xml:space="preserve">
     <value>Add speaker serial to journal entries</value>
   </data>
+  <data name="ModernBars" xml:space="preserve">
+    <value>Use modern status bars (overrides custom)</value>
+  </data>
+  <data name="ModernBarsScale" xml:space="preserve">
+    <value>Modern bar scale (%)</value>
+  </data>
+  <data name="ModernBarsShowValues" xml:space="preserve">
+    <value>Show values on modern bars</value>
+  </data>
+  <data name="ModernBarsNotorietyAccent" xml:space="preserve">
+    <value>Tint modern bars by notoriety</value>
+  </data>
+  <data name="ModernBarsOpacity" xml:space="preserve">
+    <value>Modern bar background opacity (%)</value>
+  </data>
+  <data name="ModernBarsColorsHint" xml:space="preserve">
+    <value>Modern bar colors (click to pick):</value>
+  </data>
+  <data name="ModernColorBackground" xml:space="preserve">
+    <value>Background</value>
+  </data>
+  <data name="ModernColorBorder" xml:space="preserve">
+    <value>Border</value>
+  </data>
+  <data name="ModernColorHeader" xml:space="preserve">
+    <value>Header</value>
+  </data>
+  <data name="ModernColorTrack" xml:space="preserve">
+    <value>Bar track</value>
+  </data>
+  <data name="ModernColorHp" xml:space="preserve">
+    <value>Health</value>
+  </data>
+  <data name="ModernColorMana" xml:space="preserve">
+    <value>Mana</value>
+  </data>
+  <data name="ModernColorStamina" xml:space="preserve">
+    <value>Stamina</value>
+  </data>
+  <data name="ModernColorPoison" xml:space="preserve">
+    <value>Poisoned</value>
+  </data>
+  <data name="ModernColorMortal" xml:space="preserve">
+    <value>Mortally wounded</value>
+  </data>
+  <data name="ModernColorAlert" xml:space="preserve">
+    <value>Target / war alert</value>
+  </data>
+  <data name="PickerRed" xml:space="preserve">
+    <value>Red</value>
+  </data>
+  <data name="PickerGreen" xml:space="preserve">
+    <value>Green</value>
+  </data>
+  <data name="PickerBlue" xml:space="preserve">
+    <value>Blue</value>
+  </data>
+  <data name="PickerOk" xml:space="preserve">
+    <value>OK</value>
+  </data>
+  <data name="PickerCancel" xml:space="preserve">
+    <value>Cancel</value>
+  </data>
+  <data name="ModernColorsReset" xml:space="preserve">
+    <value>Reset colors to default</value>
+  </data>
 </root>

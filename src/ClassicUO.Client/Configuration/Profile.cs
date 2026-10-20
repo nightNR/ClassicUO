@@ -301,6 +301,24 @@ namespace ClassicUO.Configuration
         public bool ShowStatValuesOnBars { get; set; }
         public bool ShowDistanceOnHealthBar { get; set; }
 
+        // Modern (fully procedural, scalable) status bars. Colors are 0xRRGGBB.
+        public bool ModernBarsToggled { get; set; }
+        public int ModernBarScale { get; set; } = 100; // percent, applies to every modern bar
+        public int ModernBarPaletteVersion { get; set; }
+        public bool ModernBarShowValues { get; set; } = true;
+        public bool ModernBarNotorietyAccent { get; set; } = true; // border/header follow notoriety
+        public int ModernBarBackgroundOpacity { get; set; } = 90;
+        public uint ModernBarBackground { get; set; } = ClassicUO.Game.UI.Gumps.ModernBarStyle.DefaultBackground;
+        public uint ModernBarBorder { get; set; } = ClassicUO.Game.UI.Gumps.ModernBarStyle.DefaultBorder;
+        public uint ModernBarHeader { get; set; } = ClassicUO.Game.UI.Gumps.ModernBarStyle.DefaultHeader;
+        public uint ModernBarTrack { get; set; } = ClassicUO.Game.UI.Gumps.ModernBarStyle.DefaultTrack;
+        public uint ModernBarHp { get; set; } = ClassicUO.Game.UI.Gumps.ModernBarStyle.DefaultHp;
+        public uint ModernBarMana { get; set; } = ClassicUO.Game.UI.Gumps.ModernBarStyle.DefaultMana;
+        public uint ModernBarStamina { get; set; } = ClassicUO.Game.UI.Gumps.ModernBarStyle.DefaultStamina;
+        public uint ModernBarPoison { get; set; } = ClassicUO.Game.UI.Gumps.ModernBarStyle.DefaultPoison;
+        public uint ModernBarMortal { get; set; } = ClassicUO.Game.UI.Gumps.ModernBarStyle.DefaultMortal;
+        public uint ModernBarAlert { get; set; } = ClassicUO.Game.UI.Gumps.ModernBarStyle.DefaultAlert; // target / war-mode border
+
         public bool ShowInfoBar { get; set; }
         public int InfoBarHighlightType { get; set; } // 0 = text colour changes, 1 = underline
 
@@ -760,7 +778,11 @@ namespace ClassicUO.Configuration
                                     break;
 
                                 case GumpType.HealthBar:
-                                    if (CustomBarsToggled)
+                                    if (ModernBarsToggled)
+                                    {
+                                        gump = new HealthBarGumpModern(world);
+                                    }
+                                    else if (CustomBarsToggled)
                                     {
                                         gump = new HealthBarGumpCustom(world);
                                     }
@@ -950,7 +972,11 @@ namespace ClassicUO.Configuration
                                         break;
 
                                     case GumpType.HealthBar:
-                                        if (CustomBarsToggled)
+                                        if (ModernBarsToggled)
+                                        {
+                                            gump = new HealthBarGumpModern(world);
+                                        }
+                                        else if (CustomBarsToggled)
                                         {
                                             gump = new HealthBarGumpCustom(world);
                                         }

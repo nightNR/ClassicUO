@@ -663,7 +663,19 @@ namespace ClassicUO.Game.UI.Gumps
                             break;
                         }
 
-                        if (ProfileManager.CurrentProfile.CustomBarsToggled)
+                        if (HealthBarFactory.IsModern(ProfileManager.CurrentProfile))
+                        {
+                            Point modernSize = HealthBarFactory.ModernSize(false);
+
+                            UIManager.Add(
+                                new HealthBarGumpModern(World, LocalSerial)
+                                {
+                                    X = Mouse.Position.X - (modernSize.X >> 1),
+                                    Y = Mouse.Position.Y - 5
+                                }
+                            );
+                        }
+                        else if (ProfileManager.CurrentProfile.CustomBarsToggled)
                         {
                             Rectangle bounds = new Rectangle(
                                 0,

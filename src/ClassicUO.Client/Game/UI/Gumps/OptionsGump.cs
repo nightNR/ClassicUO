@@ -37,7 +37,9 @@ namespace ClassicUO.Game.UI.Gumps
         private InputField _autoOpenCorpseRange;
 
         //experimental
-        private Checkbox _autoOpenDoors, _autoOpenCorpse, _skipEmptyCorpse, _disableTabBtn, _disableCtrlQWBtn, _disableDefaultHotkeys, _disableArrowBtn, _disableAutoMove, _overrideContainerLocation, _smoothDoors, _allowDiagonalCornerCutting, _showTargetRangeIndicator, _customBars, _customBarsBBG, _statValuesOnBars, _showDistanceOnHealthBar, _saveHealthbars, _saveGumpsRelativeToCenter;
+        private HSliderBar _modernScale, _modernOpacity;
+        private readonly List<(ClickableRgbBox box, Func<Profile, uint> get, Action<Profile, uint> set)> _modernColorFields = new();
+        private Checkbox _autoOpenDoors, _autoOpenCorpse, _skipEmptyCorpse, _disableTabBtn, _disableCtrlQWBtn, _disableDefaultHotkeys, _disableArrowBtn, _disableAutoMove, _overrideContainerLocation, _smoothDoors, _allowDiagonalCornerCutting, _showTargetRangeIndicator, _customBars, _customBarsBBG, _modernBars, _modernShowValues, _modernAccent, _statValuesOnBars, _showDistanceOnHealthBar, _saveHealthbars, _saveGumpsRelativeToCenter;
         private Checkbox _nameOverheadAlwaysOn, _nameOverheadShowHpBar;
         private HSliderBar _cellSize;
         private Checkbox _containerScaleItems, _containerDoubleClickToLoot, _relativeDragAnDropItems, _useLargeContianersGumps, _highlightContainersWhenMouseIsOver, _allowItemsOutsideContainerBounds;
@@ -3518,6 +3520,8 @@ namespace ClassicUO.Game.UI.Gumps
 
             SettingsSection section = AddSettingsSection(box, "Status Bars");
 
+            ModernBarStyle.MigratePalette(_currentProfile);
+
             section.Add
             (
                 _holdDownKeyAlt = AddCheckBox
@@ -3565,6 +3569,57 @@ namespace ClassicUO.Game.UI.Gumps
                     0
                 )
             );
+
+            section.Add(_modernBars = AddCheckBox(null, ResGumps.ModernBars, _currentProfile.ModernBarsToggled, 0, 0));
+            section.PushIndent();
+            section.Add(_modernShowValues = AddCheckBox(null, ResGumps.ModernBarsShowValues, _currentProfile.ModernBarShowValues, 0, 0));
+            section.Add(_modernAccent = AddCheckBox(null, ResGumps.ModernBarsNotorietyAccent, _currentProfile.ModernBarNotorietyAccent, 0, 0));
+            section.Add(AddLabel(null, ResGumps.ModernBarsScale, 0, 0));
+            section.AddRight(_modernScale = AddHSlider(null, ModernBarStyle.MinScalePercent, ModernBarStyle.MaxScalePercent, ModernBarStyle.ClampScale(_currentProfile.ModernBarScale), 0, 0, 150));
+            section.Add(AddLabel(null, ResGumps.ModernBarsOpacity, 0, 0));
+            section.AddRight(_modernOpacity = AddHSlider(null, 0, 100, Math.Clamp(_currentProfile.ModernBarBackgroundOpacity, 0, 100), 0, 0, 150));
+            section.Add(AddLabel(null, ResGumps.ModernBarsColorsHint, 0, 0));
+
+            _modernColorFields.Clear();
+
+            void AddModernColor(string label, Func<Profile, uint> get, Action<Profile, uint> set)
+            {
+                section.Add(AddLabel(null, label, 0, 0));
+
+                var box = new ClickableRgbBox(World, label, get(_currentProfile));
+                section.AddRight(box);
+                _modernColorFields.Add((box, get, set));
+            }
+
+            AddModernColor(ResGumps.ModernColorBackground, p => p.ModernBarBackground, (p, v) => p.ModernBarBackground = v);
+            AddModernColor(ResGumps.ModernColorBorder, p => p.ModernBarBorder, (p, v) => p.ModernBarBorder = v);
+            AddModernColor(ResGumps.ModernColorHeader, p => p.ModernBarHeader, (p, v) => p.ModernBarHeader = v);
+            AddModernColor(ResGumps.ModernColorTrack, p => p.ModernBarTrack, (p, v) => p.ModernBarTrack = v);
+            AddModernColor(ResGumps.ModernColorHp, p => p.ModernBarHp, (p, v) => p.ModernBarHp = v);
+            AddModernColor(ResGumps.ModernColorMana, p => p.ModernBarMana, (p, v) => p.ModernBarMana = v);
+            AddModernColor(ResGumps.ModernColorStamina, p => p.ModernBarStamina, (p, v) => p.ModernBarStamina = v);
+            AddModernColor(ResGumps.ModernColorPoison, p => p.ModernBarPoison, (p, v) => p.ModernBarPoison = v);
+            AddModernColor(ResGumps.ModernColorMortal, p => p.ModernBarMortal, (p, v) => p.ModernBarMortal = v);
+            AddModernColor(ResGumps.ModernColorAlert, p => p.ModernBarAlert, (p, v) => p.ModernBarAlert = v);
+
+            var resetColors = new NiceButton(0, 0, 200, 22, ButtonAction.Activate, ResGumps.ModernColorsReset);
+            resetColors.MouseUp += (s, e) =>
+            {
+                uint[] defaults =
+                {
+                    ModernBarStyle.DefaultBackground, ModernBarStyle.DefaultBorder, ModernBarStyle.DefaultHeader,
+                    ModernBarStyle.DefaultTrack, ModernBarStyle.DefaultHp, ModernBarStyle.DefaultMana,
+                    ModernBarStyle.DefaultStamina, ModernBarStyle.DefaultPoison, ModernBarStyle.DefaultMortal,
+                    ModernBarStyle.DefaultAlert,
+                };
+
+                for (int i = 0; i < _modernColorFields.Count && i < defaults.Length; i++)
+                {
+                    _modernColorFields[i].box.Rgb = defaults[i];
+                }
+            };
+            section.Add(resetColors);
+            section.PopIndent();
 
             section.Add
             (
@@ -4279,6 +4334,7 @@ namespace ClassicUO.Game.UI.Gumps
                     _nameOverheadShowHpBar.IsChecked = true;
                     _customBars.IsChecked = false;
                     _customBarsBBG.IsChecked = false;
+                    _modernBars.IsChecked = false;
                     _statValuesOnBars.IsChecked = false;
                     _showDistanceOnHealthBar.IsChecked = false;
                     _autoOpenCorpse.IsChecked = false;
@@ -5053,33 +5109,46 @@ namespace ClassicUO.Game.UI.Gumps
             _currentProfile.NameOverheadShowHpBar = _nameOverheadShowHpBar.IsChecked;
 
 
-            bool updateHealthBars = _currentProfile.CustomBarsToggled != _customBars.IsChecked;
+            bool wasModern = _currentProfile.ModernBarsToggled;
+            bool wasCustom = _currentProfile.CustomBarsToggled;
             _currentProfile.CustomBarsToggled = _customBars.IsChecked;
+            _currentProfile.ModernBarsToggled = _modernBars.IsChecked;
 
-            if (updateHealthBars)
+            _currentProfile.ModernBarShowValues = _modernShowValues.IsChecked;
+            _currentProfile.ModernBarNotorietyAccent = _modernAccent.IsChecked;
+            _currentProfile.ModernBarScale = ModernBarStyle.ClampScale(_modernScale.Value);
+            _currentProfile.ModernBarBackgroundOpacity = _modernOpacity.Value;
+
+            foreach ((ClickableRgbBox box, Func<Profile, uint> get, Action<Profile, uint> set) in _modernColorFields)
             {
-                if (_currentProfile.CustomBarsToggled)
+                set(_currentProfile, box.Rgb);
+            }
+
+            bool nowModern = _currentProfile.ModernBarsToggled;
+            bool nowCustom = _currentProfile.CustomBarsToggled;
+
+            if (wasModern != nowModern || (!nowModern && wasCustom != nowCustom))
+            {
+                foreach (BaseHealthBarGump bar in UIManager.Gumps.OfType<BaseHealthBarGump>().ToList())
                 {
-                    List<HealthBarGump> hbgstandard = UIManager.Gumps.OfType<HealthBarGump>().ToList();
+                    bool match = nowModern ? bar is HealthBarGumpModern : nowCustom ? bar is HealthBarGumpCustom : bar is HealthBarGump;
 
-                    foreach (HealthBarGump healthbar in hbgstandard)
+                    if (match)
                     {
-                        UIManager.Add(new HealthBarGumpCustom(World, healthbar.LocalSerial) { X = healthbar.X, Y = healthbar.Y });
-
-                        healthbar.Dispose();
+                        continue;
                     }
-                }
-                else
-                {
-                    List<HealthBarGumpCustom> hbgcustom = UIManager.Gumps.OfType<HealthBarGumpCustom>().ToList();
 
-                    foreach (HealthBarGumpCustom customhealthbar in hbgcustom)
-                    {
-                        UIManager.Add(new HealthBarGump(World, customhealthbar.LocalSerial) { X = customhealthbar.X, Y = customhealthbar.Y });
-
-                        customhealthbar.Dispose();
-                    }
+                    BaseHealthBarGump replacement = HealthBarFactory.CreateForSerial(World, bar.LocalSerial);
+                    replacement.X = bar.X;
+                    replacement.Y = bar.Y;
+                    UIManager.Add(replacement);
+                    bar.Dispose();
                 }
+            }
+
+            foreach (HealthBarGumpModern modernBar in UIManager.Gumps.OfType<HealthBarGumpModern>().ToList())
+            {
+                modernBar.RequestUpdateContents();
             }
 
             _currentProfile.CBBlackBGToggled = _customBarsBBG.IsChecked;

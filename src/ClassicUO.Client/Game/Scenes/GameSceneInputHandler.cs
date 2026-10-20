@@ -211,7 +211,12 @@ namespace ClassicUO.Game.Scenes
 
             Rectangle rect;
 
-            if (useCHB)
+            if (HealthBarFactory.IsModern(ProfileManager.CurrentProfile))
+            {
+                Point modernSize = HealthBarFactory.ModernSize(false);
+                rect = new Rectangle(0, 0, modernSize.X, modernSize.Y);
+            }
+            else if (useCHB)
             {
                 rect = new Rectangle(
                     0,
@@ -1135,7 +1140,19 @@ namespace ClassicUO.Game.Scenes
                                 StatusGumpBase.GetStatusGump()?.Dispose();
                             }
 
-                            if (ProfileManager.CurrentProfile.CustomBarsToggled)
+                            if (HealthBarFactory.IsModern(ProfileManager.CurrentProfile))
+                            {
+                                Point modernSize = HealthBarFactory.ModernSize(false);
+
+                                UIManager.Add(
+                                    customgump = new HealthBarGumpModern(_world, obj)
+                                    {
+                                        X = Mouse.LClickPosition.X - (modernSize.X >> 1),
+                                        Y = Mouse.LClickPosition.Y - (modernSize.Y >> 1)
+                                    }
+                                );
+                            }
+                            else if (ProfileManager.CurrentProfile.CustomBarsToggled)
                             {
                                 Rectangle rect = new Rectangle(
                                     0,

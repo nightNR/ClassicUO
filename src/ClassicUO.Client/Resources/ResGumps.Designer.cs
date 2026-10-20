@@ -4855,5 +4855,201 @@ namespace ClassicUO.Resources {
                 return ResourceManager.GetString("YourCurrentChannel", resourceCulture);
             }
         }
+            
+        /// <summary>
+        ///   Looks up a localized string similar to Use modern status bars (overrides custom).
+        /// </summary>
+        public static string ModernBars {
+            get {
+                return ResourceManager.GetString("ModernBars", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Modern bar scale (%).
+        /// </summary>
+        public static string ModernBarsScale {
+            get {
+                return ResourceManager.GetString("ModernBarsScale", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Show values on modern bars.
+        /// </summary>
+        public static string ModernBarsShowValues {
+            get {
+                return ResourceManager.GetString("ModernBarsShowValues", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Tint modern bars by notoriety.
+        /// </summary>
+        public static string ModernBarsNotorietyAccent {
+            get {
+                return ResourceManager.GetString("ModernBarsNotorietyAccent", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Modern bar background opacity (%).
+        /// </summary>
+        public static string ModernBarsOpacity {
+            get {
+                return ResourceManager.GetString("ModernBarsOpacity", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Modern bar colors (click to pick):.
+        /// </summary>
+        public static string ModernBarsColorsHint {
+            get {
+                return ResourceManager.GetString("ModernBarsColorsHint", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Background.
+        /// </summary>
+        public static string ModernColorBackground {
+            get {
+                return ResourceManager.GetString("ModernColorBackground", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Border.
+        /// </summary>
+        public static string ModernColorBorder {
+            get {
+                return ResourceManager.GetString("ModernColorBorder", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Header.
+        /// </summary>
+        public static string ModernColorHeader {
+            get {
+                return ResourceManager.GetString("ModernColorHeader", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Bar track.
+        /// </summary>
+        public static string ModernColorTrack {
+            get {
+                return ResourceManager.GetString("ModernColorTrack", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Health.
+        /// </summary>
+        public static string ModernColorHp {
+            get {
+                return ResourceManager.GetString("ModernColorHp", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Mana.
+        /// </summary>
+        public static string ModernColorMana {
+            get {
+                return ResourceManager.GetString("ModernColorMana", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Stamina.
+        /// </summary>
+        public static string ModernColorStamina {
+            get {
+                return ResourceManager.GetString("ModernColorStamina", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Poisoned.
+        /// </summary>
+        public static string ModernColorPoison {
+            get {
+                return ResourceManager.GetString("ModernColorPoison", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Mortally wounded.
+        /// </summary>
+        public static string ModernColorMortal {
+            get {
+                return ResourceManager.GetString("ModernColorMortal", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Target / war alert.
+        /// </summary>
+        public static string ModernColorAlert {
+            get {
+                return ResourceManager.GetString("ModernColorAlert", resourceCulture);
+            }
+        }
+        /// <summary>
+        ///   Looks up a localized string similar to Red.
+        /// </summary>
+        public static string PickerRed {
+            get {
+                return ResourceManager.GetString("PickerRed", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Green.
+        /// </summary>
+        public static string PickerGreen {
+            get {
+                return ResourceManager.GetString("PickerGreen", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Blue.
+        /// </summary>
+        public static string PickerBlue {
+            get {
+                return ResourceManager.GetString("PickerBlue", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to OK.
+        /// </summary>
+        public static string PickerOk {
+            get {
+                return ResourceManager.GetString("PickerOk", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Cancel.
+        /// </summary>
+        public static string PickerCancel {
+            get {
+                return ResourceManager.GetString("PickerCancel", resourceCulture);
+            }
+        }
+        /// <summary>
+        ///   Looks up a localized string similar to Reset colors to default.
+        /// </summary>
+        public static string ModernColorsReset {
+            get {
+                return ResourceManager.GetString("ModernColorsReset", resourceCulture);
+            }
+        }
     }
 }

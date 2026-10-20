@@ -149,6 +149,7 @@
     <EmbeddedResource Include="..\..\Assets\fonts\Cinzel\static\Cinzel-SemiBold.ttf" LogicalName="Cinzel.ttf" />
     <EmbeddedResource Include="..\..\Assets\fonts\Cormorant_Garamond\static\CormorantGaramond-SemiBold.ttf" LogicalName="Cormorant.ttf" />
     <EmbeddedResource Include="..\..\Assets\fonts\Inter\static\Inter_18pt-Regular.ttf" LogicalName="Inter.ttf" />
+    <EmbeddedResource Include="..\..\Assets\fonts\Inter\static\Inter_18pt-Bold.ttf" LogicalName="InterBold.ttf" />
     <EmbeddedResource Include="..\..\Assets\fonts\Source_Sans_3\static\SourceSans3-Regular.ttf" LogicalName="SourceSans.ttf" />
     <EmbeddedResource Include="..\..\Assets\fonts\CLF-UoClassic\CLF-UoClassic-EU.ttf" LogicalName="CLFUoClassic.ttf" />
     <EmbeddedResource Include="..\..\Assets\fonts\IM_Fell_English\IMFellEnglish-Regular.ttf" LogicalName="IMFellEnglish.ttf" />
