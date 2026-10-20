@@ -27,10 +27,23 @@ namespace ClassicUO.Game
         private readonly HashSet<long> _closed = new HashSet<long>();
         private readonly List<AStarPathSearch.Neighbor> _neighbors = new List<AStarPathSearch.Neighbor>();
 
-        private int _goalX, _goalY, _distance;
+        /// <summary>Sentinel for <see cref="Begin"/>'s goalZ: match the goal on X/Y only.</summary>
+        internal const int AnyZ = int.MinValue;
+
+        /// <summary>Max |Z - goalZ| for a node to count as the goal. UO floors sit ~20 Z apart,
+        /// while sloped land/stairs put the standing Z a few units off the clicked tile's Z.</summary>
+        internal const int GoalZTolerance = 12;
+
+        /// <summary>Extra nodes spent looking for the goal's floor after the goal X/Y was first
+        /// reached on another floor, before falling back to that X/Y-only match.</summary>
+        internal const int WrongFloorExtraNodes = 20000;
+
+        private int _goalX, _goalY, _goalZ, _distance, _maxNodes;
         private AStarPathSearch.ExpandNeighbors _expand;
         private int _goalIndex = -1;
         private bool _startWithinTolerance;
+        private int _xyOnlyIndex = -1;
+        private int _xyOnlyDeadline;
 
         public int ExpandedNodes { get; private set; }
 
@@ -47,8 +60,20 @@ namespace ClassicUO.Game
             return dx > dy ? dx : dy;
         }
 
-        public void Begin(int startX, int startY, int startZ, int goalX, int goalY, int distance, AStarPathSearch.ExpandNeighbors expand)
+        /// <param name="maxNodes">Total expansion cap across all <see cref="Step"/> calls. Once
+        /// reached the search reports <see cref="Status.Failed"/> — without it an unreachable goal
+        /// keeps the resumable search Running indefinitely.</param>
+        /// <param name="goalZ">Goal altitude, or <see cref="AnyZ"/>. When set, a node only counts
+        /// as the goal if it is also within <see cref="GoalZTolerance"/> of it — otherwise a goal
+        /// on an upper floor is "reached" on the floor below. If the X/Y is reached but the floor
+        /// never is (bad caller Z, unreachable floor), the X/Y-only match is used after
+        /// <see cref="WrongFloorExtraNodes"/> more expansions.</param>
+        public void Begin(int startX, int startY, int startZ, int goalX, int goalY, int distance, AStarPathSearch.ExpandNeighbors expand, int maxNodes = int.MaxValue, int goalZ = AnyZ)
         {
+            _maxNodes = maxNodes;
+            _goalZ = goalZ;
+            _xyOnlyIndex = -1;
+            _xyOnlyDeadline = 0;
             _nodes.Clear();
             _open.Clear();
             _bestG.Clear();
@@ -60,7 +85,7 @@ namespace ClassicUO.Game
             _expand = expand;
             _goalIndex = -1;
             ExpandedNodes = 0;
-            _startWithinTolerance = Heuristic(startX, startY, goalX, goalY) <= distance;
+            _startWithinTolerance = Heuristic(startX, startY, goalX, goalY) <= distance && IsGoalFloor(startZ);
 
             if (_startWithinTolerance)
             {
@@ -99,8 +124,28 @@ namespace ClassicUO.Game
 
                 if (Heuristic(cur.X, cur.Y, _goalX, _goalY) <= _distance)
                 {
-                    _goalIndex = idx;
-                    return Status.Found;
+                    if (IsGoalFloor(cur.Z))
+                    {
+                        _goalIndex = idx;
+                        return Status.Found;
+                    }
+
+                    // Right X/Y, wrong floor: remember it and keep searching for the stairs.
+                    if (_xyOnlyIndex < 0)
+                    {
+                        _xyOnlyIndex = idx;
+                        _xyOnlyDeadline = ExpandedNodes + WrongFloorExtraNodes;
+                    }
+                }
+
+                if (_xyOnlyIndex >= 0 && ExpandedNodes >= _xyOnlyDeadline)
+                {
+                    return UseXyOnlyMatch();
+                }
+
+                if (ExpandedNodes >= _maxNodes)
+                {
+                    return _xyOnlyIndex >= 0 ? UseXyOnlyMatch() : Status.Failed;
                 }
 
                 ExpandedNodes++;
@@ -136,7 +181,18 @@ namespace ClassicUO.Game
                 }
             }
 
-            return Status.Failed;
+            return _xyOnlyIndex >= 0 ? UseXyOnlyMatch() : Status.Failed;
+        }
+
+        private bool IsGoalFloor(int z)
+        {
+            return _goalZ == AnyZ || Math.Abs(z - _goalZ) <= GoalZTolerance;
+        }
+
+        private Status UseXyOnlyMatch()
+        {
+            _goalIndex = _xyOnlyIndex;
+            return Status.Found;
         }
 
         public void GetPath(List<AStarPathSearch.Step> path)

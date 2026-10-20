@@ -6466,7 +6466,12 @@ namespace ClassicUO.Network
                 world.Player.Direction = direction & Direction.Mask;
                 world.Player.FixHue(hue);
                 world.Player.Flags = flags;
+                // A teleport/relocation resets the walker, which also zeroes LastStepRequestTime. A still-held
+                // movement key would then fire the next step instantly (chained teleporters = extra step).
+                // Keep the step pacing so the next step waits out the delay of the step that triggered this.
+                long lastStepRequestTime = world.Player.Walker.LastStepRequestTime;
                 world.Player.Walker.DenyWalk(0xFF, -1, -1, -1);
+                world.Player.Walker.LastStepRequestTime = lastStepRequestTime;
 
                 GameScene gs = Client.Game.GetScene<GameScene>();
 
@@ -6499,7 +6504,10 @@ namespace ClassicUO.Network
 
                 world.Player.Walker.ResendPacketResync = false;
                 world.Player.CloseRangedGumps();
+                int oldX = world.Player.X;
+                int oldY = world.Player.Y;
                 world.Player.SetInWorldTile(x, y, z);
+                world.Player.Pathfinder.OnServerRelocated(oldX, oldY, x, y);
                 world.Player.UpdateAbilities();
             }
         }

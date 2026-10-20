@@ -246,6 +246,12 @@ namespace ClassicUO.Configuration
         public bool FastSpellsAssign { get; set; }
         public bool AutoOpenDoors { get; set; }
         public bool SmoothDoors { get; set; }
+
+        // Some shards allow cutting a diagonal step across a blocked corner (only the destination
+        // tile itself needs to be clear, not both flanking cardinal tiles). Off by default to
+        // match the official client's stricter rule, which is correct for most servers.
+        public bool AllowDiagonalCornerCutting { get; set; } = false;
+
         public bool AutoOpenCorpses { get; set; }
         public int AutoOpenCorpseRange { get; set; } = 2;
         public int CorpseOpenOptions { get; set; } = 3;

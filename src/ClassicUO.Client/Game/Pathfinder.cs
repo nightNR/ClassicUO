@@ -36,12 +36,18 @@ namespace ClassicUO.Game
         // ProcessAutoWalk.
         internal const int FIRST_CALL_NODE_BUDGET = 8000;
         internal const int PER_TICK_NODE_BUDGET = 4000;
+        private const int PATH_LOOKAHEAD_STEPS = 3;
+        private const int MAX_REPLANS_WITHOUT_MOVEMENT = 2;
 
         internal static int FrameBudget(bool firstCall) => firstCall ? FIRST_CALL_NODE_BUDGET : PER_TICK_NODE_BUDGET;
 
         private readonly List<AStarPathSearch.Step> _path = new List<AStarPathSearch.Step>();
         private int _pointIndex, _pathSize;
         private bool _run;
+        private int _goalX, _goalY, _goalZ, _goalDistance;
+        private int _replanX, _replanY, _replansWithoutMovement;
+        private int _pathStartX, _pathStartY;
+        private bool _hasWalkGoal, _isReplan;
         private readonly AStarSearch _search = new AStarSearch();
         private bool _searching;
         private static readonly int[] _offsetX =
@@ -642,7 +648,7 @@ namespace ClassicUO.Game
             GetNewXY((byte) direction, ref newX, ref newY);
             bool passed = CalculateNewZ(newX, newY, ref newZ, (byte) direction);
 
-            if ((sbyte) direction % 2 != 0)
+            if ((sbyte) direction % 2 != 0 && !ProfileManager.CurrentProfile.AllowDiagonalCornerCutting)
             {
                 if (passed)
                 {
@@ -753,7 +759,11 @@ namespace ClassicUO.Game
 
             int playerX = _world.Player.X;
             int playerY = _world.Player.Y;
-            sbyte playerZ = (sbyte) _world.Player.Z;
+
+            // Plan from where the queued walk stack ends, not the server-confirmed tile: Walk()
+            // chains new steps off Steps.Back(), so a path starting behind unconfirmed steps would
+            // be out of sync with every step issued from it.
+            _world.Player.GetEndPosition(out int startX, out int startY, out sbyte startZ, out _);
 
             _pathSize = 0;
             _pointIndex = 0;
@@ -767,17 +777,30 @@ namespace ClassicUO.Game
             }
 
             _run = run;
+            _goalX = x;
+            _goalY = y;
+            _goalDistance = distance;
+            _replanX = playerX;
+            _replanY = playerY;
+            _replansWithoutMovement = 0;
+            _hasWalkGoal = true;
+            _isReplan = false;
             AutoWalking = true;
 
-            _search.Begin(playerX, playerY, playerZ, x, y, distance, ExpandWalkable);
+            _pathStartX = startX;
+            _pathStartY = startY;
+            _goalZ = z;
+            _search.Begin(startX, startY, startZ, x, y, distance, ExpandWalkable, PATHFINDER_MAX_NODES, z);
             _searching = true;
 
             AStarSearch.Status status = _search.Step(FrameBudget(firstCall: true));
 
             if (status == AStarSearch.Status.Found)
             {
-                AdoptFoundPath();
-                return _pathSize != 0;
+                // The outcome (Walking/Arrived/Blocked) is already reported through WalkProgress;
+                // returning false here would make plugin callers synthesize a contradicting Stopped.
+                AdoptFoundPath(false);
+                return true;
             }
 
             if (status == AStarSearch.Status.Failed)
@@ -799,7 +822,7 @@ namespace ClassicUO.Game
             return !CalculateNewZ(x, y, ref tempZ, (byte)Direction.North);
         }
 
-        private void AdoptFoundPath()
+        private void AdoptFoundPath(bool isReplan)
         {
             _searching = false;
             _search.GetPath(_path);
@@ -809,12 +832,69 @@ namespace ClassicUO.Game
             if (_pathSize == 0)
             {
                 // Already within tolerance: nothing to walk.
-                AutoWalking = false;
+                EndAutoWalk(WalkState.Arrived);
                 return;
             }
 
-            RaiseWalkProgress(WalkState.Walking);
+            if (!isReplan)
+            {
+                RaiseWalkProgress(WalkState.Walking);
+            }
+
             ProcessAutoWalk();
+        }
+
+        private bool TryStartReplan()
+        {
+            if (!_hasWalkGoal || _world.Player == null)
+            {
+                return false;
+            }
+
+            int playerX = _world.Player.X;
+            int playerY = _world.Player.Y;
+
+            if (playerX != _replanX || playerY != _replanY)
+            {
+                _replanX = playerX;
+                _replanY = playerY;
+                _replansWithoutMovement = 0;
+            }
+
+            if (_replansWithoutMovement >= MAX_REPLANS_WITHOUT_MOVEMENT)
+            {
+                return false;
+            }
+
+            _replansWithoutMovement++;
+            _pathSize = 0;
+            _pointIndex = 0;
+            _world.Player.GetEndPosition(out int startX, out int startY, out sbyte startZ, out _);
+            _pathStartX = startX;
+            _pathStartY = startY;
+            _search.Begin(startX, startY, startZ, _goalX, _goalY, _goalDistance, ExpandWalkable, PATHFINDER_MAX_NODES, _goalZ);
+            _searching = true;
+            _isReplan = true;
+            AutoWalking = true;
+            return true;
+        }
+
+        private bool IsUpcomingPathWalkable(int x, int y, sbyte z)
+        {
+            int end = Math.Min(_pathSize, _pointIndex + PATH_LOOKAHEAD_STEPS);
+
+            for (int i = _pointIndex; i < end; i++)
+            {
+                Direction direction = (Direction)_path[i].Direction;
+                Direction requestedDirection = direction;
+
+                if (!CanWalk(ref direction, ref x, ref y, ref z) || direction != requestedDirection)
+                {
+                    return false;
+                }
+            }
+
+            return true;
         }
 
         public void ProcessAutoWalk()
@@ -830,11 +910,18 @@ namespace ClassicUO.Game
 
                 if (status == AStarSearch.Status.Found)
                 {
-                    AdoptFoundPath();
+                    bool wasReplan = _isReplan;
+                    _isReplan = false;
+                    AdoptFoundPath(wasReplan);
                 }
                 else if (status == AStarSearch.Status.Failed)
                 {
-                    EndAutoWalk(WalkState.Blocked);
+                    _searching = false;
+
+                    if (!TryStartReplan())
+                    {
+                        EndAutoWalk(WalkState.Blocked);
+                    }
                 }
 
                 return; // do not walk on the tick the search advances/finishes
@@ -842,25 +929,53 @@ namespace ClassicUO.Game
 
             if (AutoWalking && _world.InGame && _world.Player.Walker.StepsCount < Constants.MAX_STEP_COUNT && _world.Player.Walker.LastStepRequestTime <= Time.Ticks)
             {
-                if (_pointIndex >= 0 && _pointIndex < _pathSize)
+                int playerX = _world.Player.X;
+                int playerY = _world.Player.Y;
+
+                if (playerX != _replanX || playerY != _replanY)
                 {
-                    AStarPathSearch.Step p = _path[_pointIndex];
+                    _replanX = playerX;
+                    _replanY = playerY;
+                    _replansWithoutMovement = 0;
+                }
 
-                    _world.Player.GetEndPosition(out int x, out int y, out sbyte z, out Direction dir);
+                _world.Player.GetEndPosition(out int x, out int y, out sbyte z, out _);
 
-                    if (dir == (Direction) p.Direction)
-                    {
-                        _pointIndex++;
-                    }
+                // Progress is tracked by position, never by facing: Walk() in a new direction
+                // only turns the character, so "facing == step direction" can't tell a finished
+                // step from a mere turn. Counting a turn as a step advanced the index without
+                // moving — the rest of the path was then walked (and lookahead-checked) one tile
+                // off, stopping short of the goal or replanning into a turn-in-place stall.
+                while (_pointIndex < _pathSize && _path[_pointIndex].X == x && _path[_pointIndex].Y == y)
+                {
+                    _pointIndex++;
+                }
 
-                    if (!_world.Player.Walk((Direction) p.Direction, _run))
+                if (_pointIndex >= _pathSize)
+                {
+                    EndAutoWalk(WalkState.Arrived);
+                    return;
+                }
+
+                int stepStartX = _pointIndex == 0 ? _pathStartX : _path[_pointIndex - 1].X;
+                int stepStartY = _pointIndex == 0 ? _pathStartY : _path[_pointIndex - 1].Y;
+
+                if (x != stepStartX || y != stepStartY || !IsUpcomingPathWalkable(x, y, z))
+                {
+                    if (!TryStartReplan())
                     {
                         EndAutoWalk(WalkState.Blocked);
                     }
+
+                    return;
                 }
-                else
+
+                if (!_world.Player.Walk((Direction) _path[_pointIndex].Direction, _run))
                 {
-                    EndAutoWalk(WalkState.Arrived);
+                    if (!TryStartReplan())
+                    {
+                        EndAutoWalk(WalkState.Blocked);
+                    }
                 }
             }
         }
@@ -870,12 +985,35 @@ namespace ClassicUO.Game
             EndAutoWalk(WalkState.Stopped);
         }
 
+        /// <summary>
+        /// Called when the server places the player (0x20) at a new tile. A jump of more than one
+        /// tile mid-walk is a server-side relocation — typically a teleporter tile, whose step is
+        /// never confirmed because the server moves the player straight to the destination. The
+        /// walk's goal is stale at that point: replanning would walk back toward it (possibly
+        /// through the teleporter again), so the walk ends as Stopped and the caller decides.
+        /// A one-tile snap is ordinary denied-step resync and leaves the walk running.
+        /// </summary>
+        internal void OnServerRelocated(int oldX, int oldY, int newX, int newY)
+        {
+            if (!AutoWalking)
+            {
+                return;
+            }
+
+            if (Math.Max(Math.Abs(newX - oldX), Math.Abs(newY - oldY)) > 1)
+            {
+                StopAutoWalk();
+            }
+        }
+
         internal void ResetAutoWalk()
         {
             AutoWalking = false;
             _run = false;
             _pathSize = 0;
             _searching = false;
+            _hasWalkGoal = false;
+            _isReplan = false;
         }
 
         internal void EndAutoWalk(WalkState reason)
