@@ -27,7 +27,7 @@ internal sealed class PluginContextImpl : IPluginContext
     public PluginContextImpl(HostBridge bridge, PluginRegistration registration, string folderName, string pluginsRoot)
     {
         Id = registration.Id;
-        UODataPath = ResolveUODataPath();
+        UODataPath = bridge.UODataPath;
         PluginDataPath = EnsurePluginDataPath(pluginsRoot, folderName);
 
         _packets    = new PacketPipelineImpl(bridge);
@@ -103,8 +103,6 @@ internal sealed class PluginContextImpl : IPluginContext
     public void RaiseMouse(int button, int wheel) => _input.RaiseMouse(button, wheel);
     public bool RaiseHotkey(int key, int mod, bool pressed) => _input.RaiseHotkey(key, mod, pressed);
     public void RaisePacket(ReadOnlySpan<byte> data, ref bool block, bool incoming) => _packets.Raise(data, ref block, incoming);
-
-    private static string ResolveUODataPath() => AppContext.BaseDirectory;
 
     private static string EnsurePluginDataPath(string pluginsRoot, string folderName)
     {

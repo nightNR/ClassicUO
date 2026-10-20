@@ -3,6 +3,7 @@
 using System.Collections.Concurrent;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
+using System.Text.Json;
 using ClassicUO.PluginAbi;
 using ClassicUO.PluginApi;
 
@@ -32,6 +33,7 @@ internal sealed unsafe class HostBridge
     public IReadOnlyList<PluginContextImpl> Plugins => _loader.Plugins;
     public ClientBindings ClientBindings => _clientBindings;
     public bool IsGameThread => Thread.CurrentThread == _gameThread;
+    public string UODataPath { get; private set; } = AppContext.BaseDirectory;
 
     /// <summary>Test-only: discover plugins from a custom root, skipping the cuo.dll load and Initialize call.</summary>
     internal void LoadPluginsForTest(string pluginsRoot)
@@ -94,6 +96,7 @@ internal sealed unsafe class HostBridge
             return 3;
         }
 
+        UODataPath = ResolveUODataPath(args);
         var pluginsRoot = Path.Combine(AppContext.BaseDirectory, "Data", "Plugins");
         _loader.DiscoverAndLoad(pluginsRoot);
         Console.WriteLine($"[BootstrapHost] loaded {_loader.Plugins.Count} plugin(s)");
@@ -120,6 +123,51 @@ internal sealed unsafe class HostBridge
         }
 
         return 0;
+    }
+
+    private static string ResolveUODataPath(string[] args)
+    {
+        string settingsPath = Path.Combine(AppContext.BaseDirectory, "settings.json");
+
+        for (int i = 0; i + 1 < args.Length; i++)
+        {
+            if (!string.Equals(args[i], "-settings", StringComparison.OrdinalIgnoreCase))
+                continue;
+
+            settingsPath = Path.IsPathRooted(args[i + 1])
+                ? args[i + 1]
+                : Path.Combine(AppContext.BaseDirectory, args[i + 1]);
+            break;
+        }
+
+        string uoDataPath = AppContext.BaseDirectory;
+
+        try
+        {
+            using var document = JsonDocument.Parse(File.ReadAllText(settingsPath));
+            if (document.RootElement.TryGetProperty("ultimaonlinedirectory", out var pathProperty)
+                && pathProperty.ValueKind == JsonValueKind.String
+                && !string.IsNullOrWhiteSpace(pathProperty.GetString()))
+            {
+                uoDataPath = pathProperty.GetString()!;
+            }
+        }
+        catch (Exception ex) when (ex is IOException or JsonException)
+        {
+            Console.Error.WriteLine($"[BootstrapHost] unable to read UO data path from '{settingsPath}': {ex.Message}");
+        }
+
+        for (int i = 0; i + 1 < args.Length; i++)
+        {
+            if (string.Equals(args[i], "-uopath", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(args[i], "-ultimaonlinedirectory", StringComparison.OrdinalIgnoreCase))
+            {
+                uoDataPath = args[i + 1];
+                break;
+            }
+        }
+
+        return uoDataPath;
     }
 
     private static string[] CuoLibCandidates()
