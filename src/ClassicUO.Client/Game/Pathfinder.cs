@@ -689,6 +689,32 @@ namespace ClassicUO.Game
         }
 
         /// <summary>
+        /// Mouse-walk steering: returns <paramref name="want"/> or a diagonal that
+        /// goes around a small obstacle ahead. See <see cref="ObstacleAvoidance"/>.
+        /// </summary>
+        public Direction SteerAround(Direction want, int x, int y, sbyte z, int cursorDx, int cursorDy, ref int lastSide)
+        {
+            return ObstacleAvoidance.Steer(want, x, y, z, cursorDx, cursorDy, ref lastSide, CleanProbe);
+        }
+
+        private bool CleanProbe(Direction dir, int x, int y, sbyte z, out int nx, out int ny, out sbyte nz)
+        {
+            nx = x;
+            ny = y;
+            nz = z;
+            GetNewXY((byte) dir, ref nx, ref ny);
+            int expectedX = nx;
+            int expectedY = ny;
+
+            nx = x;
+            ny = y;
+            nz = z;
+            Direction d = dir;
+
+            return CanWalk(ref d, ref nx, ref ny, ref nz) && d == dir && nx == expectedX && ny == expectedY;
+        }
+
+        /// <summary>
         /// Neighbour generator for <see cref="AStarPathSearch"/>: emits the
         /// walkable tiles reachable in one step from (<paramref name="nx"/>,
         /// <paramref name="ny"/>, <paramref name="nz"/>). Mirrors the legacy

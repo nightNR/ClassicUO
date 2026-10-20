@@ -42,6 +42,8 @@ namespace ClassicUO.Game.Scenes
         private bool _dragSelectAnchorOnly;
         private int AnchorOffset => ProfileManager.CurrentProfile.DragSelectAsAnchor ? 0 : 2;
 
+        private int _mouseWalkAvoidSide;
+
         private bool MoveCharacterByMouseInput()
         {
             if ((_rightMousePressed || _continueRunning) && _world.InGame) // && !Pathfinder.AutoWalking)
@@ -84,11 +86,25 @@ namespace ClassicUO.Game.Scenes
                 }
                 else
                 {
-                    _world.Player.Walk(facing - 1, run);
+                    Direction walkDirection = facing - 1;
+
+                    if (ProfileManager.CurrentProfile.AutoAvoidObstacles)
+                    {
+                        walkDirection = _world.Player.SteerMouseWalk(
+                            walkDirection,
+                            Mouse.Position.X - x,
+                            Mouse.Position.Y - y,
+                            ref _mouseWalkAvoidSide
+                        );
+                    }
+
+                    _world.Player.Walk(walkDirection, run);
                 }
 
                 return true;
             }
+
+            _mouseWalkAvoidSide = 0;
 
             return false;
         }

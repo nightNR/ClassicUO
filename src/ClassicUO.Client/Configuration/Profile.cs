@@ -254,6 +254,9 @@ namespace ClassicUO.Configuration
         // match the official client's stricter rule, which is correct for most servers.
         public bool AllowDiagonalCornerCutting { get; set; } = false;
 
+        // Mouse-walking steers diagonally around small obstacles one tile before reaching them.
+        public bool AutoAvoidObstacles { get; set; } = false;
+
         public bool AutoOpenCorpses { get; set; }
         public int AutoOpenCorpseRange { get; set; } = 2;
         public int CorpseOpenOptions { get; set; } = 3;

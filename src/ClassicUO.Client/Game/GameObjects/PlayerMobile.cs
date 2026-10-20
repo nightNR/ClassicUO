@@ -525,6 +525,27 @@ namespace ClassicUO.Game.GameObjects
         //}
         // #############################################
 
+        /// <summary>
+        /// Steers a mouse-walk heading around a small obstacle, starting from the end of the
+        /// queued steps (same origin <see cref="Walk"/> uses).
+        /// </summary>
+        public Direction SteerMouseWalk(Direction want, int cursorDx, int cursorDy, ref int lastSide)
+        {
+            int x = X;
+            int y = Y;
+            sbyte z = Z;
+
+            if (Steps.Count != 0)
+            {
+                ref Step back = ref Steps.Back();
+                x = back.X;
+                y = back.Y;
+                z = back.Z;
+            }
+
+            return Pathfinder.SteerAround(want, x, y, z, cursorDx, cursorDy, ref lastSide);
+        }
+
         public bool Walk(Direction direction, bool run)
         {
             if (Walker.WalkingFailed || Walker.LastStepRequestTime > Time.Ticks || Walker.StepsCount >= Constants.MAX_STEP_COUNT || Client.Game.UO.Version >= ClientVersion.CV_60142 && IsParalyzed)
