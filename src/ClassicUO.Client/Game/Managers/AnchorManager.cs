@@ -4,6 +4,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Xml;
+using ClassicUO.Configuration;
 using ClassicUO.Game.UI.Controls;
 using ClassicUO.Game.UI.Gumps;
 using Microsoft.Xna.Framework;
@@ -65,6 +66,20 @@ namespace ClassicUO.Game.Managers
             foreach (AnchorGroup value in reverseMap.Values.Distinct())
             {
                 value.Save(writer);
+            }
+        }
+
+        /// <summary>
+        /// Saves each group to the character writer when it holds a serial-bound gump (container, other mobile's bar, ...),
+        /// otherwise to the profile writer (the player's own gumps are written with self="1").
+        /// </summary>
+        public void Save(XmlTextWriter profileWriter, XmlTextWriter characterWriter, uint playerSerial)
+        {
+            foreach (AnchorGroup value in reverseMap.Values.Distinct())
+            {
+                bool characterBound = value.Members().Any(g => GumpScopes.IsCharacterBound(g.GumpType, g.LocalSerial, playerSerial));
+
+                value.Save(characterBound ? characterWriter : profileWriter, playerSerial);
             }
         }
 
@@ -307,7 +322,18 @@ namespace ClassicUO.Game.Managers
                 }
             }
 
-            public void Save(XmlTextWriter writer)
+            public System.Collections.Generic.IEnumerable<AnchorableGump> Members()
+            {
+                foreach (AnchorableGump gump in controlMatrix)
+                {
+                    if (gump != null)
+                    {
+                        yield return gump;
+                    }
+                }
+            }
+
+            public void Save(XmlTextWriter writer, uint playerSerial = 0)
             {
                 writer.WriteStartElement("anchored_group_gump");
 
@@ -325,6 +351,12 @@ namespace ClassicUO.Game.Managers
                         {
                             writer.WriteStartElement("gump");
                             gump.Save(writer);
+
+                            if (GumpScopes.IsSelf(gump.GumpType, gump.LocalSerial, playerSerial))
+                            {
+                                writer.WriteAttributeString(GumpScopes.SelfAttribute, "1");
+                            }
+
                             writer.WriteAttributeString("matrix_x", x.ToString());
                             writer.WriteAttributeString("matrix_y", y.ToString());
                             writer.WriteEndElement();

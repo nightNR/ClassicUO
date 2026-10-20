@@ -18,6 +18,7 @@ internal sealed class PluginContextImpl : IPluginContext
     private readonly StatusBarsImpl _statusBars;
     private readonly HighlightImpl _highlight;
     private readonly NameplatesImpl _nameplates;
+    private readonly ProfilesImpl _profiles;
     private readonly ClientImpl _client;
     private readonly DispatcherImpl _dispatcher;
     private readonly BuffsImpl _buffs;
@@ -36,6 +37,7 @@ internal sealed class PluginContextImpl : IPluginContext
         _statusBars = new StatusBarsImpl(bridge);
         _highlight  = new HighlightImpl(bridge);
         _nameplates = new NameplatesImpl(bridge);
+        _profiles   = new ProfilesImpl(bridge);
         _client     = new ClientImpl(bridge);
         _dispatcher = new DispatcherImpl(bridge);
         _buffs = new BuffsImpl(bridge);
@@ -54,6 +56,7 @@ internal sealed class PluginContextImpl : IPluginContext
     public IStatusBars StatusBars => _statusBars;
     public IHighlight Highlight => _highlight;
     public INameplates Nameplates => _nameplates;
+    public IProfiles Profiles => _profiles;
     public IClient Client => _client;
     public IDispatcher Game => _dispatcher;
     public IPluginBuffs Buffs => _buffs;
@@ -97,6 +100,7 @@ internal sealed class PluginContextImpl : IPluginContext
     {
         _raw.RaiseEvent(eventId, payload);
         _statusBars.RaiseGenericEvent(eventId, payload);
+        _profiles.RaiseGenericEvent(eventId, payload);
     }
     public void RaiseTick()                  => Tick?.Invoke();
     public void RaiseClosing()               => Closing?.Invoke();
@@ -513,6 +517,81 @@ internal sealed class ClientImpl : IClient
             if (argsPtr != 0) Marshal.FreeHGlobal(argsPtr);
         }
     }
+}
+
+internal sealed class ProfilesImpl : IProfiles
+{
+    private readonly HostBridge _bridge;
+    private string? _active;
+
+    public ProfilesImpl(HostBridge bridge) { _bridge = bridge; }
+
+    public event Action<string>? Changed;
+    public event Action<CharacterSelection>? CharacterSelected;
+    public event Action? ListChanged;
+
+    public string? Active => _active;
+
+    internal void RaiseGenericEvent(int eventId, byte[] payload)
+    {
+        switch (eventId)
+        {
+            case GenericEventIds.ProfileChanged:
+                _active = Encoding.UTF8.GetString(payload);
+                Changed?.Invoke(_active);
+                break;
+
+            case GenericEventIds.ProfileListChanged:
+                ListChanged?.Invoke();
+                break;
+
+            case GenericEventIds.CharacterSelected:
+                var parts = Encoding.UTF8.GetString(payload).Split('\n');
+                if (parts.Length >= 3)
+                    CharacterSelected?.Invoke(new CharacterSelection(parts[0], parts[1], parts[2]));
+                break;
+        }
+    }
+
+    private unsafe int Invoke(int opcode, ReadOnlySpan<byte> args, Span<byte> result)
+    {
+        var fn = _bridge.ClientBindings.GenericInvokeFn;
+        if (fn == 0) return -1;
+        if (!_bridge.IsGameThread)
+            throw new InvalidOperationException("Profiles must be used from the game thread; use IDispatcher.Post.");
+
+        fixed (byte* a = args)
+        fixed (byte* o = result)
+        {
+            return ((delegate* unmanaged[Cdecl]<int, nint, int, nint, int, int>)fn)(opcode, (nint)a, args.Length, (nint)o, result.Length);
+        }
+    }
+
+    public IReadOnlyList<string> List()
+    {
+        var buf = new byte[16 * 1024];
+        int n = Invoke(GenericOpcodes.ListProfiles, default, buf);
+        if (n <= 0) return [];
+        return Encoding.UTF8.GetString(buf, 0, n).Split('\n');
+    }
+
+    public ProfileSwitchResult Switch(string name, bool assignToCharacter = false)
+    {
+        var nameBytes = Encoding.UTF8.GetBytes(name ?? "");
+        var args = new byte[nameBytes.Length + 1];
+        args[0] = assignToCharacter ? (byte)1 : (byte)0;
+        nameBytes.CopyTo(args, 1);
+
+        return Invoke(GenericOpcodes.SwitchProfile, args, default) switch
+        {
+            0 => ProfileSwitchResult.Applied,
+            1 => ProfileSwitchResult.QueuedForLogin,
+            -3 => ProfileSwitchResult.UnknownProfile,
+            _ => ProfileSwitchResult.Failed,
+        };
+    }
+
+    public void ClearOverride() => Invoke(GenericOpcodes.ClearProfileOverride, default, default);
 }
 
 internal sealed class RawChannelImpl : IRawChannel
