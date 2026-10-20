@@ -1,348 +1,248 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.IO;
 using System.Linq;
-using ClassicUO.Utility;
-using ClassicUO.Configuration;
+using ClassicUO.Game.Managers;
 using ClassicUO.Game.UI.Controls;
-using static ClassicUO.Game.UI.Gumps.WorldMapGump;
-using ClassicUO.Assets;
+using ClassicUO.Renderer;
 using ClassicUO.Resources;
+using static ClassicUO.Game.UI.Gumps.WorldMapGump;
 
 namespace ClassicUO.Game.UI.Gumps
 {
+    /// <summary>Add (x, y given) or edit (existing marker) a user marker: name, note, category, color, icon.</summary>
     internal sealed class UserMarkersGump : Gump
     {
+        private const ushort HUE_FONT = 0xFFFF;
+        private const ushort LABEL_OFFSET = 60;
+        private const ushort Y_OFFSET = 30;
+        private const int WIDTH = 340;
+        private const int HEIGHT = 330;
+        private const int MAX_CORD_LEN = 10;
+        private const int MAX_NAME_LEN = 25;
+        private const int MAX_NOTE_LEN = 80;
+        private const int MAP_MIN_CORD = 0;
+
         private readonly StbTextBox _textBoxX;
         private readonly StbTextBox _textBoxY;
         private readonly StbTextBox _markerName;
-
-        private const ushort HUE_FONT = 0xFFFF;
-        private const ushort LABEL_OFFSET = 40;
-        private const ushort Y_OFFSET = 30;
-
+        private readonly StbTextBox _markerNote;
+        private readonly Combobox _categoryCombo;
         private readonly Combobox _colorsCombo;
-        private readonly string[] _colors;
+        private readonly NiceButton _iconButton;
+        private readonly Label _warning;
 
-        private readonly Combobox _iconsCombo;
-        private readonly string[] _icons;
-
-        private readonly List<WMapMarker> _markers;
-        private readonly int _markerIdx;
-
-        private const int MAX_CORD_LEN = 10;
-        private const int MAX_NAME_LEN = 25;
-
-        private const int MAP_MIN_CORD = 0;
+        private readonly UserMarkerStore _store = UserMarkers;
+        private readonly WMapMarker _editing;
+        private readonly int _mapId;
         private readonly int _mapMaxX;
         private readonly int _mapMaxY;
 
-        private readonly string _userMarkersFilePath = Path.Combine(CUOEnviroment.ExecutablePath, "Data", "Client", $"{USER_MARKERS_FILE}.usr");
-
-        public event EventHandler EditEnd;
+        private string _iconName = "";
+        private bool _dupWarned;
 
         private enum ButtonsOption
         {
             ADD_BTN,
             EDIT_BTN,
             CANCEL_BTN,
+            ICON_BTN,
         }
 
-        internal UserMarkersGump(World world, int x, int y, List<WMapMarker> markers, string color = "none", string icon = "exit", bool isEdit = false, int markerIdx = -1) : base(world, 0, 0)
+        /// <summary>Add a new marker at the given coordinates on the current map.</summary>
+        internal UserMarkersGump(World world, int x, int y, string categoryId = null) : this(world, null, x, y, categoryId)
+        {
+        }
+
+        /// <summary>Edit an existing user marker.</summary>
+        internal UserMarkersGump(World world, WMapMarker marker) : this(world, marker, marker.X, marker.Y, null)
+        {
+        }
+
+        private UserMarkersGump(World world, WMapMarker editing, int x, int y, string categoryId) : base(world, 0, 0)
         {
             CanMove = true;
+            X = Client.Game.Scene.Camera.Bounds.Width / 2 - WIDTH / 2;
+            Y = 150;
 
-            _mapMaxX= Client.Game.UO.FileManager.Maps.MapsDefaultSize[world.MapIndex, 0];
-            _mapMaxY = Client.Game.UO.FileManager.Maps.MapsDefaultSize[world.MapIndex, 1];
+            _editing = editing;
+            _mapId = editing?.MapId ?? world.MapIndex;
+            _mapMaxX = Client.Game.UO.FileManager.Maps.MapsDefaultSize[_mapId, 0];
+            _mapMaxY = Client.Game.UO.FileManager.Maps.MapsDefaultSize[_mapId, 1];
 
-            _markers = markers;
-            _markerIdx = markerIdx;
+            bool isEdit = editing != null;
+            MarkerCategory category = isEdit ? _store.FindCategory(editing) : _store.GetCategory(categoryId) ?? _store.Categories[0];
+            string[] categoryNames = _store.Categories.Select(c => c.Name).ToArray();
+            int selectedCategory = Math.Max(0, _store.Categories.IndexOf(category));
 
-            _colors = new[] { "none", "red", "green", "blue", "purple", "black", "yellow", "white" };
-            _icons = _markerIcons.Keys.ToArray();
+            string color = isEdit ? editing.ColorName : "none";
+            int selectedColor = Math.Max(0, Array.IndexOf(MarkerColors.Names, color));
 
-            var markerName = _markerIdx < 0 ? ResGumps.MarkerDefName : _markers[_markerIdx].Name;
-
-            int selectedIcon = Array.IndexOf(_icons, icon);
-            if (selectedIcon < 0)
-                selectedIcon = 0;
-
-            int selectedColor = isEdit ? Array.IndexOf(_colors, color) : (_icons.Length == 0 ? 1 : 0);
-            if (selectedColor < 0)
-                selectedColor = 0;
-
-            AlphaBlendControl markersGumpBackground = new AlphaBlendControl
+            if (isEdit)
             {
-                Width = 320,
-                Height = 220,
-                X = Client.Game.Scene.Camera.Bounds.Width / 2 - 125,
-                Y = 150,
-                Alpha = 0.7f,
-                CanMove = true,
-                CanCloseWithRightClick = true,
-                AcceptMouseInput = true
-            };
+                _iconName = editing.MarkerIconName ?? "";
+            }
 
-            Add(markersGumpBackground);
+            Add(new AlphaBlendControl(0.95f) { Width = WIDTH, Height = HEIGHT, Hue = 999, CanMove = true, CanCloseWithRightClick = true, AcceptMouseInput = true });
+            Add(new Label(isEdit ? ResGumps.EditMarker : ResGumps.AddMarker, true, HUE_FONT, 0, 255, FontStyle.BlackBorder) { X = 120, Y = 5 });
 
-            if (!isEdit)
-                Add(new Label(ResGumps.AddMarker, true, HUE_FONT, 0, 255, FontStyle.BlackBorder)
-                {
-                    X = markersGumpBackground.X + 100,
-                    Y = markersGumpBackground.Y + 3,
-                });
-            else
-                Add(new Label(ResGumps.EditMarker, true, HUE_FONT, 0, 255, FontStyle.BlackBorder)
-                {
-                    X = markersGumpBackground.X + 100,
-                    Y = markersGumpBackground.Y + 3,
-                });
+            int fx = 8;
+            int fy = 30;
 
-            // X Field
-            var fx = markersGumpBackground.X + 5;
-            var fy = markersGumpBackground.Y + 25;
-            Add(new ResizePic(0x0BB8)
-            {
-                X = fx + LABEL_OFFSET,
-                Y = fy,
-                Width = 90,
-                Height = 25
-            });
+            _textBoxX = AddTextField(ResGumps.MarkerX, fx, fy, 90, MAX_CORD_LEN, x.ToString());
+            Add(new Label(ResGumps.MarkerY, true, HUE_FONT, 0, 255, FontStyle.BlackBorder) { X = fx + LABEL_OFFSET + 100, Y = fy });
+            _textBoxY = AddTextField(null, fx + LABEL_OFFSET + 130, fy, 90, MAX_CORD_LEN, y.ToString());
 
-            _textBoxX = new StbTextBox(
-                0xFF,
-                MAX_CORD_LEN,
-                90,
-                true,
-                FontStyle.BlackBorder | FontStyle.Fixed
-            )
-            {
-                X = fx + LABEL_OFFSET,
-                Y = fy,
-                Width = 90,
-                Height = 25,
-                Text = x.ToString()
-            };
-            Add(_textBoxX);
-            Add(new Label(ResGumps.MarkerX, true, HUE_FONT, 0, 255, FontStyle.BlackBorder) { X = fx, Y = fy });
-
-            // Y Field
             fy += Y_OFFSET;
-            Add(new ResizePic(0x0BB8)
-            {
-                X = fx + LABEL_OFFSET,
-                Y = fy,
-                Width = 90,
-                Height = 25
-            });
+            _markerName = AddTextField(ResGumps.MarkerName, fx, fy, 250, MAX_NAME_LEN, isEdit ? editing.Name : ResGumps.MarkerDefName);
 
-            _textBoxY = new StbTextBox(
-                0xFF,
-                MAX_CORD_LEN,
-                90,
-                true,
-                FontStyle.BlackBorder | FontStyle.Fixed
-            )
-            {
-                X = fx + LABEL_OFFSET,
-                Y = fy,
-                Width = 90,
-                Height = 25,
-                Text = y.ToString()
-            };
-            Add(_textBoxY);
-            Add(new Label(ResGumps.MarkerY, true, HUE_FONT, 0, 255, FontStyle.BlackBorder) { X = fx, Y = fy });
-
-            // Marker Name field
             fy += Y_OFFSET;
-            Add(new ResizePic(0x0BB8)
-            {
-                X = fx + LABEL_OFFSET,
-                Y = fy,
-                Width = 250,
-                Height = 25
-            });
+            _markerNote = AddTextField("Note", fx, fy, 250, MAX_NOTE_LEN, isEdit ? editing.Note ?? "" : "");
 
-            _markerName = new StbTextBox(
-                0xFF,
-                MAX_NAME_LEN,
-                250,
-                true,
-                FontStyle.BlackBorder | FontStyle.Fixed
-            )
-            {
-                X = fx + LABEL_OFFSET,
-                Y = fy,
-                Width = 250,
-                Height = 25,
-                Text = markerName
-            };
-            Add(_markerName);
-            Add(new Label(ResGumps.MarkerName, true, HUE_FONT, 0, 255, FontStyle.BlackBorder) { X = fx, Y = fy });
-
-            // Color Combobox
             fy += Y_OFFSET;
-            _colorsCombo = new Combobox
-                (
-                    fx + LABEL_OFFSET,
-                    fy,
-                    250,
-                    _colors,
-                    selectedColor
-                );
-            Add(_colorsCombo);
+            Add(new Label("Category", true, HUE_FONT, 0, 255, FontStyle.BlackBorder) { X = fx, Y = fy });
+            _categoryCombo = new Combobox(fx + LABEL_OFFSET, fy, 250, categoryNames, selectedCategory);
+
+            fy += Y_OFFSET;
             Add(new Label(ResGumps.MarkerColor, true, HUE_FONT, 0, 255, FontStyle.BlackBorder) { X = fx, Y = fy });
+            _colorsCombo = new Combobox(fx + LABEL_OFFSET, fy, 250, MarkerColors.Names, selectedColor);
 
-            if (_icons.Length > 0)
-            {
-                // Icon combobox
-                fy += Y_OFFSET;
-                _iconsCombo = new Combobox
-                    (
-                        fx + LABEL_OFFSET,
-                        fy,
-                        250,
-                        _icons,
-                        selectedIcon
-                    );
-                Add(_iconsCombo);
-                Add(new Label(ResGumps.MarkerIcon, true, HUE_FONT, 0, 255, FontStyle.BlackBorder) { X = fx, Y = fy });
-            }
+            fy += Y_OFFSET;
+            Add(new Label(ResGumps.MarkerIcon, true, HUE_FONT, 0, 255, FontStyle.BlackBorder) { X = fx, Y = fy });
+            _iconButton = new NiceButton(fx + LABEL_OFFSET, fy, 250, 25, ButtonAction.Activate, IconLabel()) { ButtonParameter = (int)ButtonsOption.ICON_BTN, IsSelectable = false };
+            Add(_iconButton);
 
-            // Buttons Add and Edit depend of state
-            if (!isEdit)
-            {
-                Add
-                (
-                    new NiceButton
-                        (
-                            markersGumpBackground.X + 13,
-                            markersGumpBackground.Y + markersGumpBackground.Height - 30,
-                            60,
-                            25,
-                            ButtonAction.Activate,
-                            ResGumps.CreateMarker
-                        )
-                    { ButtonParameter = (int)ButtonsOption.ADD_BTN, IsSelectable = false }
-                );
-            }
-            else
-            {
-                Add
-                (
-                    new NiceButton
-                        (
-                            markersGumpBackground.X + 13,
-                            markersGumpBackground.Y + markersGumpBackground.Height - 30,
-                            60,
-                            25,
-                            ButtonAction.Activate,
-                            ResGumps.Edit
-                        )
-                    { ButtonParameter = (int)ButtonsOption.EDIT_BTN, IsSelectable = false }
-                );
-            }
+            fy += Y_OFFSET;
+            _warning = new Label("", true, 0x0021, WIDTH - 20, 255, FontStyle.BlackBorder) { X = fx, Y = fy };
+            Add(_warning);
 
-            Add
-            (
-                new NiceButton
-                    (
-                        markersGumpBackground.X + 78,
-                        markersGumpBackground.Y + markersGumpBackground.Height - 30,
-                        60,
-                        25,
-                        ButtonAction.Activate,
-                        ResGumps.Cancel
-                    )
-                { ButtonParameter = (int)ButtonsOption.CANCEL_BTN, IsSelectable = false }
-            );
+            Add(new NiceButton(13, HEIGHT - 30, 80, 25, ButtonAction.Activate, isEdit ? ResGumps.Edit : ResGumps.CreateMarker)
+            {
+                ButtonParameter = (int)(isEdit ? ButtonsOption.EDIT_BTN : ButtonsOption.ADD_BTN),
+                IsSelectable = false
+            });
+
+            Add(new NiceButton(100, HEIGHT - 30, 80, 25, ButtonAction.Activate, ResGumps.Cancel) { ButtonParameter = (int)ButtonsOption.CANCEL_BTN, IsSelectable = false });
+
+            // comboboxes last so their drop-downs draw above the fields below them
+            Add(_colorsCombo);
+            Add(_categoryCombo);
 
             SetInScreen();
         }
 
-        private void EditMarker()
+        private StbTextBox AddTextField(string label, int x, int y, int width, int maxLen, string text)
         {
-            var editedMarker = PrepareMarker();
-            if (editedMarker == null)
-                return;
-
-            _markers[_markerIdx] = editedMarker;
-
-            EditEnd.Raise(editedMarker);
-
-            Dispose();
-        }
-
-        private void AddNewMarker()
-        {
-            if (!File.Exists(_userMarkersFilePath))
+            if (label != null)
             {
-                return;
+                Add(new Label(label, true, HUE_FONT, 0, 255, FontStyle.BlackBorder) { X = x, Y = y });
             }
 
-            var newMarker = PrepareMarker();
-            if (newMarker == null)
+            int fx = label != null ? x + LABEL_OFFSET : x;
+
+            Add(new ResizePic(0x0BB8) { X = fx, Y = y, Width = width, Height = 25 });
+
+            var box = new StbTextBox(0xFF, maxLen, width, true, FontStyle.BlackBorder | FontStyle.Fixed)
             {
-                return;
-            }
-
-            var newLine = $"{newMarker.X},{newMarker.Y},{newMarker.MapId},{newMarker.Name},{newMarker.MarkerIconName},{newMarker.ColorName},4\r";
-
-            File.AppendAllText(_userMarkersFilePath, newLine);
-
-            _markers.Add(newMarker);
-
-            Dispose();
-        }
-
-        private WMapMarker PrepareMarker()
-        {
-            if (!int.TryParse(_textBoxX.Text, out var x))
-                return null;
-            if (!int.TryParse(_textBoxY.Text, out var y))
-                return null;
-
-            // Validate User Enter Data
-            if (x > _mapMaxX || x < MAP_MIN_CORD)
-            {
-                return null;
-            }
-
-            if (y > _mapMaxY || y < MAP_MIN_CORD)
-            {
-                return null;
-            }
-
-            var markerName = _markerName.Text;
-            if (string.IsNullOrEmpty(markerName))
-                return null;
-
-            if (markerName.Contains(","))
-                markerName = markerName.Replace(",", "");
-
-            var mapIdx = World.MapIndex;
-            var color = _colors[_colorsCombo.SelectedIndex];
-            var icon = _iconsCombo == null ? string.Empty : _icons[_iconsCombo.SelectedIndex];
-
-            var marker = new WMapMarker
-            {
-                Name = markerName,
-                X = x,
+                X = fx,
                 Y = y,
-                MapId = mapIdx,
-                ColorName = color,
-                Color = GetColor(color),
+                Width = width,
+                Height = 25,
+                Text = text
             };
 
-            if (!_markerIcons.TryGetValue(icon, out var iconTexture))
+            Add(box);
+
+            return box;
+        }
+
+        private string IconLabel()
+        {
+            return string.IsNullOrEmpty(_iconName) ? "(category default / none)" : _iconName;
+        }
+
+        private bool TryRead(out int x, out int y, out string name)
+        {
+            name = null;
+
+            if (!int.TryParse(_textBoxX.Text, out x) || !int.TryParse(_textBoxY.Text, out y))
             {
-                return marker;
+                y = 0;
+                _warning.Text = "Invalid coordinates";
+
+                return false;
             }
 
-            marker.MarkerIcon = iconTexture;
-            marker.MarkerIconName = icon;
+            if (x > _mapMaxX || x < MAP_MIN_CORD || y > _mapMaxY || y < MAP_MIN_CORD)
+            {
+                _warning.Text = $"Coordinates out of range (0..{_mapMaxX}, 0..{_mapMaxY})";
 
-            return marker;
+                return false;
+            }
+
+            name = (_markerName.Text ?? "").Replace(",", "").Trim();
+
+            if (name.Length == 0)
+            {
+                _warning.Text = "Name required";
+
+                return false;
+            }
+
+            return true;
+        }
+
+        private void Save()
+        {
+            if (!TryRead(out int x, out int y, out string name))
+            {
+                return;
+            }
+
+            MarkerCategory target = _store.Categories[Math.Max(0, _categoryCombo.SelectedIndex)];
+            string color = MarkerColors.Names[_colorsCombo.SelectedIndex];
+            string note = (_markerNote.Text ?? "").Trim();
+
+            if (_editing == null)
+            {
+                WMapMarker dup = _store.FindDuplicate(x, y, _mapId);
+
+                if (dup != null && !_dupWarned)
+                {
+                    _dupWarned = true;
+                    _warning.Text = $"'{dup.Name}' already exists here. Press Create again to add anyway.";
+
+                    return;
+                }
+
+                _store.AddMarker(target.Id, new WMapMarker
+                {
+                    Name = name,
+                    X = x,
+                    Y = y,
+                    MapId = _mapId,
+                    ColorName = color,
+                    MarkerIconName = _iconName,
+                    Note = string.IsNullOrEmpty(note) ? null : note,
+                    ZoomIndex = 3,
+                });
+            }
+            else
+            {
+                _editing.Name = name;
+                _editing.X = x;
+                _editing.Y = y;
+                _editing.ColorName = color;
+                _editing.MarkerIconName = _iconName;
+                _editing.Note = string.IsNullOrEmpty(note) ? null : note;
+
+                if (_store.FindCategory(_editing) != target)
+                {
+                    _store.MoveMarkers(new[] { _editing }, target.Id);
+                }
+
+                _store.NotifyMarkerEdited(_editing);
+            }
+
+            Dispose();
         }
 
         public override void OnButtonClick(int buttonId)
@@ -350,13 +250,21 @@ namespace ClassicUO.Game.UI.Gumps
             switch (buttonId)
             {
                 case (int)ButtonsOption.ADD_BTN:
-                    AddNewMarker();
-                    break;
                 case (int)ButtonsOption.EDIT_BTN:
-                    EditMarker();
+                    Save();
+
+                    break;
+                case (int)ButtonsOption.ICON_BTN:
+                    UIManager.Add(new MarkerIconPickerGump(World, _iconName, picked =>
+                    {
+                        _iconName = picked;
+                        _iconButton.TextLabel.Text = IconLabel();
+                    }));
+
                     break;
                 case (int)ButtonsOption.CANCEL_BTN:
                     Dispose();
+
                     break;
             }
         }
