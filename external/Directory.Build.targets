@@ -1,0 +1,34 @@
+<Project>
+
+  <!--
+    FileEmbed is a Roslyn source generator. IDE / language servers (csharp-ls, Rider, ...)
+    load it as an analyzer straight from bin/ and keep that file locked. Whenever the
+    project gets re-evaluated or rebuilt, obj/FileEmbed.dll ends up with a newer timestamp
+    than bin/FileEmbed.dll (identical bytes), so the copy-to-output step tries to overwrite
+    the locked file and fails with MSB3021/MSB3027.
+
+    If obj and bin are byte-identical, align the obj timestamp with bin so the incremental
+    copy (SkipUnchangedFiles) is a no-op and never touches the locked file.
+  -->
+  <Target Name="FileEmbedSkipUnchangedCopy"
+          BeforeTargets="CopyFilesToOutputDirectory"
+          Condition="'$(MSBuildProjectName)' == 'FileEmbed'">
+    <PropertyGroup>
+      <_FeObj>@(IntermediateAssembly->'%(FullPath)')</_FeObj>
+      <_FeBin>$([System.IO.Path]::GetFullPath('$(OutDir)$(TargetFileName)', '$(MSBuildProjectDirectory)'))</_FeBin>
+      <_FeBothExist Condition="Exists('$(_FeObj)') And Exists('$(_FeBin)')">true</_FeBothExist>
+    </PropertyGroup>
+
+    <GetFileHash Files="$(_FeObj)" Condition="'$(_FeBothExist)' == 'true'">
+      <Output TaskParameter="Hash" PropertyName="_FeObjHash" />
+    </GetFileHash>
+    <GetFileHash Files="$(_FeBin)" Condition="'$(_FeBothExist)' == 'true'">
+      <Output TaskParameter="Hash" PropertyName="_FeBinHash" />
+    </GetFileHash>
+
+    <Touch Files="$(_FeObj)"
+           Time="$([System.IO.File]::GetLastWriteTime('$(_FeBin)').ToString('o'))"
+           Condition="'$(_FeBothExist)' == 'true' And '$(_FeObjHash)' == '$(_FeBinHash)'" />
+  </Target>
+
+</Project>

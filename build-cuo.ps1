@@ -51,7 +51,10 @@ param(
     [string]$DeployTo,
     # The custom gothic login/realm/character scene is built in by default.
     # Pass -ClassicLogin to build the original UO login instead.
-    [switch]$ClassicLogin
+    [switch]$ClassicLogin,
+    # Phoenix ship.ps1 build id (yyyy.MM.dd.N). Stamped into bin/dist/build-info.txt next to
+    # cuo.dll so a running client's Info tab can show which ship build it came from.
+    [string]$BuildId = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -105,6 +108,12 @@ Write-Host ""
 Write-Host "==> cuo.dll built" -ForegroundColor Green
 Write-Host ("    {0}  ({1:N0} bytes, {2:yyyy-MM-dd HH:mm:ss})" -f $cuoDll, $item.Length, $item.LastWriteTime)
 
+if ($BuildId) {
+    $buildInfoFile = Join-Path $outputDir "build-info.txt"
+    Set-Content -Path $buildInfoFile -Value $BuildId -Encoding ascii -NoNewline
+    Write-Host "==> Stamped build id $BuildId -> $buildInfoFile" -ForegroundColor Green
+}
+
 if ($DeployTo) {
     if (-not (Test-Path $DeployTo)) {
         New-Item -ItemType Directory -Force -Path $DeployTo | Out-Null
@@ -112,5 +121,6 @@ if ($DeployTo) {
     Copy-Item $cuoDll -Destination $DeployTo -Force
     $cuoPdb = Join-Path $outputDir "cuo.pdb"
     if (Test-Path $cuoPdb) { Copy-Item $cuoPdb -Destination $DeployTo -Force }
+    if ($BuildId) { Copy-Item (Join-Path $outputDir "build-info.txt") -Destination $DeployTo -Force }
     Write-Host "==> Deployed cuo.dll -> $DeployTo" -ForegroundColor Green
 }

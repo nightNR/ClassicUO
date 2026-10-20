@@ -15,10 +15,12 @@
 # Prereqs (NativeAOT on Linux): clang, zlib1g-dev, and the usual build toolchain.
 #
 # Usage:
-#   bash build-cuo.sh [--rid <rid>] [--config <cfg>] [--deploy-to <dir>] [--custom-login-scene]
+#   bash build-cuo.sh [--rid <rid>] [--config <cfg>] [--deploy-to <dir>] [--custom-login-scene] [--build-id <id>]
 # Defaults: --rid linux-x64  --config Release
 # CUSTOM_LOGIN_SCENE=1 env var (or --custom-login-scene) opts into the custom
 # 1280x720 login scene by passing -p:CustomLoginScene=true through to publish.
+# --build-id stamps bin/dist/build-info.txt (Phoenix ship.ps1 build id, e.g. 2026.07.21.4) next
+# to the cuo lib, so a running client's Info tab can show which ship build it came from.
 ###############################################################################
 set -euo pipefail
 
@@ -26,6 +28,7 @@ RID="linux-x64"
 CONFIG="Release"
 DEPLOY=""
 CUSTOM_LOGIN_SCENE="${CUSTOM_LOGIN_SCENE:-0}"
+BUILD_ID=""
 
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -33,6 +36,7 @@ while [ $# -gt 0 ]; do
     --config)    CONFIG="$2"; shift 2 ;;
     --deploy-to) DEPLOY="$2"; shift 2 ;;
     --custom-login-scene) CUSTOM_LOGIN_SCENE=1; shift 1 ;;
+    --build-id)  BUILD_ID="$2"; shift 2 ;;
     *) echo "unknown arg: $1" >&2; exit 2 ;;
   esac
 done
@@ -75,8 +79,32 @@ dotnet publish "$CLIENT_PROJECT" "${PUBLISH_ARGS[@]}" \
 say "$LIB built"
 ls -la "$CUO_LIB"
 
+if [ -n "$BUILD_ID" ]; then
+  printf '%s' "$BUILD_ID" > "$OUTPUT_DIR/build-info.txt"
+  say "Stamped build id $BUILD_ID -> $OUTPUT_DIR/build-info.txt"
+fi
+
+# ZLib.cs P/Invokes DllImport("libz") on unix. There's no NuGet-bundled native for
+# it (unlike SDL3/FAudio/FNA3D) — it relies on the OS's zlib. Ubuntu ships the
+# runtime lib (libz.so.1, via zlib1g) but NOT the unversioned libz.so symlink
+# (that's only in the zlib1g-dev package), so on a clean install .NET's unix
+# native-library probing (which tries {name}.so, lib{name}.so, ... in the app's
+# own base directory first) fails with DllNotFoundException even though
+# libz.so.1 is right there on the system. Ship our own libz.so next to cuo.so
+# so app-local probing finds it regardless of what the target has installed.
+if [[ "$RID" == linux-* ]]; then
+  LIBZ_SRC="$(ldconfig -p 2>/dev/null | grep -m1 'libz\.so\.1 ' | awk '{print $NF}')"
+  if [ -n "$LIBZ_SRC" ] && [ -f "$LIBZ_SRC" ]; then
+    cp -L "$LIBZ_SRC" "$OUTPUT_DIR/libz.so"
+    say "Bundled libz.so ($LIBZ_SRC) -> $OUTPUT_DIR/libz.so"
+  else
+    echo "WARNING: libz.so.1 not found via ldconfig — libz.so NOT bundled; client will DllNotFoundException on targets without zlib1g-dev." >&2
+  fi
+fi
+
 if [ -n "$DEPLOY" ]; then
   mkdir -p "$DEPLOY"
   cp "$CUO_LIB" "$DEPLOY/"
+  [ -n "$BUILD_ID" ] && cp "$OUTPUT_DIR/build-info.txt" "$DEPLOY/"
   say "Deployed $LIB -> $DEPLOY"
 fi
