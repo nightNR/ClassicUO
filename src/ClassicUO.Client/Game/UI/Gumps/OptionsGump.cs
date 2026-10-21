@@ -3820,7 +3820,7 @@ namespace ClassicUO.Game.UI.Gumps
             // section.Bounds.Bottom instead - SettingsSection.Add updates
             // Height synchronously - offset by box.Y to convert from box-local
             // space into rightArea-space (box is a direct child of rightArea).
-            int anchorY = box.Y + section.Bounds.Bottom + 15;
+            int anchorY = box.Y + Math.Max(section.Bounds.Bottom, section.ContentBottom) + 15;
 
             rightArea.Add(AddLabel(null, "Anchor groups", startX, anchorY));
 
@@ -5610,6 +5610,27 @@ namespace ClassicUO.Game.UI.Gumps
                 _databox = new DataBox(label.X + 10, label.Height + 4, 0, 0);
 
                 base.Add(_databox);
+            }
+
+            // Real bottom of the laid-out content in section-local space. Height
+            // drifts low when AddRight controls are taller than their row's
+            // left control, so callers stacking below the section use this.
+            public int ContentBottom
+            {
+                get
+                {
+                    int bottom = 0;
+
+                    foreach (Control c in _databox.Children)
+                    {
+                        if (c.IsVisible && c.Bounds.Bottom > bottom)
+                        {
+                            bottom = c.Bounds.Bottom;
+                        }
+                    }
+
+                    return _databox.Y + bottom;
+                }
             }
 
             public void PushIndent()
