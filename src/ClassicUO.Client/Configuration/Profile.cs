@@ -67,8 +67,8 @@ namespace ClassicUO.Configuration
 
         // sounds
         public bool EnableSound { get; set; } = true;
-        public int SoundVolume { get; set; } = 100;
-        public bool EnableMusic { get; set; } = true;
+        public int SoundVolume { get; set; } = 43;
+        public bool EnableMusic { get; set; } = false;
         public int MusicVolume { get; set; } = 100;
         public bool EnableFootstepsSound { get; set; } = true;
         public bool EnableCombatMusic { get; set; } = true;
@@ -154,19 +154,19 @@ namespace ClassicUO.Configuration
         public ushort HarmfulHue { get; set; } = 0x0020;
         public ushort NeutralHue { get; set; } = 0x03B1;
         public bool EnabledSpellHue { get; set; }
-        public bool EnabledSpellFormat { get; set; }
+        public bool EnabledSpellFormat { get; set; } = true;
         public string SpellDisplayFormat { get; set; } = "{power} [{spell}]";
         public ushort PoisonHue { get; set; } = 0x0044;
         public ushort ParalyzedHue { get; set; } = 0x014C;
         public ushort InvulnerableHue { get; set; } = 0x0030;
 
         // visual
-        public bool EnabledCriminalActionQuery { get; set; } = true;
+        public bool EnabledCriminalActionQuery { get; set; } = false;
         public bool EnabledBeneficialCriminalActionQuery { get; set; } = false;
         public bool EnableStatReport { get; set; } = true;
         public bool EnableSkillReport { get; set; } = true;
         public bool UseOldStatusGump { get; set; }
-        public bool StatusGumpBarMutuallyExclusive { get; set; } = true;
+        public bool StatusGumpBarMutuallyExclusive { get; set; } = false;
         public int BackpackStyle { get; set; }
         public bool HighlightGameObjects { get; set; }
         public bool HighlightMobilesByParalize { get; set; } = true;
@@ -175,22 +175,22 @@ namespace ClassicUO.Configuration
         public bool ShowMobilesHP { get; set; }
         public int MobileHPType { get; set; }     // 0 = %, 1 = line, 2 = both
         public int MobileHPShowWhen { get; set; } // 0 = Always, 1 - <100%
-        public bool DrawRoofs { get; set; } = true;
-        public bool TreeToStumps { get; set; }
+        public bool DrawRoofs { get; set; } = false;
+        public bool TreeToStumps { get; set; } = true;
         public bool EnableCaveBorder { get; set; }
         public bool HideVegetation { get; set; }
         public int FieldsType { get; set; } // 0 = normal, 1 = static, 2 = tile
         public bool NoColorObjectsOutOfRange { get; set; }
-        public bool UseCircleOfTransparency { get; set; }
-        public int CircleOfTransparencyRadius { get; set; } = Constants.MAX_CIRCLE_OF_TRANSPARENCY_RADIUS / 2;
-        public int CircleOfTransparencyType { get; set; } // 0 = normal, 1 = like original client
+        public bool UseCircleOfTransparency { get; set; } = true;
+        public int CircleOfTransparencyRadius { get; set; } = 100;
+        public int CircleOfTransparencyType { get; set; } = 1; // 0 = normal, 1 = like original client
         public int VendorGumpHeight { get; set; } = 60;   //original vendor gump size
         public float DefaultScale { get; set; } = 1.0f;
         public bool EnableMousewheelScaleZoom { get; set; }
         public bool SaveScaleAfterClose { get; set; }
         public bool RestoreScaleAfterUnpressCtrl { get; set; }
         public bool BandageSelfOld { get; set; } = true;
-        public bool EnableDeathScreen { get; set; } = true;
+        public bool EnableDeathScreen { get; set; } = false;
         public bool EnableBlackWhiteEffect { get; set; } = true;
 
         // tooltip
@@ -204,11 +204,11 @@ namespace ClassicUO.Configuration
         // movements
         public bool EnablePathfind { get; set; }
         public bool UseShiftToPathfind { get; set; }
-        public bool AlwaysRun { get; set; }
-        public bool AlwaysRunUnlessHidden { get; set; }
+        public bool AlwaysRun { get; set; } = true;
+        public bool AlwaysRunUnlessHidden { get; set; } = true;
         public bool FastRotation { get; set; }
         public bool SmoothMovements { get; set; } = true;
-        public bool HoldDownKeyTab { get; set; } = true;
+        public bool HoldDownKeyTab { get; set; } = false;
         public bool HoldShiftForContext { get; set; } = false;
         public bool HoldShiftToSplitStack { get; set; } = false;
 
@@ -223,15 +223,15 @@ namespace ClassicUO.Configuration
         [JsonConverter(typeof(Point2Converter))] public Point TopbarGumpPosition { get; set; } = new Point(0, 0);
         public bool TopbarGumpIsMinimized { get; set; }
         public bool TopbarGumpIsDisabled { get; set; }
-        public bool UseAlternativeLights { get; set; }
-        public bool UseCustomLightLevel { get; set; }
-        public byte LightLevel { get; set; }
-        public int LightLevelType { get; set; } // 0 = absolute, 1 = minimum
+        public bool UseAlternativeLights { get; set; } = true;
+        public bool UseCustomLightLevel { get; set; } = true;
+        public byte LightLevel { get; set; } = 10;
+        public int LightLevelType { get; set; } = 1; // 0 = absolute, 1 = minimum
         public bool UseColoredLights { get; set; } = true;
         public bool UseDarkNights { get; set; }
         public int CloseHealthBarType { get; set; } // 0 = none, 1 == not exists, 2 == is dead
-        public bool ActivateChatAfterEnter { get; set; }
-        public bool ActivateChatAdditionalButtons { get; set; } = true;
+        public bool ActivateChatAfterEnter { get; set; } = true;
+        public bool ActivateChatAdditionalButtons { get; set; } = false;
         public bool ActivateChatShiftEnterSupport { get; set; } = true;
         public bool UseObjectsFading { get; set; } = true;
         public bool HoldDownKeyAltToCloseAnchored { get; set; } = true;
@@ -243,8 +243,8 @@ namespace ClassicUO.Configuration
         // Experimental
         public bool CastSpellsByOneClick { get; set; }
         public bool SaveGumpsRelativeToCenter { get; set; }
-        public bool BuffBarTime { get; set; }
-        public bool BuffBarShowId { get; set; } = true;
+        public bool BuffBarTime { get; set; } = true;
+        public bool BuffBarShowId { get; set; } = false;
         public bool FastSpellsAssign { get; set; }
         public bool AutoOpenDoors { get; set; }
         public bool SmoothDoors { get; set; }
@@ -296,16 +296,16 @@ namespace ClassicUO.Configuration
         public bool NameOverheadShowGump { get; set; } = true;
         public bool NameOverheadShowHpBar { get; set; } = true;
         public bool ShowTargetRangeIndicator { get; set; }
-        public bool PartyInviteGump { get; set; }
+        public bool PartyInviteGump { get; set; } = true;
         public bool CustomBarsToggled { get; set; }
         public bool StatusbarColorsEnabled { get; set; } = true;
         public int StatusbarColorOpacity { get; set; } = 80;
         public bool CBBlackBGToggled { get; set; }
         public bool ShowStatValuesOnBars { get; set; }
-        public bool ShowDistanceOnHealthBar { get; set; }
+        public bool ShowDistanceOnHealthBar { get; set; } = true;
 
         // Modern (fully procedural, scalable) status bars. Colors are 0xRRGGBB.
-        public bool ModernBarsToggled { get; set; }
+        public bool ModernBarsToggled { get; set; } = true;
         public int ModernBarScale { get; set; } = 100; // percent, applies to every modern bar
         public int ModernBarPaletteVersion { get; set; }
         public bool ModernBarShowValues { get; set; } = true;
@@ -325,16 +325,16 @@ namespace ClassicUO.Configuration
         public bool ShowInfoBar { get; set; }
         public int InfoBarHighlightType { get; set; } // 0 = text colour changes, 1 = underline
 
-        public bool CounterBarEnabled { get; set; }
+        public bool CounterBarEnabled { get; set; } = true;
         public bool CounterBarHighlightOnChange { get; set; } = true;
         public bool CounterBarHighlightOnAmount { get; set; }
-        public bool CounterBarDisplayAbbreviatedAmount { get; set; }
+        public bool CounterBarDisplayAbbreviatedAmount { get; set; } = true;
         public int CounterBarAbbreviatedAmount { get; set; } = 1000;
         public int CounterBarHighlightAmount { get; set; } = 5;
         public int CounterBarCellSize { get; set; } = 40;
-        public bool CounterBarUseFixedGrid { get; set; } = false;
-        public bool CounterBarShowVitals { get; set; }
-        public int CounterBarRows { get; set; } = 3;
+        public bool CounterBarUseFixedGrid { get; set; } = true;
+        public bool CounterBarShowVitals { get; set; } = true;
+        public int CounterBarRows { get; set; } = 2;
         public int CounterBarColumns { get; set; } = 10;
 
         // Grid layout for plugin-opened, grouped status bars: bars stack down a
@@ -353,8 +353,8 @@ namespace ClassicUO.Configuration
         public bool ShadowsStatics { get; set; } = true;
         public int TerrainShadowsLevel { get; set; } = 15;
         public int AuraUnderFeetType { get; set; } // 0 = NO, 1 = in warmode, 2 = ctrl+shift, 3 = always
-        public bool AuraOnMouse { get; set; } = true;
-        public bool AnimatedWaterEffect { get; set; } = false;
+        public bool AuraOnMouse { get; set; } = false;
+        public bool AnimatedWaterEffect { get; set; } = true;
 
         public bool PartyAura { get; set; }
 
@@ -362,7 +362,7 @@ namespace ClassicUO.Configuration
 
         public bool HideChatGradient { get; set; } = false;
 
-        public bool StandardSkillsGump { get; set; } = true;
+        public bool StandardSkillsGump { get; set; } = false;
 
         public bool ShowNewMobileNameIncoming { get; set; } = true;
         public bool ShowNewCorpseNameIncoming { get; set; } = true;
@@ -375,7 +375,7 @@ namespace ClassicUO.Configuration
 
         // Draw the grid-container panel (backdrop + cells) in a pale/light color instead of the
         // default dark. Off = dark (unchanged for existing users).
-        public bool GridContainerLightBackground { get; set; }
+        public bool GridContainerLightBackground { get; set; } = true;
 
         // Keep the historical fixed-size paged grid when enabled. When disabled,
         // grid containers are scrollable and resizable (the default).
@@ -395,7 +395,7 @@ namespace ClassicUO.Configuration
 
         public bool JournalDarkMode { get; set; }
 
-        public byte ContainersScale { get; set; } = 100;
+        public byte ContainersScale { get; set; } = 110;
 
         public bool ScaleItemsInsideContainers { get; set; }
 
@@ -405,10 +405,10 @@ namespace ClassicUO.Configuration
 
         public bool RelativeDragAndDropItems { get; set; }
 
-        public bool AllowItemsOutsideContainerBounds { get; set; }
+        public bool AllowItemsOutsideContainerBounds { get; set; } = true;
 
         // 0 = Standard (default), 1 = Grid, 2 = Toggle
-        public int ContainerViewMode { get; set; }
+        public int ContainerViewMode { get; set; } = 2;
 
         // In Toggle mode, the view used for a serial the user has never toggled.
         // false = standard, true = grid.
@@ -420,16 +420,16 @@ namespace ClassicUO.Configuration
         [JsonPropertyName("container_grid_states"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public Dictionary<uint, bool> LegacyContainerGridStates { get => null; set { if (value != null) ContainerGridStates = value; } }
 
-        public bool HighlightContainerWhenSelected { get; set; }
+        public bool HighlightContainerWhenSelected { get; set; } = true;
 
         public bool UseNewTargetSystem { get; set; } = true;
-        public bool NewTargetSystemUseNameOverhead { get; set; }
+        public bool NewTargetSystemUseNameOverhead { get; set; } = true;
         public bool UseKrEquipUnequipPacket { get; set; }
-        public bool ShowHouseContent { get; set; }
+        public bool ShowHouseContent { get; set; } = true;
         public bool SaveHealthbars { get; set; }
         public bool TextFading { get; set; } = true;
 
-        public bool UseSmoothBoatMovement { get; set; } = false;
+        public bool UseSmoothBoatMovement { get; set; } = true;
 
         public bool IgnoreStaminaCheck { get; set; } = false;
 
@@ -467,7 +467,7 @@ namespace ClassicUO.Configuration
         public static uint GumpsVersion { get; private set; }
 
         //Alternate Journal
-        public bool UseAlternateJournal { get; set; }
+        public bool UseAlternateJournal { get; set; } = true;
         public Dictionary<string, MessageType[]> JournalTabs { get; } = new Dictionary<string, MessageType[]>()
         {
             { "All", new MessageType[] {

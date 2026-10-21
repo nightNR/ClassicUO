@@ -12,7 +12,7 @@ namespace ClassicUO.UnitTests.Game.UI
         {
             var p = new Profile();
 
-            Assert.Equal(0, p.ContainerViewMode);
+            Assert.Equal(2, p.ContainerViewMode);
             Assert.False(p.ContainerToggleDefaultGrid);
             Assert.NotNull(p.ContainerGridStates);
             Assert.Empty(p.ContainerGridStates);
