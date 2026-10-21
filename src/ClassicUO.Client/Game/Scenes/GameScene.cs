@@ -1073,8 +1073,10 @@ namespace ClassicUO.Game.Scenes
                 return false;
             }
 
-            if (CheckDeathScreen(batcher))
+            if (IsDeathScreenActive())
             {
+                ClearWorldTargetsForDeathScreen(batcher, renderTargets);
+
                 return true;
             }
 
@@ -1297,6 +1299,18 @@ namespace ClassicUO.Game.Scenes
 
         public override void DrawUI(UltimaBatcher2D batcher)
         {
+            if (IsDeathScreenActive())
+            {
+                _youAreDeadText.Draw(
+                    batcher,
+                    Camera.Bounds.X + (Camera.Bounds.Width / 2 - _youAreDeadText.Width / 2),
+                    Camera.Bounds.Bottom / 2,
+                    0f
+                );
+
+                return;
+            }
+
             _healthLinesManager.Draw(batcher, 0f);
 
             if (!UIManager.IsMouseOverWorld)
@@ -1364,32 +1378,25 @@ namespace ClassicUO.Game.Scenes
             TEXT_ALIGN_TYPE.TS_LEFT
         );
 
-        private bool CheckDeathScreen(UltimaBatcher2D batcher)
+        private bool IsDeathScreenActive()
         {
-            if (
-                ProfileManager.CurrentProfile != null
+            return ProfileManager.CurrentProfile != null
                 && ProfileManager.CurrentProfile.EnableDeathScreen
-            )
-            {
-                if (_world.InGame)
-                {
-                    if (_world.Player.IsDead && _world.Player.DeathScreenTimer > Time.Ticks)
-                    {
-                        batcher.Begin();
-                        _youAreDeadText.Draw(
-                            batcher,
-                            Camera.Bounds.X + (Camera.Bounds.Width / 2 - _youAreDeadText.Width / 2),
-                            Camera.Bounds.Bottom / 2,
-                            0f
-                        );
-                        batcher.End();
+                && _world.InGame
+                && _world.Player.IsDead
+                && _world.Player.DeathScreenTimer > Time.Ticks;
+        }
 
-                        return true;
-                    }
-                }
-            }
+        // World/light targets are composited every frame, so blank them instead of leaving the last frame in place.
+        private void ClearWorldTargetsForDeathScreen(UltimaBatcher2D batcher, RenderTargets renderTargets)
+        {
+            GraphicsDevice device = batcher.GraphicsDevice;
 
-            return false;
+            device.SetRenderTarget(renderTargets.WorldRenderTarget);
+            device.Clear(Color.Black);
+
+            device.SetRenderTarget(renderTargets.LightRenderTarget);
+            device.Clear(Color.Transparent);
         }
 
         private void StopFollowing()
