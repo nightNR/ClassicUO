@@ -30,6 +30,8 @@ namespace ClassicUO.Game.UI.Gumps
         private DataBox _dataBox;
         private CounterVitals _counterVitals;
         private int _vitalsIndex;
+        private int _vitalsColSpan = 1;
+        private int _vitalsRowSpan = 1;
         private int _rectSize;
         private ScissorControl _scissor;
 
@@ -215,6 +217,8 @@ namespace ClassicUO.Game.UI.Gumps
             Add(_scissor = new ScissorControl(true, borderSize, borderSize, 0, 0));
             _dataBox = new DataBox(borderSize, borderSize, 0, 0);
             Add(_dataBox);
+            _vitalsColSpan = Math.Max(1, ProfileManager.CurrentProfile.CounterBarVitalsColSpan);
+            _vitalsRowSpan = Math.Max(1, ProfileManager.CurrentProfile.CounterBarVitalsRowSpan);
             SetVitalsVisible(ProfileManager.CurrentProfile.CounterBarShowVitals);
             Add(new ScissorControl(false));
             _dataBox.WantUpdateSize = true;
@@ -272,9 +276,6 @@ namespace ClassicUO.Game.UI.Gumps
             _scissor.Width = width;
             _scissor.Height = height;
 
-            int x = 0;
-            int y = 0;
-
             if (_dataBox?.Children.Count == 0 && _helpTextLabel == null)
             {
                 Add(_helpTextLabel = new Label(ResGumps.CounterEmptyHelpText, true, HELP_TEXT_HUE)
@@ -294,50 +295,41 @@ namespace ClassicUO.Game.UI.Gumps
                 _helpTextLabel = null;
             }
 
-            if (_useFixedGrid)
+            int cols = _useFixedGrid ? _cols : Math.Max(1, width / _rectSize);
+            int maxRowSpan = _useFixedGrid ? _rows : int.MaxValue;
+
+            var live = new List<Control>();
+            var spans = new List<(int colSpan, int rowSpan)>();
+
+            foreach (Control c in _dataBox.Children)
             {
-                _scrollOffset = Math.Clamp(_scrollOffset, 0, CounterBarGridMath.MaxScroll(_dataBox.Children.Count, _rows, _cols));
-
-                for (int i = 0; i < _dataBox.Children.Count; i++)
+                if (c.IsDisposed)
                 {
-                    Control c = _dataBox.Children[i];
-                    if (c.IsDisposed)
-                    {
-                        continue;
-                    }
-
-                    int col = i % _cols;
-                    int row = i / _cols;
-
-                    c.X = col * _rectSize + BORDER_LEFT;
-                    c.Y = (row - _scrollOffset) * _rectSize + BORDER_TOP;
-                    c.Width = _rectSize - BORDER_LEFT - BORDER_RIGHT;
-                    c.Height = _rectSize - BORDER_TOP - BORDER_BOTTOM;
-                }
-
-                return;
-            }
-
-            for (int i = 0; i < _dataBox.Children.Count; i++)
-            {
-                Control c = _dataBox.Children[i];
-                if (!c.IsDisposed)
-                {
-                    c.X = x + BORDER_LEFT;
-                    c.Y = y + BORDER_TOP;
-                    c.Width = _rectSize - BORDER_LEFT - BORDER_RIGHT;
-                    c.Height = _rectSize - BORDER_TOP - BORDER_BOTTOM;
-
-                    x += _rectSize;
-
-                    if (x + _rectSize > width)
-                    {
-                        x = 0;
-                        y += _rectSize;
-                    }
-
                     continue;
                 }
+
+                live.Add(c);
+                spans.Add(c == _counterVitals
+                    ? (_vitalsColSpan, Math.Min(_vitalsRowSpan, maxRowSpan))
+                    : (1, 1));
+            }
+
+            var placed = CounterBarGridMath.Layout(spans, cols);
+
+            if (_useFixedGrid)
+            {
+                _scrollOffset = Math.Clamp(_scrollOffset, 0, Math.Max(0, CounterBarGridMath.TotalRows(placed) - _rows));
+            }
+
+            for (int i = 0; i < live.Count; i++)
+            {
+                Control c = live[i];
+                var p = placed[i];
+
+                c.X = p.col * _rectSize + BORDER_LEFT;
+                c.Y = (p.row - _scrollOffset) * _rectSize + BORDER_TOP;
+                c.Width = p.colSpan * _rectSize - BORDER_LEFT - BORDER_RIGHT;
+                c.Height = p.rowSpan * _rectSize - BORDER_TOP - BORDER_BOTTOM;
             }
         }
 
@@ -381,7 +373,7 @@ namespace ClassicUO.Game.UI.Gumps
                 return;
             }
 
-            int maxScroll = CounterBarGridMath.MaxScroll(_dataBox.Children.Count, _rows, _cols);
+            int maxScroll = Math.Max(0, CounterBarGridMath.TotalRows(PlaceItems(_cols)) - _rows);
 
             if (delta == Input.MouseEventType.WheelScrollUp)
             {
@@ -420,6 +412,28 @@ namespace ClassicUO.Game.UI.Gumps
             {
                 GameActions.Print(World, string.Format(ResGumps.CounterErrorSlotNotValid, slotString));
             }
+        }
+
+        private (int col, int row, int colSpan, int rowSpan)[] PlaceItems(int cols)
+        {
+            var spans = new List<(int colSpan, int rowSpan)>();
+
+            foreach (Control c in _dataBox.Children)
+            {
+                if (!c.IsDisposed)
+                {
+                    spans.Add(c == _counterVitals ? (_vitalsColSpan, Math.Min(_vitalsRowSpan, _rows)) : (1, 1));
+                }
+            }
+
+            return CounterBarGridMath.Layout(spans, cols);
+        }
+
+        public void SetVitalsSpan(int colSpan, int rowSpan)
+        {
+            _vitalsColSpan = Math.Max(1, colSpan);
+            _vitalsRowSpan = Math.Max(1, rowSpan);
+            SetupLayout();
         }
 
         public void SetVitalsVisible(bool visible)

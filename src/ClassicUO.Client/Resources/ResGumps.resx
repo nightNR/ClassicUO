@@ -339,6 +339,12 @@
   <data name="CounterShowVitals" xml:space="preserve">
     <value>Show HP/Mana/Stamina in first counter slot</value>
   </data>
+  <data name="CounterVitalsColSpan" xml:space="preserve">
+    <value>Vitals colspan</value>
+  </data>
+  <data name="CounterVitalsRowSpan" xml:space="preserve">
+    <value>Vitals rowspan</value>
+  </data>
   <data name="ShowHP" xml:space="preserve">
     <value>Show HP</value>
   </data>

@@ -334,6 +334,8 @@ namespace ClassicUO.Configuration
         public int CounterBarCellSize { get; set; } = 40;
         public bool CounterBarUseFixedGrid { get; set; } = true;
         public bool CounterBarShowVitals { get; set; } = true;
+        public int CounterBarVitalsColSpan { get; set; } = 1;
+        public int CounterBarVitalsRowSpan { get; set; } = 1;
         public int CounterBarRows { get; set; } = 2;
         public int CounterBarColumns { get; set; } = 10;
 

@@ -38,5 +38,40 @@ namespace ClassicUO.UnitTests.Game.UI
         {
             Assert.Equal(expected, CounterBarGridMath.MaxScroll(items, rows, cols));
         }
+
+        [Fact]
+        public void Layout_NoSpans_FillsRowByRow()
+        {
+            var placed = CounterBarGridMath.Layout(new[] { (1, 1), (1, 1), (1, 1) }, 2);
+            Assert.Equal((0, 0), (placed[0].col, placed[0].row));
+            Assert.Equal((1, 0), (placed[1].col, placed[1].row));
+            Assert.Equal((0, 1), (placed[2].col, placed[2].row));
+        }
+
+        [Fact]
+        public void Layout_TwoByTwoFirstItem_PushesOthersAround()
+        {
+            var placed = CounterBarGridMath.Layout(new[] { (2, 2), (1, 1), (1, 1), (1, 1) }, 4);
+            Assert.Equal((0, 0, 2, 2), placed[0]);
+            Assert.Equal((2, 0), (placed[1].col, placed[1].row));
+            Assert.Equal((3, 0), (placed[2].col, placed[2].row));
+            Assert.Equal((2, 1), (placed[3].col, placed[3].row));
+            Assert.Equal(2, CounterBarGridMath.TotalRows(placed));
+        }
+
+        [Fact]
+        public void Layout_ColSpanWiderThanGrid_IsClamped()
+        {
+            var placed = CounterBarGridMath.Layout(new[] { (5, 1), (1, 1) }, 3);
+            Assert.Equal((0, 0, 3, 1), placed[0]);
+            Assert.Equal((0, 1), (placed[1].col, placed[1].row));
+        }
+
+        [Fact]
+        public void Layout_SpanInMiddle_WrapsToNextRowWhenItDoesNotFit()
+        {
+            var placed = CounterBarGridMath.Layout(new[] { (1, 1), (1, 1), (2, 1) }, 3);
+            Assert.Equal((0, 1), (placed[2].col, placed[2].row));
+        }
     }
 }

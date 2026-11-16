@@ -3880,6 +3880,24 @@ namespace ClassicUO.Resources {
         }
 
         /// <summary>
+        ///   Looks up a localized string similar to Vitals colspan.
+        /// </summary>
+        public static string CounterVitalsColSpan {
+            get {
+                return ResourceManager.GetString("CounterVitalsColSpan", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Vitals rowspan.
+        /// </summary>
+        public static string CounterVitalsRowSpan {
+            get {
+                return ResourceManager.GetString("CounterVitalsRowSpan", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to Show HP/Mana/Stamina in first counter slot.
         /// </summary>
         public static string CounterShowVitals {

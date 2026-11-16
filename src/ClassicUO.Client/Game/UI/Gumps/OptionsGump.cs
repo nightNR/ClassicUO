@@ -61,6 +61,7 @@ namespace ClassicUO.Game.UI.Gumps
 
         //counters
         private Checkbox _enableCounters, _highlightOnChange, _highlightOnAmount, _enableAbbreviatedAmount, _useFixedGridCheckbox, _showCounterVitals;
+        private InputField _vitalsColSpan, _vitalsRowSpan;
         private Checkbox _enableDragSelect, _dragSelectHumanoidsOnly, _dragSelectHostileOnly;
 
         // sounds
@@ -3094,6 +3095,40 @@ namespace ClassicUO.Game.UI.Gumps
 
             startY += _showCounterVitals.Height + 2;
 
+            int spanX = startX + 20;
+
+            _vitalsColSpan = AddInputField
+            (
+                rightArea,
+                spanX,
+                startY,
+                50,
+                TEXTBOX_HEIGHT,
+                ResGumps.CounterVitalsColSpan,
+                50,
+                false,
+                true,
+                3
+            );
+            _vitalsColSpan.SetText(_currentProfile.CounterBarVitalsColSpan.ToString());
+
+            _vitalsRowSpan = AddInputField
+            (
+                rightArea,
+                spanX + 150,
+                startY,
+                50,
+                TEXTBOX_HEIGHT,
+                ResGumps.CounterVitalsRowSpan,
+                50,
+                false,
+                true,
+                3
+            );
+            _vitalsRowSpan.SetText(_currentProfile.CounterBarVitalsRowSpan.ToString());
+
+            startY += TEXTBOX_HEIGHT + 8;
+
             _highlightOnChange = AddCheckBox
             (
                 rightArea,
@@ -4492,6 +4527,8 @@ namespace ClassicUO.Game.UI.Gumps
                 case 9: // counters
                     _enableCounters.IsChecked = false;
                     _showCounterVitals.IsChecked = false;
+                    _vitalsColSpan.SetText("1");
+                    _vitalsRowSpan.SetText("1");
                     _highlightOnChange.IsChecked = false;
                     _enableAbbreviatedAmount.IsChecked = false;
                     _useFixedGridCheckbox.IsChecked = false;
@@ -4999,6 +5036,21 @@ namespace ClassicUO.Game.UI.Gumps
             _currentProfile.CounterBarCellSize = _cellSize.Value;
             _currentProfile.CounterBarShowVitals = _showCounterVitals.IsChecked;
 
+            if (!int.TryParse(_vitalsColSpan.Text, out int vitalsColSpan) || vitalsColSpan < 1)
+            {
+                vitalsColSpan = 1;
+                _vitalsColSpan.SetText("1");
+            }
+
+            if (!int.TryParse(_vitalsRowSpan.Text, out int vitalsRowSpan) || vitalsRowSpan < 1)
+            {
+                vitalsRowSpan = 1;
+                _vitalsRowSpan.SetText("1");
+            }
+
+            _currentProfile.CounterBarVitalsColSpan = vitalsColSpan;
+            _currentProfile.CounterBarVitalsRowSpan = vitalsRowSpan;
+
             _currentProfile.CounterBarHighlightOnChange = _highlightOnChange.IsChecked;
 
             if (!int.TryParse(_highlightAmount.Text, out int v))
@@ -5068,6 +5120,7 @@ namespace ClassicUO.Game.UI.Gumps
             }
 
             counterGump?.SetVitalsVisible(_currentProfile.CounterBarShowVitals);
+            counterGump?.SetVitalsSpan(_currentProfile.CounterBarVitalsColSpan, _currentProfile.CounterBarVitalsRowSpan);
 
             // experimental
             // Reset nested checkboxes if parent checkbox is unchecked
